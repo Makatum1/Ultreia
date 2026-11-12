@@ -1,0 +1,6 @@
+{
+  "name": "Ultreia",
+  "description": "Guía de viaje y diario del Camino de Santiago con etapas, GPX, mapa interactivo, alojamientos y exportación a PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
