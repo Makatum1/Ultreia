@@ -84,7 +84,6 @@ fun SettingsActionMenu(
                     Column {
                         Text(viewModel.string("language"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         val langLabel = when (currentLang) {
-                            LanguageMode.SYSTEM -> viewModel.string("lang_system")
                             LanguageMode.ES -> viewModel.string("lang_es")
                             LanguageMode.EN -> viewModel.string("lang_en")
                         }
@@ -166,15 +165,6 @@ fun SettingsActionMenu(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ThemeOptionRow(
-                        title = viewModel.string("lang_system"),
-                        subtitle = "Default system language",
-                        isSelected = currentLang == LanguageMode.SYSTEM,
-                        onClick = {
-                            viewModel.setLanguageMode(LanguageMode.SYSTEM)
-                            showLangDialog = false
-                        }
-                    )
                     ThemeOptionRow(
                         title = viewModel.string("lang_es"),
                         subtitle = "Español (Castellano)",

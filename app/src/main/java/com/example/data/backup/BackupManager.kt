@@ -12,155 +12,342 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.text.Normalizer
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+
+data class ParsedCaminoData(
+    val camino: CaminoEntity,
+    val stages: List<StageEntity>,
+    val accommodationsByStageIndex: Map<Int, List<AccommodationEntity>>
+)
+
+data class ImportConflict(
+    val importedTitle: String,
+    val existingCamino: CaminoEntity,
+    val parsedData: ParsedCaminoData
+)
 
 object BackupManager {
 
-    suspend fun exportAllCaminosJson(context: Context, repository: CaminoRepository): File? = withContext(Dispatchers.IO) {
-        try {
-            val caminos = repository.getAllCaminosOnce()
-            val root = JSONObject()
-            root.put("version", 1)
-            root.put("appName", "Ultreia")
-            root.put("exportedAt", System.currentTimeMillis())
-
-            val caminosArray = JSONArray()
-            for (camino in caminos) {
-                val stages = repository.getStagesForCaminoOnce(camino.id)
-                val allAccommodations = repository.getAllAccommodationsForCaminoOnce(camino.id)
-                val accMap = allAccommodations.groupBy { it.stageId }
-
-                val caminoObj = serializeCamino(camino, stages, accMap)
-                caminosArray.put(caminoObj)
-            }
-            root.put("caminos", caminosArray)
-
-            val outputDir = File(context.cacheDir, "backups")
-            if (!outputDir.exists()) outputDir.mkdirs()
-            val backupFile = File(outputDir, "Ultreia_Todos_los_Caminos_Backup.json")
-            FileOutputStream(backupFile).use { fos ->
-                fos.write(root.toString(2).toByteArray(Charsets.UTF_8))
-            }
-
-            withContext(Dispatchers.Main) {
-                shareBackupFile(context, backupFile, "Copia de Seguridad Completa - Ultreia")
-            }
-            backupFile
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+    fun normalizeName(s: String): String {
+        return Normalizer.normalize(s.trim(), Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+            .lowercase()
     }
 
-    suspend fun exportSingleCaminoJson(context: Context, caminoId: Long, repository: CaminoRepository): File? = withContext(Dispatchers.IO) {
-        try {
-            val camino = repository.getCaminoByIdOnce(caminoId) ?: return@withContext null
+    fun capitalizeFirst(s: String): String {
+        val trimmed = s.trim()
+        return if (trimmed.isNotEmpty()) {
+            trimmed.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        } else trimmed
+    }
+
+    /**
+     * Serializes caminos to JSON string
+     */
+    suspend fun serializeCaminosToJson(
+        caminos: List<CaminoEntity>,
+        repository: CaminoRepository
+    ): String = withContext(Dispatchers.IO) {
+        val root = JSONObject()
+        root.put("version", 2)
+        root.put("appName", "Ultreia")
+        root.put("exportedAt", System.currentTimeMillis())
+
+        val caminosArray = JSONArray()
+        for (camino in caminos) {
             val stages = repository.getStagesForCaminoOnce(camino.id)
             val allAccommodations = repository.getAllAccommodationsForCaminoOnce(camino.id)
             val accMap = allAccommodations.groupBy { it.stageId }
 
-            val root = JSONObject()
-            root.put("version", 1)
-            root.put("appName", "Ultreia")
-            root.put("exportedAt", System.currentTimeMillis())
+            val caminoObj = serializeCamino(camino, stages, accMap)
+            caminosArray.put(caminoObj)
+        }
+        root.put("caminos", caminosArray)
+        root.toString(2)
+    }
 
-            val caminosArray = JSONArray()
-            caminosArray.put(serializeCamino(camino, stages, accMap))
-            root.put("caminos", caminosArray)
-
+    /**
+     * Generates a ZIP file containing the backup JSON and shares it
+     */
+    suspend fun exportToZip(
+        context: Context,
+        caminos: List<CaminoEntity>,
+        zipFileName: String,
+        shareSubject: String,
+        repository: CaminoRepository
+    ): File? = withContext(Dispatchers.IO) {
+        try {
+            val jsonString = serializeCaminosToJson(caminos, repository)
             val outputDir = File(context.cacheDir, "backups")
             if (!outputDir.exists()) outputDir.mkdirs()
-            val sanitized = camino.title.trim()
-                .replace("\\s+".toRegex(), "_")
-                .replace("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ_-]".toRegex(), "_")
-                .ifBlank { "Camino_${camino.id}" }
-            val backupFile = File(outputDir, "${sanitized}_Backup.json")
-            FileOutputStream(backupFile).use { fos ->
-                fos.write(root.toString(2).toByteArray(Charsets.UTF_8))
+
+            val zipFile = File(outputDir, if (zipFileName.endsWith(".zip", ignoreCase = true)) zipFileName else "$zipFileName.zip")
+            FileOutputStream(zipFile).use { fos ->
+                ZipOutputStream(fos).use { zos ->
+                    val entry = ZipEntry("ultreia_backup.json")
+                    zos.putNextEntry(entry)
+                    zos.write(jsonString.toByteArray(Charsets.UTF_8))
+                    zos.closeEntry()
+                }
             }
 
             withContext(Dispatchers.Main) {
-                shareBackupFile(context, backupFile, "Copia de Seguridad: ${camino.title}")
+                shareFile(context, zipFile, "application/zip", shareSubject)
             }
-            backupFile
+            zipFile
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
 
-    suspend fun importFromJson(jsonString: String, repository: CaminoRepository): Result<Int> = withContext(Dispatchers.IO) {
+    /**
+     * Single Camino export as JSON (replaces Exportar CSV)
+     */
+    suspend fun exportSingleCaminoJson(
+        context: Context,
+        caminoId: Long,
+        repository: CaminoRepository
+    ): File? = withContext(Dispatchers.IO) {
         try {
-            val root = JSONObject(jsonString)
-            val caminosArray = root.optJSONArray("caminos") ?: return@withContext Result.failure(Exception("Formato no válido: no se encontraron caminos"))
-            var importedCount = 0
+            val camino = repository.getCaminoByIdOnce(caminoId) ?: return@withContext null
+            val jsonString = serializeCaminosToJson(listOf(camino), repository)
 
-            for (i in 0 until caminosArray.length()) {
-                val caminoObj = caminosArray.getJSONObject(i)
-                val newCamino = CaminoEntity(
-                    id = 0,
-                    title = caminoObj.optString("title", "Camino Importado"),
-                    subtitle = caminoObj.optString("subtitle", ""),
-                    coverPhotoResName = caminoObj.optString("coverPhotoResName", "img_camino_hero"),
-                    coverPhotoUri = caminoObj.optString("coverPhotoUri").takeIf { it.isNotBlank() },
-                    pilgrimName = caminoObj.optString("pilgrimName", ""),
-                    startDate = caminoObj.optString("startDate", ""),
-                    totalEstimatedKm = caminoObj.optDouble("totalEstimatedKm", 0.0),
-                    isTravelGuide = caminoObj.optBoolean("isTravelGuide", false),
-                    attachedFilesJson = caminoObj.optString("attachedFilesJson", "[]")
-                )
-                val newCaminoId = repository.insertCamino(newCamino)
+            val outputDir = File(context.cacheDir, "backups")
+            if (!outputDir.exists()) outputDir.mkdirs()
 
-                val stagesArray = caminoObj.optJSONArray("stages") ?: JSONArray()
-                for (j in 0 until stagesArray.length()) {
-                    val stageObj = stagesArray.getJSONObject(j)
-                    val newStage = StageEntity(
-                        id = 0,
-                        caminoId = newCaminoId,
-                        dayNumber = stageObj.optInt("dayNumber", j + 1),
-                        date = stageObj.optString("date", ""),
-                        title = stageObj.optString("title", "Etapa ${j + 1}"),
-                        origin = stageObj.optString("origin", ""),
-                        destination = stageObj.optString("destination", ""),
-                        distanceKm = stageObj.optDouble("distanceKm", 0.0),
-                        elevationGainM = stageObj.optInt("elevationGainM", 0),
-                        elevationLossM = stageObj.optInt("elevationLossM", 0),
-                        estimatedTime = stageObj.optString("estimatedTime", "5h 00m"),
-                        difficulty = stageObj.optString("difficulty", "Moderada"),
-                        isCompleted = stageObj.optBoolean("isCompleted", false),
-                        completedDate = stageObj.optString("completedDate", ""),
-                        stageNotes = stageObj.optString("stageNotes", ""),
-                        diaryNotes = stageObj.optString("diaryNotes", ""),
-                        diaryPhotoUri = stageObj.optString("diaryPhotoUri").takeIf { it.isNotBlank() },
-                        vivenciasJson = stageObj.optString("vivenciasJson", "[]"),
-                        attachedFilesJson = stageObj.optString("attachedFilesJson", "[]"),
-                        gpxTrackJson = stageObj.optString("gpxTrackJson").takeIf { it.isNotBlank() }
-                    )
-                    val newStageId = repository.insertStage(newStage)
+            val sanitized = camino.title.trim()
+                .replace("\\s+".toRegex(), "_")
+                .replace("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ_-]".toRegex(), "_")
+                .ifBlank { "Camino_${camino.id}" }
+            val jsonFile = File(outputDir, "${sanitized}_export.json")
+            FileOutputStream(jsonFile).use { fos ->
+                fos.write(jsonString.toByteArray(Charsets.UTF_8))
+            }
 
-                    val accArray = stageObj.optJSONArray("accommodations") ?: JSONArray()
-                    for (k in 0 until accArray.length()) {
-                        val accObj = accArray.getJSONObject(k)
-                        val newAcc = AccommodationEntity(
-                            id = 0,
-                            stageId = newStageId,
-                            name = accObj.optString("name", "Alojamiento"),
-                            address = accObj.optString("address", ""),
-                            phone = accObj.optString("phone", ""),
-                            roomOptionsJson = accObj.optString("roomOptionsJson", "[]"),
-                            notes = accObj.optString("notes", ""),
-                            isBooked = accObj.optBoolean("isBooked", false)
-                        )
-                        repository.insertAccommodation(newAcc)
+            withContext(Dispatchers.Main) {
+                shareFile(context, jsonFile, "application/json", "Exportación: ${camino.title}")
+            }
+            jsonFile
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * Complete backup: all caminos and all travels across both profiles in a single ZIP
+     */
+    suspend fun exportAllBackupZip(
+        context: Context,
+        repository: CaminoRepository
+    ): File? = withContext(Dispatchers.IO) {
+        val allCaminos = repository.getAllCaminosOnce()
+        exportToZip(
+            context = context,
+            caminos = allCaminos,
+            zipFileName = "Ultreia_Backup_Completo.zip",
+            shareSubject = "Copia de Seguridad Completa - Ultreia (ZIP)",
+            repository = repository
+        )
+    }
+
+    /**
+     * Reads file from URI, which can be either a .zip or a .json file
+     */
+    suspend fun readJsonFromUri(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext null
+            val headerBytes = ByteArray(4)
+            val bufferedStream = BufferedInputStream(inputStream)
+            bufferedStream.mark(4)
+            val bytesRead = bufferedStream.read(headerBytes, 0, 4)
+            bufferedStream.reset()
+
+            // Check if ZIP magic number: 0x50 0x4B 0x03 0x04 ("PK..")
+            val isZip = bytesRead == 4 &&
+                    headerBytes[0] == 0x50.toByte() &&
+                    headerBytes[1] == 0x4B.toByte() &&
+                    headerBytes[2] == 0x03.toByte() &&
+                    headerBytes[3] == 0x04.toByte()
+
+            if (isZip) {
+                ZipInputStream(bufferedStream).use { zis ->
+                    var entry: ZipEntry? = zis.nextEntry
+                    while (entry != null) {
+                        if (!entry.isDirectory && entry.name.endsWith(".json", ignoreCase = true)) {
+                            return@withContext zis.bufferedReader(Charsets.UTF_8).readText()
+                        }
+                        entry = zis.nextEntry
                     }
                 }
-                importedCount++
+                null
+            } else {
+                bufferedStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             }
-            Result.success(importedCount)
         } catch (e: Exception) {
-            Result.failure(e)
+            e.printStackTrace()
+            null
         }
+    }
+
+    /**
+     * Parses the JSON into structured ParsedCaminoData
+     */
+    fun parseJsonContent(jsonString: String): List<ParsedCaminoData> {
+        val list = mutableListOf<ParsedCaminoData>()
+        val root = JSONObject(jsonString)
+        val caminosArray = root.optJSONArray("caminos") ?: return emptyList()
+
+        for (i in 0 until caminosArray.length()) {
+            val caminoObj = caminosArray.getJSONObject(i)
+            val rawTitle = caminoObj.optString("title", "Camino Importado")
+            val rawCapTitle = capitalizeFirst(rawTitle)
+
+            val parsedCamino = CaminoEntity(
+                id = 0,
+                title = rawCapTitle,
+                subtitle = caminoObj.optString("subtitle", ""),
+                coverPhotoResName = caminoObj.optString("coverPhotoResName", "img_camino_hero"),
+                coverPhotoUri = caminoObj.optString("coverPhotoUri").takeIf { it.isNotBlank() },
+                pilgrimName = caminoObj.optString("pilgrimName", ""),
+                startDate = caminoObj.optString("startDate", ""),
+                totalEstimatedKm = caminoObj.optDouble("totalEstimatedKm", 0.0),
+                isTravelGuide = caminoObj.optBoolean("isTravelGuide", false),
+                attachedFilesJson = caminoObj.optString("attachedFilesJson", "[]")
+            )
+
+            val stagesArray = caminoObj.optJSONArray("stages") ?: JSONArray()
+            val stagesList = mutableListOf<StageEntity>()
+            val accMap = mutableMapOf<Int, MutableList<AccommodationEntity>>()
+
+            for (j in 0 until stagesArray.length()) {
+                val stageObj = stagesArray.getJSONObject(j)
+                val stage = StageEntity(
+                    id = 0,
+                    caminoId = 0,
+                    dayNumber = stageObj.optInt("dayNumber", j + 1),
+                    date = stageObj.optString("date", ""),
+                    title = stageObj.optString("title", "Etapa ${j + 1}"),
+                    origin = stageObj.optString("origin", ""),
+                    destination = stageObj.optString("destination", ""),
+                    distanceKm = stageObj.optDouble("distanceKm", 0.0),
+                    elevationGainM = stageObj.optInt("elevationGainM", 0),
+                    elevationLossM = stageObj.optInt("elevationLossM", 0),
+                    estimatedTime = stageObj.optString("estimatedTime", "5h 00m"),
+                    difficulty = stageObj.optString("difficulty", "Moderada"),
+                    isCompleted = stageObj.optBoolean("isCompleted", false),
+                    completedDate = stageObj.optString("completedDate", ""),
+                    stageNotes = stageObj.optString("stageNotes", ""),
+                    diaryNotes = stageObj.optString("diaryNotes", ""),
+                    diaryPhotoUri = stageObj.optString("diaryPhotoUri").takeIf { it.isNotBlank() },
+                    vivenciasJson = stageObj.optString("vivenciasJson", "[]"),
+                    attachedFilesJson = stageObj.optString("attachedFilesJson", "[]"),
+                    gpxTrackJson = stageObj.optString("gpxTrackJson").takeIf { it.isNotBlank() }
+                )
+                stagesList.add(stage)
+
+                val accArray = stageObj.optJSONArray("accommodations") ?: JSONArray()
+                val accList = mutableListOf<AccommodationEntity>()
+                for (k in 0 until accArray.length()) {
+                    val accObj = accArray.getJSONObject(k)
+                    val acc = AccommodationEntity(
+                        id = 0,
+                        stageId = 0,
+                        name = accObj.optString("name", "Alojamiento"),
+                        address = accObj.optString("address", ""),
+                        phone = accObj.optString("phone", ""),
+                        roomOptionsJson = accObj.optString("roomOptionsJson", "[]"),
+                        notes = accObj.optString("notes", ""),
+                        isBooked = accObj.optBoolean("isBooked", false)
+                    )
+                    accList.add(acc)
+                }
+                accMap[j] = accList
+            }
+
+            list.add(ParsedCaminoData(parsedCamino, stagesList, accMap))
+        }
+
+        return list
+    }
+
+    /**
+     * Checks if any parsed camino matches existing ones ignoring case and accents
+     */
+    suspend fun findConflicts(
+        parsedList: List<ParsedCaminoData>,
+        repository: CaminoRepository
+    ): List<ImportConflict> = withContext(Dispatchers.IO) {
+        val existing = repository.getAllCaminosOnce()
+        val conflicts = mutableListOf<ImportConflict>()
+
+        for (parsed in parsedList) {
+            val normParsed = normalizeName(parsed.camino.title)
+            val match = existing.firstOrNull { normalizeName(it.title) == normParsed }
+            if (match != null) {
+                conflicts.add(ImportConflict(parsed.camino.title, match, parsed))
+            }
+        }
+        conflicts
+    }
+
+    /**
+     * Inserts or overwrites the caminos into repository
+     */
+    suspend fun applyImport(
+        parsedList: List<ParsedCaminoData>,
+        overwrittenCaminoIds: Set<Long>,
+        repository: CaminoRepository
+    ): Int = withContext(Dispatchers.IO) {
+        val existing = repository.getAllCaminosOnce()
+        var importedCount = 0
+
+        for (parsed in parsedList) {
+            val normParsed = normalizeName(parsed.camino.title)
+            val match = existing.firstOrNull { normalizeName(it.title) == normParsed }
+
+            val targetCaminoId: Long
+            if (match != null && overwrittenCaminoIds.contains(match.id)) {
+                // Overwrite existing: delete old stages and update camino
+                val oldStages = repository.getStagesForCaminoOnce(match.id)
+                for (oldStage in oldStages) {
+                    repository.deleteStage(oldStage)
+                }
+                val updatedCamino = parsed.camino.copy(id = match.id)
+                repository.updateCamino(updatedCamino)
+                targetCaminoId = match.id
+            } else if (match != null) {
+                // If conflict but user declined overwrite, skip this item
+                continue
+            } else {
+                // Create new with first letter capitalized
+                val capTitle = capitalizeFirst(parsed.camino.title)
+                val newCamino = parsed.camino.copy(id = 0, title = capTitle)
+                targetCaminoId = repository.insertCamino(newCamino)
+            }
+
+            // Insert stages & accommodations
+            for ((index, stage) in parsed.stages.withIndex()) {
+                val newStage = stage.copy(id = 0, caminoId = targetCaminoId)
+                val newStageId = repository.insertStage(newStage)
+
+                val accommodations = parsed.accommodationsByStageIndex[index] ?: emptyList()
+                for (acc in accommodations) {
+                    val newAcc = acc.copy(id = 0, stageId = newStageId)
+                    repository.insertAccommodation(newAcc)
+                }
+            }
+            importedCount++
+        }
+        importedCount
     }
 
     private fun serializeCamino(
@@ -220,19 +407,19 @@ object BackupManager {
         return obj
     }
 
-    private fun shareBackupFile(context: Context, file: File, title: String) {
+    private fun shareFile(context: Context, file: File, mimeType: String, title: String) {
         val uri: Uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             file
         )
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
+            type = mimeType
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, title)
-            putExtra(Intent.EXTRA_TEXT, "Copia de seguridad en formato JSON generada con Ultreia.")
+            putExtra(Intent.EXTRA_TEXT, "Archivo generado con Ultreia.")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "Compartir Copia de Seguridad"))
+        context.startActivity(Intent.createChooser(intent, "Compartir con"))
     }
 }

@@ -167,6 +167,177 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             CaminoStats(0, 0, 0.0, 0.0, 0, 0, 0)
         )
 
+    val totalCaminosCount: StateFlow<Int> = caminos
+        .map { list -> list.count { !it.isTravelGuide } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val totalTripsCount: StateFlow<Int> = caminos
+        .map { list -> list.count { it.isTravelGuide } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val totalAllRoutesCount: StateFlow<Int> = caminos
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val totalAllStagesCount: StateFlow<Int> = repository.allStages
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    // Conflict state for import overwriting
+    data class ConflictDialogState(
+        val conflict: com.example.data.backup.ImportConflict,
+        val parsedList: List<com.example.data.backup.ParsedCaminoData>,
+        val remainingConflicts: List<com.example.data.backup.ImportConflict>,
+        val acceptedOverwriteIds: Set<Long>
+    )
+
+    private val _conflictDialogState = MutableStateFlow<ConflictDialogState?>(null)
+    val conflictDialogState: StateFlow<ConflictDialogState?> = _conflictDialogState.asStateFlow()
+
+    fun resolveConflict(overwrite: Boolean) {
+        val state = _conflictDialogState.value ?: return
+        val newAccepted = if (overwrite) state.acceptedOverwriteIds + state.conflict.existingCamino.id else state.acceptedOverwriteIds
+        if (state.remainingConflicts.isNotEmpty()) {
+            _conflictDialogState.value = ConflictDialogState(
+                conflict = state.remainingConflicts.first(),
+                parsedList = state.parsedList,
+                remainingConflicts = state.remainingConflicts.drop(1),
+                acceptedOverwriteIds = newAccepted
+            )
+        } else {
+            _conflictDialogState.value = null
+            viewModelScope.launch {
+                _isExportingPdf.value = true
+                try {
+                    val count = com.example.data.backup.BackupManager.applyImport(
+                        state.parsedList,
+                        newAccepted,
+                        repository
+                    )
+                    _userMessage.value = "¡Importación completada! ($count rutas procesadas)"
+                    val first = repository.getAllCaminosOnce().firstOrNull()
+                    if (first != null) selectCamino(first.id)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    _userMessage.value = "Error al aplicar importación: ${e.message}"
+                } finally {
+                    _isExportingPdf.value = false
+                }
+            }
+        }
+    }
+
+    fun cancelAllConflicts() {
+        _conflictDialogState.value = null
+    }
+
+    fun importFromUri(context: Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            _isExportingPdf.value = true
+            try {
+                val jsonString = com.example.data.backup.BackupManager.readJsonFromUri(context, uri)
+                if (jsonString.isNullOrBlank()) {
+                    _userMessage.value = "No se pudo leer el archivo o el ZIP no contiene datos válidos."
+                    return@launch
+                }
+                val parsed = com.example.data.backup.BackupManager.parseJsonContent(jsonString)
+                if (parsed.isEmpty()) {
+                    _userMessage.value = "No se encontraron rutas válidas en el archivo importado."
+                    return@launch
+                }
+                val conflicts = com.example.data.backup.BackupManager.findConflicts(parsed, repository)
+                if (conflicts.isNotEmpty()) {
+                    _conflictDialogState.value = ConflictDialogState(
+                        conflict = conflicts.first(),
+                        parsedList = parsed,
+                        remainingConflicts = conflicts.drop(1),
+                        acceptedOverwriteIds = emptySet()
+                    )
+                } else {
+                    val count = com.example.data.backup.BackupManager.applyImport(parsed, emptySet(), repository)
+                    _userMessage.value = "¡Importación completada con éxito! ($count rutas añadidas)"
+                    val first = repository.getAllCaminosOnce().firstOrNull()
+                    if (first != null) selectCamino(first.id)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _userMessage.value = "Error al importar: ${e.message}"
+            } finally {
+                _isExportingPdf.value = false
+            }
+        }
+    }
+
+    fun addPredefinedCamino(route: com.example.data.sample.PredefinedRouteInfo) {
+        viewModelScope.launch {
+            val newId = com.example.data.sample.SampleData.createPredefinedCamino(route, repository)
+            selectCamino(newId)
+            _userMessage.value = "¡${route.title} creado correctamente!"
+        }
+    }
+
+    fun exportZip(context: Context, caminoIds: List<Long>, isAll: Boolean, title: String) {
+        viewModelScope.launch {
+            _isExportingPdf.value = true
+            try {
+                val list = if (isAll) repository.getAllCaminosOnce() else caminoIds.mapNotNull { repository.getCaminoByIdOnce(it) }
+                val fileName = if (isAll) "Ultreia_Rutas_Export.zip" else "${title.replace("\\s+".toRegex(), "_")}.zip"
+                val file = com.example.data.backup.BackupManager.exportToZip(
+                    context = context,
+                    caminos = list,
+                    zipFileName = fileName,
+                    shareSubject = "Exportación: $title",
+                    repository = repository
+                )
+                if (file != null) {
+                    _userMessage.value = "ZIP generado y listo para compartir"
+                } else {
+                    _userMessage.value = "Error al generar archivo ZIP"
+                }
+            } catch (e: Exception) {
+                _userMessage.value = "Error al exportar ZIP: ${e.message}"
+            } finally {
+                _isExportingPdf.value = false
+            }
+        }
+    }
+
+    fun exportAllBackupZip(context: Context) {
+        viewModelScope.launch {
+            _isExportingPdf.value = true
+            try {
+                val file = com.example.data.backup.BackupManager.exportAllBackupZip(context, repository)
+                if (file != null) {
+                    _userMessage.value = "Backup completo ZIP listo para compartir"
+                } else {
+                    _userMessage.value = "Error al generar backup completo"
+                }
+            } catch (e: Exception) {
+                _userMessage.value = "Error: ${e.message}"
+            } finally {
+                _isExportingPdf.value = false
+            }
+        }
+    }
+
+    fun exportSingleCaminoJson(context: Context, caminoId: Long) {
+        viewModelScope.launch {
+            _isExportingPdf.value = true
+            try {
+                val file = com.example.data.backup.BackupManager.exportSingleCaminoJson(context, caminoId, repository)
+                if (file != null) {
+                    _userMessage.value = "Ruta exportada en formato JSON"
+                } else {
+                    _userMessage.value = "Error al exportar ruta"
+                }
+            } catch (e: Exception) {
+                _userMessage.value = "Error al exportar: ${e.message}"
+            } finally {
+                _isExportingPdf.value = false
+            }
+        }
+    }
+
     private val _selectedStageId = MutableStateFlow<Long?>(null)
     val selectedStageId: StateFlow<Long?> = _selectedStageId.asStateFlow()
 
@@ -852,53 +1023,5 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             array.put(obj)
         }
         return array.toString()
-    }
-
-    // Backup & Restore
-    fun exportAllBackup(context: Context) {
-        viewModelScope.launch {
-            _isExportingPdf.value = true
-            try {
-                val file = com.example.data.backup.BackupManager.exportAllCaminosJson(context, repository)
-                if (file != null) {
-                    _userMessage.value = "Copia de seguridad completa lista para compartir"
-                } else {
-                    _userMessage.value = "Error al generar copia de seguridad"
-                }
-            } finally {
-                _isExportingPdf.value = false
-            }
-        }
-    }
-
-    fun exportSingleBackup(context: Context, caminoId: Long) {
-        viewModelScope.launch {
-            _isExportingPdf.value = true
-            try {
-                val file = com.example.data.backup.BackupManager.exportSingleCaminoJson(context, caminoId, repository)
-                if (file != null) {
-                    _userMessage.value = "Copia del camino/viaje lista para compartir"
-                } else {
-                    _userMessage.value = "Error al generar copia del camino"
-                }
-            } finally {
-                _isExportingPdf.value = false
-            }
-        }
-    }
-
-    fun importBackup(jsonString: String) {
-        viewModelScope.launch {
-            val result = com.example.data.backup.BackupManager.importFromJson(jsonString, repository)
-            result.onSuccess { count ->
-                _userMessage.value = "¡Restaurados $count caminos/viajes correctamente!"
-                val first = repository.getAllCaminosOnce().firstOrNull()
-                if (first != null) {
-                    selectCamino(first.id)
-                }
-            }.onFailure { err ->
-                _userMessage.value = "Error al importar copia de seguridad: ${err.message}"
-            }
-        }
     }
 }

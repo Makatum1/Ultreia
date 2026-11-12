@@ -11,7 +11,6 @@ enum class ThemeMode {
 }
 
 enum class LanguageMode {
-    SYSTEM,
     ES,
     EN
 }
@@ -19,12 +18,7 @@ enum class LanguageMode {
 object AppStrings {
 
     fun get(key: String, language: LanguageMode): String {
-        val isEn = when (language) {
-            LanguageMode.EN -> true
-            LanguageMode.ES -> false
-            LanguageMode.SYSTEM -> false // Ultreia defaults to Spanish in all default/system settings
-        }
-
+        val isEn = language == LanguageMode.EN
         return if (isEn) enStrings[key] ?: esStrings[key] ?: key
         else esStrings[key] ?: key
     }
@@ -37,21 +31,24 @@ object AppStrings {
         "your_routes_desc" to "Elige un camino o viaje para ver sus etapas organizadas por fechas, mapa y memorias.",
         "caminos_title" to "Caminos Disponibles",
         "new_camino" to "Nuevo Camino",
+        "new_trip" to "Nuevo Viaje",
         "tab_caminos" to "Caminos",
+        "tab_trips" to "Viajes",
         "tab_stages" to "Etapas",
+        "tab_days" to "Días",
         "tab_map" to "Mapa",
-        "tab_stats" to "Estadísticas",
+        "tab_stats" to "Datos",
         "settings" to "Ajustes",
         "theme" to "Tema Visual",
-        "theme_system" to "Sistema (por defecto)",
+        "theme_system" to "Sistema",
         "theme_light" to "Modo Claro",
         "theme_dark" to "Modo Oscuro",
         "language" to "Idioma",
-        "lang_system" to "Sistema (por defecto)",
         "lang_es" to "Español",
         "lang_en" to "English",
-        "export_pdf" to "Exportar a PDF",
+        "export_pdf" to "Exportar PDF",
         "export_pdf_desc" to "Guía de viaje profesional con portada, mapa y consejos.",
+        "export_json" to "Exportar",
         "stage_tips" to "Consejos del Día",
         "see_more" to "... Ver más",
         "see_less" to "Ver menos",
@@ -82,7 +79,21 @@ object AppStrings {
         "completed_stages" to "Etapas Finalizadas",
         "progress" to "Progreso General",
         "total_distance" to "Distancia Recorrida",
-        "remaining_distance" to "Por Recorrer"
+        "remaining_distance" to "Por Recorrer",
+        "total_stages" to "Total de etapas",
+        "total_caminos" to "Total de caminos",
+        "total_trips" to "Total de viajes",
+        "main_routes" to "Principales Rutas",
+        "empty_import_trip" to "Importar Viaje",
+        "empty_add_sample_trip" to "Añadir Viaje de Prueba",
+        "empty_import_camino" to "Importar Camino",
+        "empty_add_sample_camino" to "Añadir Camino de Prueba",
+        "export_import_title" to "Exportar e Importar",
+        "export_btn" to "Exportar",
+        "import_btn" to "Importar",
+        "export_complete_backup" to "Exportar Backup Completo",
+        "import_complete_backup" to "Importar Backup Completo",
+        "english_route_hint" to "Se recomienda realizar el Camino por el trazado antiguo"
     )
 
     private val enStrings = mapOf(
@@ -93,21 +104,24 @@ object AppStrings {
         "your_routes_desc" to "Select a Camino or trip to explore daily stages by date, map route, and travel memories.",
         "caminos_title" to "Available Caminos",
         "new_camino" to "New Camino",
+        "new_trip" to "New Trip",
         "tab_caminos" to "Caminos",
+        "tab_trips" to "Trips",
         "tab_stages" to "Stages",
+        "tab_days" to "Days",
         "tab_map" to "Map",
-        "tab_stats" to "Statistics",
+        "tab_stats" to "Data",
         "settings" to "Settings",
         "theme" to "Display Theme",
-        "theme_system" to "System (default)",
+        "theme_system" to "System",
         "theme_light" to "Light Mode",
         "theme_dark" to "Dark Mode",
         "language" to "Language",
-        "lang_system" to "System (default)",
         "lang_es" to "Español",
         "lang_en" to "English",
-        "export_pdf" to "Export to PDF",
+        "export_pdf" to "Export PDF",
         "export_pdf_desc" to "Professional travel guide with cover, maps, and tips.",
+        "export_json" to "Export",
         "stage_tips" to "Tips of the Day",
         "see_more" to "... See more",
         "see_less" to "See less",
@@ -138,7 +152,21 @@ object AppStrings {
         "completed_stages" to "Completed Stages",
         "progress" to "Total Progress",
         "total_distance" to "Distance Covered",
-        "remaining_distance" to "Remaining"
+        "remaining_distance" to "Remaining",
+        "total_stages" to "Total stages",
+        "total_caminos" to "Total Caminos",
+        "total_trips" to "Total Trips",
+        "main_routes" to "Main Routes",
+        "empty_import_trip" to "Import Trip",
+        "empty_add_sample_trip" to "Add Sample Trip",
+        "empty_import_camino" to "Import Camino",
+        "empty_add_sample_camino" to "Add Sample Camino",
+        "export_import_title" to "Export and Import",
+        "export_btn" to "Export",
+        "import_btn" to "Import",
+        "export_complete_backup" to "Export Complete Backup",
+        "import_complete_backup" to "Import Complete Backup",
+        "english_route_hint" to "It is recommended to take the Camino along the ancient route"
     )
 
     /**

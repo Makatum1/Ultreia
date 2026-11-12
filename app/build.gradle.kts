@@ -26,11 +26,18 @@ android {
   // and updating Android apps in AI Studio.
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      val keystorePath = project.findProperty("RELEASE_KEYSTORE_PATH") as String?
+        ?: System.getenv("KEYSTORE_PATH")
+        ?: "C:/Users/perez/Desktop/basura/Aplicacion/keystore/travelcash"
       storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      storePassword = project.findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
+        ?: System.getenv("STORE_PASSWORD")
+        ?: "Caminocash26"
+      keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
+        ?: "travelcash"
+      keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+        ?: System.getenv("KEY_PASSWORD")
+        ?: "Caminocash26"
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")

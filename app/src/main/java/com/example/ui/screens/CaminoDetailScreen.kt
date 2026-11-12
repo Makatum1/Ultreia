@@ -107,14 +107,14 @@ fun CaminoDetailScreen(
                         )
                     }
 
-                    // Export Camino Backup (JSON)
+                    // Export Camino (JSON)
                     IconButton(
-                        onClick = { viewModel.exportSingleBackup(context, camino.id) },
-                        modifier = Modifier.testTag("camino_export_backup_button")
+                        onClick = { viewModel.exportSingleCaminoJson(context, camino.id) },
+                        modifier = Modifier.testTag("camino_export_json_button")
                     ) {
                         Icon(
-                            Icons.Default.Backup,
-                            contentDescription = "Exportar Backup de ${camino.title}",
+                            Icons.Default.FileDownload,
+                            contentDescription = "Exportar ${camino.title}",
                             tint = CaminoBlue
                         )
                     }
@@ -281,22 +281,44 @@ fun StagesListTab(
             CaminoHeaderBanner(camino = camino, stats = stats)
         }
 
-        // Share Travel Memories (PDF) button
+        // Export Actions: Exportar PDF & Exportar (JSON)
         item {
-            Button(
-                onClick = { viewModel.exportToPdf(context) },
-                colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("btn_share_travel_memories")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Compartir memorias de viaje",
-                    fontWeight = FontWeight.Bold
-                )
+                Button(
+                    onClick = { viewModel.exportToPdf(context) },
+                    colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("btn_export_pdf_camino")
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Exportar PDF",
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { viewModel.exportSingleCaminoJson(context, camino.id) },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("btn_export_json_camino")
+                ) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Exportar",
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
             }
         }
 

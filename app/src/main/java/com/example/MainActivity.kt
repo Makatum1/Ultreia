@@ -18,16 +18,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -81,12 +82,14 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
     val stats by viewModel.caminoStats.collectAsStateWithLifecycle()
     val isExportingPdf by viewModel.isExportingPdf.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
+    val conflictDialogState by viewModel.conflictDialogState.collectAsStateWithLifecycle()
 
     var showAddStageDialog by remember { mutableStateOf(false) }
     var stageToEdit by remember { mutableStateOf<com.example.data.model.StageEntity?>(null) }
     var showSettingsModal by remember { mutableStateOf(false) }
 
     // Splash Screen on launch: 4 seconds duration or tap to enter
+    // Displays ONLY the image (no icon on top), shifted slightly to the left
     var showSplash by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -104,7 +107,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 painter = painterResource(id = R.drawable.portada_splash),
                 contentDescription = "Portada Ultreia",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                alignment = BiasAlignment(-0.20f, 0f)
             )
         }
         return
@@ -132,24 +136,6 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
         }
     }
 
-    val coroutineScope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(initialPage = currentTab.ordinal, pageCount = { 5 })
-
-    // Sync swiping between tabs with ViewModel
-    LaunchedEffect(pagerState.currentPage) {
-        val targetTab = MainTab.values().getOrNull(pagerState.currentPage) ?: MainTab.CAMINOS
-        if (currentTab != targetTab) {
-            viewModel.selectTab(targetTab)
-        }
-    }
-
-    // Sync ViewModel programmatic tab selection with Pager animation
-    LaunchedEffect(currentTab) {
-        if (pagerState.currentPage != currentTab.ordinal) {
-            pagerState.animateScrollToPage(currentTab.ordinal)
-        }
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
@@ -160,11 +146,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             ) {
                 // Button 1: Caminos
                 NavigationBarItem(
-                    selected = (pagerState.currentPage == 0 || currentTab == MainTab.CAMINOS) && destination !is NavigationDestination.StageDetail,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                        viewModel.selectTab(MainTab.CAMINOS)
-                    },
+                    selected = currentTab == MainTab.CAMINOS && destination !is NavigationDestination.StageDetail,
+                    onClick = { viewModel.selectTab(MainTab.CAMINOS) },
                     icon = { Icon(Icons.Default.Hiking, contentDescription = null) },
                     label = { Text(viewModel.string("tab_caminos")) },
                     colors = NavigationBarItemDefaults.colors(
@@ -176,11 +159,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
 
                 // Button 2: Etapas
                 NavigationBarItem(
-                    selected = (pagerState.currentPage == 1 || currentTab == MainTab.STAGES) && destination !is NavigationDestination.StageDetail,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
-                        viewModel.selectTab(MainTab.STAGES)
-                    },
+                    selected = currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail,
+                    onClick = { viewModel.selectTab(MainTab.STAGES) },
                     icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
                     label = { Text(viewModel.string("tab_stages")) },
                     colors = NavigationBarItemDefaults.colors(
@@ -192,11 +172,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
 
                 // Button 3: Mapa
                 NavigationBarItem(
-                    selected = (pagerState.currentPage == 2 || currentTab == MainTab.MAP) && destination !is NavigationDestination.StageDetail,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                        viewModel.selectTab(MainTab.MAP)
-                    },
+                    selected = currentTab == MainTab.MAP && destination !is NavigationDestination.StageDetail,
+                    onClick = { viewModel.selectTab(MainTab.MAP) },
                     icon = { Icon(Icons.Default.Map, contentDescription = null) },
                     label = { Text(viewModel.string("tab_map")) },
                     colors = NavigationBarItemDefaults.colors(
@@ -206,13 +183,10 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     modifier = Modifier.testTag("btn_bottom_map")
                 )
 
-                // Button 4: Estadísticas
+                // Button 4: Datos (formerly Estadísticas)
                 NavigationBarItem(
-                    selected = (pagerState.currentPage == 3 || currentTab == MainTab.STATS) && destination !is NavigationDestination.StageDetail,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(3) }
-                        viewModel.selectTab(MainTab.STATS)
-                    },
+                    selected = currentTab == MainTab.STATS && destination !is NavigationDestination.StageDetail,
+                    onClick = { viewModel.selectTab(MainTab.STATS) },
                     icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
                     label = { Text(viewModel.string("tab_stats")) },
                     colors = NavigationBarItemDefaults.colors(
@@ -224,11 +198,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
 
                 // Button 5: Ajustes
                 NavigationBarItem(
-                    selected = (pagerState.currentPage == 4 || currentTab == MainTab.SETTINGS) && destination !is NavigationDestination.StageDetail,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(4) }
-                        viewModel.selectTab(MainTab.SETTINGS)
-                    },
+                    selected = currentTab == MainTab.SETTINGS && destination !is NavigationDestination.StageDetail,
+                    onClick = { viewModel.selectTab(MainTab.SETTINGS) },
                     icon = { Icon(Icons.Default.Tune, contentDescription = null) },
                     label = { Text(viewModel.string("settings")) },
                     colors = NavigationBarItemDefaults.colors(
@@ -240,7 +211,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             }
         },
         floatingActionButton = {
-            if (pagerState.currentPage == 1 && destination !is NavigationDestination.StageDetail && selectedCamino != null) {
+            if (currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail && selectedCamino != null) {
                 FloatingActionButton(
                     onClick = { showAddStageDialog = true },
                     containerColor = CaminoBlue,
@@ -266,83 +237,64 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     onBack = { viewModel.navigateBack() }
                 )
             } else {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize()
-                ) { page ->
-                    when (page) {
-                        0 -> {
-                            CaminoListScreen(
-                                caminos = caminos,
+                // Direct vertical-only tab rendering: eliminates crashes and lateral swipes
+                when (currentTab) {
+                    MainTab.CAMINOS -> {
+                        CaminoListScreen(
+                            caminos = caminos,
+                            viewModel = viewModel,
+                            onSelectCamino = { id -> viewModel.selectCamino(id) }
+                        )
+                    }
+
+                    MainTab.STAGES -> {
+                        if (selectedCamino != null) {
+                            StagesListTab(
+                                camino = selectedCamino!!,
+                                stages = stages,
+                                stats = stats,
                                 viewModel = viewModel,
-                                onSelectCamino = { id ->
-                                    viewModel.selectCamino(id)
-                                }
+                                onStageClick = { stageId -> viewModel.navigateToStage(stageId) },
+                                onToggleStage = { stage -> viewModel.toggleStageCompletion(stage) },
+                                onEditStage = { stage -> stageToEdit = stage }
+                            )
+                        } else {
+                            NoCaminoSelectedState(
+                                message = "Crea tu primer camino o viaje para ver y gestionar sus etapas diarias.",
+                                onCreateCamino = { viewModel.selectTab(MainTab.CAMINOS) }
                             )
                         }
+                    }
 
-                        1 -> {
-                            if (selectedCamino != null) {
-                                StagesListTab(
-                                    camino = selectedCamino!!,
-                                    stages = stages,
-                                    stats = stats,
-                                    viewModel = viewModel,
-                                    onStageClick = { stageId -> viewModel.navigateToStage(stageId) },
-                                    onToggleStage = { stage -> viewModel.toggleStageCompletion(stage) },
-                                    onEditStage = { stage -> stageToEdit = stage }
-                                )
-                            } else {
-                                NoCaminoSelectedState(
-                                    message = "Crea tu primer camino o viaje para ver y gestionar sus etapas diarias.",
-                                    onCreateCamino = {
-                                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                                    }
-                                )
-                            }
-                        }
-
-                        2 -> {
-                            if (selectedCamino != null) {
-                                InteractiveMapScreen(
-                                    camino = selectedCamino!!,
-                                    stages = stages,
-                                    onStageClick = { stageId -> viewModel.navigateToStage(stageId) }
-                                )
-                            } else {
-                                NoCaminoSelectedState(
-                                    message = "Crea tu primer camino o viaje para ver el mapa interactivo y tus rutas.",
-                                    onCreateCamino = {
-                                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                                    }
-                                )
-                            }
-                        }
-
-                        3 -> {
-                            if (selectedCamino != null) {
-                                StatsScreen(
-                                    camino = selectedCamino!!,
-                                    stages = stages,
-                                    stats = stats,
-                                    viewModel = viewModel
-                                )
-                            } else {
-                                NoCaminoSelectedState(
-                                    message = "Crea tu primer camino o viaje para seguir tus kilómetros y etapas completadas.",
-                                    onCreateCamino = {
-                                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                                    }
-                                )
-                            }
-                        }
-
-                        4 -> {
-                            SettingsScreen(
-                                viewModel = viewModel,
-                                selectedCamino = selectedCamino
+                    MainTab.MAP -> {
+                        if (selectedCamino != null) {
+                            InteractiveMapScreen(
+                                camino = selectedCamino!!,
+                                stages = stages,
+                                onStageClick = { stageId -> viewModel.navigateToStage(stageId) }
+                            )
+                        } else {
+                            NoCaminoSelectedState(
+                                message = "Crea tu primer camino o viaje para ver el mapa interactivo y tus rutas.",
+                                onCreateCamino = { viewModel.selectTab(MainTab.CAMINOS) }
                             )
                         }
+                    }
+
+                    MainTab.STATS -> {
+                        StatsScreen(
+                            camino = selectedCamino,
+                            stages = stages,
+                            stats = stats,
+                            viewModel = viewModel
+                        )
+                    }
+
+                    MainTab.SETTINGS -> {
+                        SettingsScreen(
+                            viewModel = viewModel,
+                            selectedCamino = selectedCamino
+                        )
                     }
                 }
             }
@@ -363,13 +315,48 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 CircularProgressIndicator(color = CaminoBlue)
-                                Text("Generando documento PDF...", fontWeight = FontWeight.Medium)
+                                Text("Procesando datos...", fontWeight = FontWeight.Medium)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // Overwrite Confirmation Dialog for Import Conflicts
+    if (conflictDialogState != null) {
+        val conflict = conflictDialogState!!.conflict
+        val isTravel = conflict.existingCamino.isTravelGuide
+        val entityType = if (isTravel) "el Viaje" else "el Camino"
+        val displayName = conflict.existingCamino.title
+
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelAllConflicts() },
+            title = {
+                Text(
+                    text = "Ruta ya existente",
+                    fontWeight = FontWeight.Bold,
+                    color = CaminoBlue
+                )
+            },
+            text = {
+                Text("El ${if (isTravel) "Viaje" else "Camino"} \"$displayName\" ya existe. ¿Quieres sobreescribirlo junto a todas las etapas?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.resolveConflict(overwrite = true) },
+                    colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
+                ) {
+                    Text("Sí, sobreescribir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.resolveConflict(overwrite = false) }) {
+                    Text("No, omitir")
+                }
+            }
+        )
     }
 
     if (showAddStageDialog && selectedCamino != null) {
@@ -438,24 +425,15 @@ fun SettingsScreen(
 
     var isThemeExpanded by remember { mutableStateOf(false) }
     var isLanguageExpanded by remember { mutableStateOf(false) }
-    var isBackupExpanded by remember { mutableStateOf(false) }
-    var isDataExpanded by remember { mutableStateOf(false) }
+    var isExportImportExpanded by remember { mutableStateOf(true) }
+    var showExportSelectionDialog by remember { mutableStateOf(false) }
 
-    var showConfirmClearDialog by remember { mutableStateOf(false) }
-
-    // JSON file picker launcher for backup restoration
-    val importBackupLauncher = rememberLauncherForActivityResult(
+    // File picker launcher for ZIP and JSON import
+    val importFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader().use { it?.readText() }
-                if (jsonString != null) {
-                    viewModel.importBackup(jsonString)
-                }
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "Error al leer el archivo de copia de seguridad", android.widget.Toast.LENGTH_SHORT).show()
-            }
+            viewModel.importFromUri(context, uri)
         }
     }
 
@@ -474,7 +452,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Personalización, copias de seguridad y preferencias de la aplicación",
+                text = "Personalización, exportación y preferencias de la aplicación",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -556,7 +534,7 @@ fun SettingsScreen(
             }
         }
 
-        // Accordion 2: Idioma (Collapsed by default)
+        // Accordion 2: Idioma (Collapsed by default, only Español and English, NO Sistema)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -580,7 +558,6 @@ fun SettingsScreen(
                                 Text(viewModel.string("language"), fontWeight = FontWeight.Bold)
                                 Text(
                                     when (currentLang) {
-                                        LanguageMode.SYSTEM -> viewModel.string("lang_system")
                                         LanguageMode.ES -> viewModel.string("lang_es")
                                         LanguageMode.EN -> viewModel.string("lang_en")
                                     },
@@ -609,14 +586,8 @@ fun SettingsScreen(
                         ) {
                             HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
                             ThemeOptionRow(
-                                title = viewModel.string("lang_system"),
-                                subtitle = "Default system language",
-                                isSelected = currentLang == LanguageMode.SYSTEM,
-                                onClick = { viewModel.setLanguageMode(LanguageMode.SYSTEM) }
-                            )
-                            ThemeOptionRow(
                                 title = viewModel.string("lang_es"),
-                                subtitle = "Español",
+                                subtitle = "Español (por defecto)",
                                 isSelected = currentLang == LanguageMode.ES,
                                 onClick = { viewModel.setLanguageMode(LanguageMode.ES) }
                             )
@@ -632,7 +603,7 @@ fun SettingsScreen(
             }
         }
 
-        // Accordion 3: Copia de Seguridad y Restauración JSON (Collapsed by default)
+        // Accordion 3: Sección Reconfigurada "Exportar e Importar"
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -644,32 +615,32 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { isBackupExpanded = !isBackupExpanded }
+                            .clickable { isExportImportExpanded = !isExportImportExpanded }
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Backup, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.SwapVert, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text("Copia de Seguridad (Backup)", fontWeight = FontWeight.Bold)
+                                Text(viewModel.string("export_import_title"), fontWeight = FontWeight.Bold)
                                 Text(
-                                    "Importar y exportar datos en formato JSON",
+                                    "Copias de seguridad en formato ZIP y archivos de datos",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                         Icon(
-                            imageVector = if (isBackupExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (isBackupExpanded) "Comprimir" else "Desplegar",
+                            imageVector = if (isExportImportExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExportImportExpanded) "Comprimir" else "Desplegar",
                             tint = CaminoBlue
                         )
                     }
 
                     AnimatedVisibility(
-                        visible = isBackupExpanded,
+                        visible = isExportImportExpanded,
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically()
                     ) {
@@ -681,129 +652,72 @@ fun SettingsScreen(
                         ) {
                             HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
 
-                            // Export all caminos
-                            Button(
-                                onClick = { viewModel.exportAllBackup(context) },
-                                colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                            // 1. Two Main Buttons: "Exportar" e "Importar"
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Icon(Icons.Default.FileDownload, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Exportar TODOS los caminos y viajes (Completo)")
-                            }
+                                Button(
+                                    onClick = { showExportSelectionDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("btn_main_export")
+                                ) {
+                                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(viewModel.string("export_btn"), fontWeight = FontWeight.Bold)
+                                }
 
-                            // Individual camino export section
-                            if (caminos.isNotEmpty()) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = "Exportar un camino o viaje individual:",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = CaminoBlue
-                                )
-
-                                for (cam in caminos) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.exportSingleBackup(context, cam.id) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (cam.isTravelGuide) Icons.Default.Luggage else Icons.Default.Hiking,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp),
-                                            tint = CaminoBlue
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            text = "Exportar \"${cam.title}\"",
-                                            maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                        )
-                                    }
+                                Button(
+                                    onClick = {
+                                        importFileLauncher.launch(arrayOf("application/zip", "application/json", "*/*"))
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("btn_main_import")
+                                ) {
+                                    Icon(Icons.Default.FileUpload, contentDescription = null, tint = CaminoBlueDark, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(viewModel.string("import_btn"), color = CaminoBlueDark, fontWeight = FontWeight.Bold)
                                 }
                             }
 
+                            Spacer(Modifier.height(6.dp))
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                            // Import backup JSON
-                            FilledTonalButton(
-                                onClick = { importBackupLauncher.launch(arrayOf("application/json", "text/*", "*/*")) },
+                            Text(
+                                text = "Copia de Seguridad Global (Backup Completo):",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = CaminoBlue
+                            )
+
+                            // 2. Extra Button: "Exportar Backup Completo"
+                            OutlinedButton(
+                                onClick = { viewModel.exportAllBackupZip(context) },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(Icons.Default.Restore, contentDescription = null)
+                                Icon(Icons.Default.Archive, contentDescription = null, tint = CaminoBlue)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Importar Copia de Seguridad (JSON)")
+                                Text(viewModel.string("export_complete_backup"), fontWeight = FontWeight.Bold)
                             }
-                        }
-                    }
-                }
-            }
-        }
 
-        // Accordion 4: Gestión de Datos (Collapsed by default)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isDataExpanded = !isDataExpanded }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text("Gestión de Datos", fontWeight = FontWeight.Bold)
-                                Text(
-                                    "Reiniciar o borrar todos los datos",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Icon(
-                            imageVector = if (isDataExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (isDataExpanded) "Comprimir" else "Desplegar",
-                            tint = CaminoBlue
-                        )
-                    }
-
-                    AnimatedVisibility(
-                        visible = isDataExpanded,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
-                            Text(
-                                text = "Si deseas comenzar de nuevo desde cero, puedes borrar todas las rutas y datos guardados.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            OutlinedButton(
-                                onClick = { showConfirmClearDialog = true },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                modifier = Modifier.fillMaxWidth()
+                            // 3. Extra Button: "Importar Backup Completo"
+                            FilledTonalButton(
+                                onClick = {
+                                    importFileLauncher.launch(arrayOf("application/zip", "application/json", "*/*"))
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Default.Unarchive, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Borrar todos los caminos y viajes")
+                                Text(viewModel.string("import_complete_backup"), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -814,25 +728,105 @@ fun SettingsScreen(
         item { Spacer(Modifier.height(32.dp)) }
     }
 
-    if (showConfirmClearDialog) {
+    // Export Selection Dialog: All vs Individual (Generates ZIP)
+    if (showExportSelectionDialog) {
         AlertDialog(
-            onDismissRequest = { showConfirmClearDialog = false },
-            title = { Text("¿Borrar todos los caminos y viajes?") },
-            text = { Text("Se eliminarán todas las rutas, etapas, alojamientos y vivencias guardadas. La app volverá al estado inicial.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.clearAllCaminos()
-                        showConfirmClearDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Sí, borrar todo")
+            onDismissRequest = { showExportSelectionDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, tint = CaminoBlue)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Exportar a ZIP", fontWeight = FontWeight.Bold, color = CaminoBlue)
                 }
             },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Elige qué deseas exportar en un archivo comprimido ZIP:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Option: All caminos / viajes
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.exportZip(
+                                    context = context,
+                                    caminoIds = emptyList(),
+                                    isAll = true,
+                                    title = "Todos_los_Caminos_y_Viajes"
+                                )
+                                showExportSelectionDialog = false
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = PilgrimYellow.copy(alpha = 0.25f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.FolderZip, contentDescription = null, tint = CaminoBlueDark)
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text("Todos los viajes y caminos", fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                                Text("Genera un ZIP con todas tus rutas guardadas", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    if (caminos.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "O selecciona una ruta individual:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = CaminoBlue
+                        )
+
+                        for (cam in caminos) {
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.exportZip(
+                                        context = context,
+                                        caminoIds = listOf(cam.id),
+                                        isAll = false,
+                                        title = cam.title
+                                    )
+                                    showExportSelectionDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (cam.isTravelGuide) Icons.Default.Luggage else Icons.Default.Hiking,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = CaminoBlue
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = cam.title,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showConfirmClearDialog = false }) {
-                    Text("Cancelar")
+                TextButton(onClick = { showExportSelectionDialog = false }) {
+                    Text("Cerrar")
                 }
             }
         )
@@ -876,7 +870,7 @@ fun NoCaminoSelectedState(
                     )
                 }
                 Text(
-                    text = "No hay ningún camino o viaje seleccionado",
+                    text = "No hay ninguna ruta seleccionada",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = CaminoBlue,
@@ -895,7 +889,7 @@ fun NoCaminoSelectedState(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Crear tu primer Camino o Viaje", fontWeight = FontWeight.Bold)
+                    Text("Crear tu primera Ruta", fontWeight = FontWeight.Bold)
                 }
             }
         }

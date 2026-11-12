@@ -10,8 +10,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -45,21 +47,22 @@ fun CaminoListScreen(
 ) {
     val isInitialLoadDone by viewModel.isInitialLoadDone.collectAsStateWithLifecycle()
     val isTravelProfile by viewModel.isTravelProfile.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var showAddCaminoDialog by remember { mutableStateOf(false) }
-    var hasAutoShownFirstCaminoDialog by rememberSaveable { mutableStateOf(false) }
+    var showMainRoutesDialog by remember { mutableStateOf(false) }
+
+    val importFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.importFromUri(context, uri)
+        }
+    }
 
     // Filter list according to the active profile (Caminos vs Viajes)
     val filteredCaminos = remember(caminos, isTravelProfile) {
         caminos.filter { it.isTravelGuide == isTravelProfile }
-    }
-
-    // Auto-show create dialog on first fresh launch if everything is empty
-    LaunchedEffect(isInitialLoadDone, caminos) {
-        if (isInitialLoadDone && caminos.isEmpty() && !hasAutoShownFirstCaminoDialog) {
-            showAddCaminoDialog = true
-            hasAutoShownFirstCaminoDialog = true
-        }
     }
 
     var caminoToDelete by remember { mutableStateOf<CaminoEntity?>(null) }
@@ -123,15 +126,32 @@ fun CaminoListScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showAddCaminoDialog = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(if (isTravelProfile) "Nuevo Viaje" else "Nuevo Camino") },
-                containerColor = CaminoBlue,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.testTag("fab_add_camino")
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (!isTravelProfile) {
+                    ExtendedFloatingActionButton(
+                        onClick = { showMainRoutesDialog = true },
+                        icon = { Icon(Icons.Default.Explore, contentDescription = null) },
+                        text = { Text("Principales Rutas") },
+                        containerColor = PilgrimYellow,
+                        contentColor = CaminoBlueDark,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.testTag("fab_main_routes")
+                    )
+                }
+
+                ExtendedFloatingActionButton(
+                    onClick = { showAddCaminoDialog = true },
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text(if (isTravelProfile) "Nuevo Viaje" else "Nuevo Camino") },
+                    containerColor = CaminoBlue,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.testTag("fab_add_camino")
+                )
+            }
         }
     ) { innerPadding ->
         LazyColumn(
@@ -288,25 +308,50 @@ fun CaminoListScreen(
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 text = if (isTravelProfile)
-                                    "Comienza creando tu primera guía de viaje general con tus etapas, alojamientos, archivos y mapas."
+                                    "Comienza importando un archivo o añade un viaje de prueba para ver el funcionamiento."
                                 else
-                                    "Comienza creando tu primera guía del Camino de Santiago con tus etapas, albergues y vivencias.",
+                                    "Comienza importando un archivo o añade un camino de prueba para explorar sus etapas.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
-                            Spacer(Modifier.height(18.dp))
+                            Spacer(Modifier.height(20.dp))
 
+                            // 1. Botón "Importar Viaje" / "Importar Camino"
                             Button(
-                                onClick = { showAddCaminoDialog = true },
+                                onClick = {
+                                    importFileLauncher.launch(arrayOf("application/zip", "application/json", "*/*"))
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.testTag("btn_empty_create_first_camino")
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("btn_empty_import")
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = if (isTravelProfile) "Crear mi primer Viaje" else "Crear mi primer Camino",
+                                    text = if (isTravelProfile) "Importar Viaje" else "Importar Camino",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            // 2. Debajo de este: Botón "Añadir Viaje de Prueba" / "Añadir Camino de Prueba"
+                            FilledTonalButton(
+                                onClick = {
+                                    if (isTravelProfile) viewModel.createSampleTrip() else viewModel.createSampleCamino()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("btn_empty_add_sample")
+                            ) {
+                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = if (isTravelProfile) "Añadir Viaje de Prueba" else "Añadir Camino de Prueba",
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -327,6 +372,16 @@ fun CaminoListScreen(
                 Spacer(Modifier.height(80.dp))
             }
         }
+    }
+
+    if (showMainRoutesDialog) {
+        MainRoutesDialog(
+            onDismiss = { showMainRoutesDialog = false },
+            onSelectRoute = { route ->
+                viewModel.addPredefinedCamino(route)
+                showMainRoutesDialog = false
+            }
+        )
     }
 
     if (showAddCaminoDialog) {
@@ -709,6 +764,121 @@ fun AddCaminoDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
+}
+
+@Composable
+fun MainRoutesDialog(
+    onDismiss: () -> Unit,
+    onSelectRoute: (com.example.data.sample.PredefinedRouteInfo) -> Unit
+) {
+    var selectedRoute by remember { mutableStateOf<com.example.data.sample.PredefinedRouteInfo?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Explore, contentDescription = null, tint = CaminoBlue)
+                Spacer(Modifier.width(8.dp))
+                Text("Principales Rutas", fontWeight = FontWeight.Bold, color = CaminoBlue)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Selecciona una de las rutas históricas oficiales para crear tu guía con sus etapas predefinidas:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                com.example.data.sample.SampleData.PREDEFINED_ROUTES.forEach { route ->
+                    val isChosen = selectedRoute?.title == route.title
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedRoute = route },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isChosen) PilgrimYellowLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        border = if (isChosen) androidx.compose.foundation.BorderStroke(2.dp, CaminoBlue) else null
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = route.title,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CaminoBlueDark
+                                )
+                                Text(
+                                    text = "${route.totalKm.toInt()} km",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CaminoBlue
+                                )
+                            }
+                            Text(
+                                text = route.subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            if (route.note != null) {
+                                Spacer(Modifier.height(6.dp))
+                                Surface(
+                                    color = PilgrimYellow.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = CaminoBlueDark,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = route.note,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = CaminoBlueDark
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    selectedRoute?.let { onSelectRoute(it) }
+                },
+                enabled = selectedRoute != null,
+                colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
+            ) {
+                Text("Crear Camino")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
         }
     )
 }

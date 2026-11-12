@@ -107,7 +107,9 @@ fun InteractiveMapScreen(
         mutableStateOf<StageEntity?>(stages.firstOrNull())
     }
 
+    // Elevation toggle state and dropdown
     var showElevationProfile by remember { mutableStateOf(false) }
+    var showStagesDropdown by remember { mutableStateOf(false) }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
 
     // Prepare JSON payload for the webview with stage-specific colors
@@ -174,11 +176,11 @@ fun InteractiveMapScreen(
             }
         )
 
-        // TOP HEADER OVERLAY: Title of Camino (as in stages) + Layer Selector (No extra buttons)
+        // TOP HEADER OVERLAY: Title of Camino (lowered down to match Etapas screen)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .padding(top = 28.dp, start = 14.dp, end = 14.dp, bottom = 10.dp)
                 .align(Alignment.TopCenter)
                 .shadow(6.dp, RoundedCornerShape(16.dp)),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -280,46 +282,128 @@ fun InteractiveMapScreen(
                     .fillMaxWidth()
                     .padding(12.dp)
             ) {
-                // Header of stages controller: Counter + "Todas" toggle button
+                // Header of stages controller: Exact buttons: 1. "Etapas", 2. "Todos", 3. "Ocultar Etapas"
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Route, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
+                    // Button 1: "Etapas" with vertical dropdown
+                    Box(modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { showStagesDropdown = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_map_control_etapas")
+                        ) {
+                            Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "Etapas",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+
+                        DropdownMenu(
+                            expanded = showStagesDropdown,
+                            onDismissRequest = { showStagesDropdown = false },
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .heightIn(max = 350.dp)
+                        ) {
+                            sortedStages.forEach { stg ->
+                                val isChecked = selectedStageIds.contains(stg.id)
+                                val stageColor = getStageComposeColor(stg.dayNumber)
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .background(stageColor, CircleShape),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "${stg.dayNumber}",
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Día ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${stg.distanceKm} km • +${stg.elevationGainM}m",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedStageIds = setOf(stg.id)
+                                        focusedStage = stg
+                                        showStagesDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Button 2: "Todos"
+                    Button(
+                        onClick = {
+                            selectedStageIds = sortedStages.map { it.id }.toSet()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_map_control_todos")
+                    ) {
+                        Icon(Icons.Default.SelectAll, contentDescription = null, tint = CaminoBlueDark, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "Etapas en el mapa (${selectedStageIds.size}/${sortedStages.size})",
-                            style = MaterialTheme.typography.titleSmall,
+                            text = "Todos",
+                            color = CaminoBlueDark,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = CaminoBlue
+                            maxLines = 1
                         )
                     }
 
-                    val allSelected = selectedStageIds.size == sortedStages.size
-                    FilledTonalButton(
+                    // Button 3: "Ocultar Etapas"
+                    OutlinedButton(
                         onClick = {
-                            selectedStageIds = if (allSelected) {
-                                emptySet()
-                            } else {
-                                sortedStages.map { it.id }.toSet()
-                            }
+                            selectedStageIds = emptySet()
                         },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.testTag("btn_toggle_all_stages")
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .testTag("btn_map_control_ocultar")
                     ) {
-                        Icon(
-                            imageVector = if (allSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = if (allSelected) "Ocultar todas" else "Ver todas",
+                            text = "Ocultar Etapas",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
                         )
                     }
                 }
