@@ -48,28 +48,13 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun UltreiaTheme(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    themeMode: ThemeMode = ThemeMode.LIGHT,
     dynamicColor: Boolean = false, // Preserve brand Camino colors by default
     content: @Composable () -> Unit
 ) {
-    val isSystemDark = isSystemInDarkTheme()
-    val darkTheme = when (themeMode) {
-        ThemeMode.SYSTEM -> isSystemDark
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
-
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+    // La aplicación usa siempre el modo claro (Light Mode) por defecto
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = LightColorScheme,
         typography = Typography,
         content = content
     )

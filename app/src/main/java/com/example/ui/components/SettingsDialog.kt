@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.CaminoViewModel
 import com.example.ui.settings.LanguageMode
-import com.example.ui.settings.ThemeMode
 import com.example.ui.theme.CaminoBlue
 
 @Composable
@@ -24,10 +23,8 @@ fun SettingsActionMenu(
     modifier: Modifier = Modifier
 ) {
     var expandedMenu by remember { mutableStateOf(false) }
-    var showThemeDialog by remember { mutableStateOf(false) }
     var showLangDialog by remember { mutableStateOf(false) }
 
-    val currentTheme by viewModel.themeMode.collectAsState()
     val currentLang by viewModel.languageMode.collectAsState()
 
     Box(modifier = modifier) {
@@ -47,38 +44,6 @@ fun SettingsActionMenu(
             onDismissRequest = { expandedMenu = false },
             modifier = Modifier.width(220.dp)
         ) {
-            DropdownMenuItem(
-                text = {
-                    Column {
-                        Text(viewModel.string("theme"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        val themeLabel = when (currentTheme) {
-                            ThemeMode.SYSTEM -> viewModel.string("theme_system")
-                            ThemeMode.LIGHT -> viewModel.string("theme_light")
-                            ThemeMode.DARK -> viewModel.string("theme_dark")
-                        }
-                        Text(themeLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = when (currentTheme) {
-                            ThemeMode.LIGHT -> Icons.Default.LightMode
-                            ThemeMode.DARK -> Icons.Default.DarkMode
-                            ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
-                        },
-                        contentDescription = null,
-                        tint = CaminoBlue
-                    )
-                },
-                onClick = {
-                    expandedMenu = false
-                    showThemeDialog = true
-                },
-                modifier = Modifier.testTag("menu_item_theme")
-            )
-
-            HorizontalDivider()
-
             DropdownMenuItem(
                 text = {
                     Column {
@@ -102,63 +67,13 @@ fun SettingsActionMenu(
         }
     }
 
-    // Theme Selection Dialog
-    if (showThemeDialog) {
-        AlertDialog(
-            onDismissRequest = { showThemeDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Palette, contentDescription = null, tint = CaminoBlue)
-                    Spacer(Modifier.width(8.dp))
-                    Text(viewModel.string("theme"))
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ThemeOptionRow(
-                        title = viewModel.string("theme_system"),
-                        subtitle = "Sigue la configuración de Android",
-                        isSelected = currentTheme == ThemeMode.SYSTEM,
-                        onClick = {
-                            viewModel.setThemeMode(ThemeMode.SYSTEM)
-                            showThemeDialog = false
-                        }
-                    )
-                    ThemeOptionRow(
-                        title = viewModel.string("theme_light"),
-                        subtitle = "Fondo claro y tonos frescos",
-                        isSelected = currentTheme == ThemeMode.LIGHT,
-                        onClick = {
-                            viewModel.setThemeMode(ThemeMode.LIGHT)
-                            showThemeDialog = false
-                        }
-                    )
-                    ThemeOptionRow(
-                        title = viewModel.string("theme_dark"),
-                        subtitle = "Ideal para ahorro de batería y noche",
-                        isSelected = currentTheme == ThemeMode.DARK,
-                        onClick = {
-                            viewModel.setThemeMode(ThemeMode.DARK)
-                            showThemeDialog = false
-                        }
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showThemeDialog = false }) {
-                    Text(viewModel.string("cancel"))
-                }
-            }
-        )
-    }
-
     // Language Selection Dialog
     if (showLangDialog) {
         AlertDialog(
             onDismissRequest = { showLangDialog = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Translate, contentDescription = null, tint = CaminoBlue)
+                    Icon(Icons.Default.Language, contentDescription = null, tint = CaminoBlue)
                     Spacer(Modifier.width(8.dp))
                     Text(viewModel.string("language"))
                 }
@@ -167,7 +82,7 @@ fun SettingsActionMenu(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ThemeOptionRow(
                         title = viewModel.string("lang_es"),
-                        subtitle = "Español (Castellano)",
+                        subtitle = "Español (por defecto)",
                         isSelected = currentLang == LanguageMode.ES,
                         onClick = {
                             viewModel.setLanguageMode(LanguageMode.ES)
@@ -176,7 +91,7 @@ fun SettingsActionMenu(
                     )
                     ThemeOptionRow(
                         title = viewModel.string("lang_en"),
-                        subtitle = "English (International pilgrim)",
+                        subtitle = "English",
                         isSelected = currentLang == LanguageMode.EN,
                         onClick = {
                             viewModel.setLanguageMode(LanguageMode.EN)
@@ -202,28 +117,29 @@ fun ThemeOptionRow(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
         color = if (isSelected) CaminoBlue.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(10.dp)
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) CaminoBlue else MaterialTheme.colorScheme.outlineVariant
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             RadioButton(
                 selected = isSelected,
                 onClick = onClick,
                 colors = RadioButtonDefaults.colors(selectedColor = CaminoBlue)
             )
-            Spacer(Modifier.width(8.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }

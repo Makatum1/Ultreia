@@ -281,7 +281,13 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             _isExportingPdf.value = true
             try {
                 val list = if (isAll) repository.getAllCaminosOnce() else caminoIds.mapNotNull { repository.getCaminoByIdOnce(it) }
-                val fileName = if (isAll) "Ultreia_Rutas_Export.zip" else "${title.replace("\\s+".toRegex(), "_")}.zip"
+                val fileName = if (isAll) {
+                    "Ultreia_Rutas_Export.zip"
+                } else if (list.size == 1) {
+                    com.example.data.backup.BackupManager.getSanitizedFileName(list.first().title, list.first().isTravelGuide, "zip")
+                } else {
+                    "${title.replace("\\s+".toRegex(), "_")}.zip"
+                }
                 val file = com.example.data.backup.BackupManager.exportToZip(
                     context = context,
                     caminos = list,
@@ -302,15 +308,15 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun exportAllBackupZip(context: Context) {
+    fun exportGlobalBackup(context: Context, backupType: com.example.data.backup.GlobalBackupType) {
         viewModelScope.launch {
             _isExportingPdf.value = true
             try {
-                val file = com.example.data.backup.BackupManager.exportAllBackupZip(context, repository)
+                val file = com.example.data.backup.BackupManager.exportGlobalBackupZip(context, backupType, repository)
                 if (file != null) {
-                    _userMessage.value = "Backup completo ZIP listo para compartir"
+                    _userMessage.value = "Copia de seguridad exportada correctamente"
                 } else {
-                    _userMessage.value = "Error al generar backup completo"
+                    _userMessage.value = "Error al generar copia de seguridad"
                 }
             } catch (e: Exception) {
                 _userMessage.value = "Error: ${e.message}"
@@ -318,6 +324,10 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 _isExportingPdf.value = false
             }
         }
+    }
+
+    fun exportAllBackupZip(context: Context) {
+        exportGlobalBackup(context, com.example.data.backup.GlobalBackupType.COMPLETE_ALL)
     }
 
     fun exportSingleCaminoJson(context: Context, caminoId: Long) {

@@ -14,9 +14,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.text.Normalizer
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -33,6 +35,12 @@ data class ImportConflict(
     val parsedData: ParsedCaminoData
 )
 
+enum class GlobalBackupType {
+    CAMINOS_ONLY,
+    VIAJES_ONLY,
+    COMPLETE_ALL
+}
+
 object BackupManager {
 
     fun normalizeName(s: String): String {
@@ -46,6 +54,24 @@ object BackupManager {
         return if (trimmed.isNotEmpty()) {
             trimmed.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
         } else trimmed
+    }
+
+    /**
+     * Genera la nomenclatura estándar para copias de seguridad:
+     * - Camino: Camino_[Nombre del Título].zip / .json
+     * - Viaje: Viaje_[Nombre del Título].zip / .json
+     */
+    fun getSanitizedFileName(title: String, isTravelGuide: Boolean, extension: String = "zip"): String {
+        val prefix = if (isTravelGuide) "Viaje_" else "Camino_"
+        val clean = title.trim()
+            .replace("\\s+".toRegex(), "_")
+            .replace("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ_-]".toRegex(), "")
+            .removePrefix("Camino_")
+            .removePrefix("Viaje_")
+            .removePrefix("camino_")
+            .removePrefix("viaje_")
+            .ifBlank { "Ruta" }
+        return "${prefix}${clean}.${extension.removePrefix(".")}"
     }
 
     /**
@@ -88,7 +114,8 @@ object BackupManager {
             val outputDir = File(context.cacheDir, "backups")
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val zipFile = File(outputDir, if (zipFileName.endsWith(".zip", ignoreCase = true)) zipFileName else "$zipFileName.zip")
+            val actualName = if (zipFileName.endsWith(".zip", ignoreCase = true)) zipFileName else "$zipFileName.zip"
+            val zipFile = File(outputDir, actualName)
             FileOutputStream(zipFile).use { fos ->
                 ZipOutputStream(fos).use { zos ->
                     val entry = ZipEntry("ultreia_backup.json")
@@ -109,7 +136,8 @@ object BackupManager {
     }
 
     /**
-     * Single Camino export as JSON (replaces Exportar CSV)
+     * Exportación individual de un Camino o Viaje en formato JSON
+     * Aplica la nomenclatura automática Camino_[Nombre] o Viaje_[Nombre]
      */
     suspend fun exportSingleCaminoJson(
         context: Context,
@@ -123,11 +151,8 @@ object BackupManager {
             val outputDir = File(context.cacheDir, "backups")
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val sanitized = camino.title.trim()
-                .replace("\\s+".toRegex(), "_")
-                .replace("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ_-]".toRegex(), "_")
-                .ifBlank { "Camino_${camino.id}" }
-            val jsonFile = File(outputDir, "${sanitized}_export.json")
+            val fileName = getSanitizedFileName(camino.title, camino.isTravelGuide, "json")
+            val jsonFile = File(outputDir, fileName)
             FileOutputStream(jsonFile).use { fos ->
                 fos.write(jsonString.toByteArray(Charsets.UTF_8))
             }
@@ -143,18 +168,61 @@ object BackupManager {
     }
 
     /**
-     * Complete backup: all caminos and all travels across both profiles in a single ZIP
+     * Exportación individual de un Camino o Viaje en formato ZIP
+     * Aplica la nomenclatura automática Camino_[Nombre] o Viaje_[Nombre]
      */
-    suspend fun exportAllBackupZip(
+    suspend fun exportSingleCaminoZip(
         context: Context,
+        caminoId: Long,
+        repository: CaminoRepository
+    ): File? = withContext(Dispatchers.IO) {
+        val camino = repository.getCaminoByIdOnce(caminoId) ?: return@withContext null
+        val fileName = getSanitizedFileName(camino.title, camino.isTravelGuide, "zip")
+        exportToZip(
+            context = context,
+            caminos = listOf(camino),
+            zipFileName = fileName,
+            shareSubject = "Exportación: ${camino.title}",
+            repository = repository
+        )
+    }
+
+    /**
+     * Exportación de la Copia de Seguridad Global con opciones:
+     * 1. CAMINOS_ONLY: Solo Caminos
+     * 2. VIAJES_ONLY: Solo Viajes
+     * 3. COMPLETE_ALL: Tanto Caminos como Viajes
+     */
+    suspend fun exportGlobalBackupZip(
+        context: Context,
+        backupType: GlobalBackupType,
         repository: CaminoRepository
     ): File? = withContext(Dispatchers.IO) {
         val allCaminos = repository.getAllCaminosOnce()
+        val filteredList = when (backupType) {
+            GlobalBackupType.CAMINOS_ONLY -> allCaminos.filter { !it.isTravelGuide }
+            GlobalBackupType.VIAJES_ONLY -> allCaminos.filter { it.isTravelGuide }
+            GlobalBackupType.COMPLETE_ALL -> allCaminos
+        }
+
+        val dateSuffix = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+        val fileName = when (backupType) {
+            GlobalBackupType.CAMINOS_ONLY -> "Caminos_Backup_${dateSuffix}.zip"
+            GlobalBackupType.VIAJES_ONLY -> "Viajes_Backup_${dateSuffix}.zip"
+            GlobalBackupType.COMPLETE_ALL -> "Ultreia_Backup_Completo_${dateSuffix}.zip"
+        }
+
+        val subject = when (backupType) {
+            GlobalBackupType.CAMINOS_ONLY -> "Copia de Seguridad - Todos los Caminos"
+            GlobalBackupType.VIAJES_ONLY -> "Copia de Seguridad - Todos los Viajes"
+            GlobalBackupType.COMPLETE_ALL -> "Copia de Seguridad Completa (Caminos y Viajes)"
+        }
+
         exportToZip(
             context = context,
-            caminos = allCaminos,
-            zipFileName = "Ultreia_Backup_Completo.zip",
-            shareSubject = "Copia de Seguridad Completa - Ultreia (ZIP)",
+            caminos = filteredList,
+            zipFileName = fileName,
+            shareSubject = subject,
             repository = repository
         )
     }
@@ -199,7 +267,8 @@ object BackupManager {
     }
 
     /**
-     * Parses the JSON into structured ParsedCaminoData
+     * Parsea el JSON y separa rigurosamente Caminos y Viajes según el prefijo Camino_ / Viaje_
+     * o la propiedad isTravelGuide, garantizando que nunca se mezclen perfiles.
      */
     fun parseJsonContent(jsonString: String): List<ParsedCaminoData> {
         val list = mutableListOf<ParsedCaminoData>()
@@ -208,8 +277,25 @@ object BackupManager {
 
         for (i in 0 until caminosArray.length()) {
             val caminoObj = caminosArray.getJSONObject(i)
-            val rawTitle = caminoObj.optString("title", "Camino Importado")
-            val rawCapTitle = capitalizeFirst(rawTitle)
+            val rawTitle = caminoObj.optString("title", "Ruta Importada")
+
+            // Reconocimiento de prefijos según requisito 5
+            val isPrefixedViaje = rawTitle.startsWith("Viaje_", ignoreCase = true)
+            val isPrefixedCamino = rawTitle.startsWith("Camino_", ignoreCase = true)
+
+            val isTravelGuide = when {
+                isPrefixedViaje -> true
+                isPrefixedCamino -> false
+                else -> caminoObj.optBoolean("isTravelGuide", false)
+            }
+
+            // Limpieza del título para visualización en app
+            val cleanTitle = rawTitle
+                .removePrefix("Camino_")
+                .removePrefix("Viaje_")
+                .removePrefix("camino_")
+                .removePrefix("viaje_")
+            val rawCapTitle = capitalizeFirst(cleanTitle)
 
             val parsedCamino = CaminoEntity(
                 id = 0,
@@ -220,7 +306,7 @@ object BackupManager {
                 pilgrimName = caminoObj.optString("pilgrimName", ""),
                 startDate = caminoObj.optString("startDate", ""),
                 totalEstimatedKm = caminoObj.optDouble("totalEstimatedKm", 0.0),
-                isTravelGuide = caminoObj.optBoolean("isTravelGuide", false),
+                isTravelGuide = isTravelGuide,
                 attachedFilesJson = caminoObj.optString("attachedFilesJson", "[]")
             )
 
@@ -235,7 +321,7 @@ object BackupManager {
                     caminoId = 0,
                     dayNumber = stageObj.optInt("dayNumber", j + 1),
                     date = stageObj.optString("date", ""),
-                    title = stageObj.optString("title", "Etapa ${j + 1}"),
+                    title = stageObj.optString("title", if (isTravelGuide) "Día ${j + 1}" else "Etapa ${j + 1}"),
                     origin = stageObj.optString("origin", ""),
                     destination = stageObj.optString("destination", ""),
                     distanceKm = stageObj.optDouble("distanceKm", 0.0),
@@ -280,7 +366,7 @@ object BackupManager {
     }
 
     /**
-     * Checks if any parsed camino matches existing ones ignoring case and accents
+     * Checks if any parsed camino matches existing ones in the same profile ignoring case and accents
      */
     suspend fun findConflicts(
         parsedList: List<ParsedCaminoData>,
@@ -291,7 +377,9 @@ object BackupManager {
 
         for (parsed in parsedList) {
             val normParsed = normalizeName(parsed.camino.title)
-            val match = existing.firstOrNull { normalizeName(it.title) == normParsed }
+            val match = existing.firstOrNull { 
+                it.isTravelGuide == parsed.camino.isTravelGuide && normalizeName(it.title) == normParsed 
+            }
             if (match != null) {
                 conflicts.add(ImportConflict(parsed.camino.title, match, parsed))
             }
@@ -312,23 +400,25 @@ object BackupManager {
 
         for (parsed in parsedList) {
             val normParsed = normalizeName(parsed.camino.title)
-            val match = existing.firstOrNull { normalizeName(it.title) == normParsed }
+            val match = existing.firstOrNull { 
+                it.isTravelGuide == parsed.camino.isTravelGuide && normalizeName(it.title) == normParsed 
+            }
 
             val targetCaminoId: Long
             if (match != null && overwrittenCaminoIds.contains(match.id)) {
-                // Overwrite existing: delete old stages and update camino
+                // Overwrite existing in the same profile
                 val oldStages = repository.getStagesForCaminoOnce(match.id)
                 for (oldStage in oldStages) {
                     repository.deleteStage(oldStage)
                 }
-                val updatedCamino = parsed.camino.copy(id = match.id)
+                val updatedCamino = parsed.camino.copy(id = match.id, isTravelGuide = match.isTravelGuide)
                 repository.updateCamino(updatedCamino)
                 targetCaminoId = match.id
             } else if (match != null) {
-                // If conflict but user declined overwrite, skip this item
+                // User declined overwrite, skip
                 continue
             } else {
-                // Create new with first letter capitalized
+                // Create new with first letter capitalized, preserving profile
                 val capTitle = capitalizeFirst(parsed.camino.title)
                 val newCamino = parsed.camino.copy(id = 0, title = capTitle)
                 targetCaminoId = repository.insertCamino(newCamino)
@@ -356,7 +446,10 @@ object BackupManager {
         accMap: Map<Long, List<AccommodationEntity>>
     ): JSONObject {
         val obj = JSONObject()
-        obj.put("title", camino.title)
+        // Prefijo estándar en el título serializado para facilitar portabilidad
+        val prefix = if (camino.isTravelGuide) "Viaje_" else "Camino_"
+        val clean = camino.title.removePrefix("Camino_").removePrefix("Viaje_")
+        obj.put("title", "${prefix}${clean}")
         obj.put("subtitle", camino.subtitle)
         obj.put("coverPhotoResName", camino.coverPhotoResName)
         obj.put("coverPhotoUri", camino.coverPhotoUri ?: "")

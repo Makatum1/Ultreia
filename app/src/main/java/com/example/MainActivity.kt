@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -36,11 +37,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.backup.GlobalBackupType
 import com.example.ui.CaminoViewModel
 import com.example.ui.MainTab
 import com.example.ui.NavigationDestination
@@ -112,6 +115,84 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             )
         }
         return
+    }
+
+    val prefs = remember { context.getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE) }
+    var showWelcomeModal by remember {
+        mutableStateOf(!prefs.getBoolean("hasSeenTravelModeModal", false))
+    }
+
+    if (showWelcomeModal) {
+        AlertDialog(
+            onDismissRequest = {
+                prefs.edit().putBoolean("hasSeenTravelModeModal", true).apply()
+                showWelcomeModal = false
+            },
+            icon = {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(PilgrimYellow.copy(alpha = 0.25f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Luggage,
+                        contentDescription = null,
+                        tint = CaminoBlueDark,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+            },
+            title = {
+                Text(
+                    text = "¡Bienvenido a Ultreia!",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = CaminoBlue
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Ultreia cuenta con dos perfiles para acompañarte en tus aventuras:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Surface(
+                        color = CaminoBlue.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Puedes pulsar el icono de la maleta 🧳 (ubicado en la parte superior) en cualquier momento para cambiar al perfil de Modo Viaje o volver al Modo Caminos.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = CaminoBlueDark,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        prefs.edit().putBoolean("hasSeenTravelModeModal", true).apply()
+                        showWelcomeModal = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Entendido", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -419,14 +500,13 @@ fun SettingsScreen(
     selectedCamino: com.example.data.model.CaminoEntity? = null
 ) {
     val context = LocalContext.current
-    val currentTheme by viewModel.themeMode.collectAsStateWithLifecycle()
     val currentLang by viewModel.languageMode.collectAsStateWithLifecycle()
     val caminos by viewModel.caminos.collectAsStateWithLifecycle()
 
-    var isThemeExpanded by remember { mutableStateOf(false) }
     var isLanguageExpanded by remember { mutableStateOf(false) }
     var isExportImportExpanded by remember { mutableStateOf(true) }
     var showExportSelectionDialog by remember { mutableStateOf(false) }
+    var showGlobalExportDialog by remember { mutableStateOf(false) }
 
     // File picker launcher for ZIP and JSON import
     val importFileLauncher = rememberLauncherForActivityResult(
@@ -458,7 +538,7 @@ fun SettingsScreen(
             )
         }
 
-        // Accordion 1: Tema Visual (Collapsed by default)
+        // Sección: Sugerencias y Errores
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -466,69 +546,40 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isThemeExpanded = !isThemeExpanded }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Palette, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(viewModel.string("theme"), fontWeight = FontWeight.Bold)
-                                Text(
-                                    when (currentTheme) {
-                                        ThemeMode.SYSTEM -> viewModel.string("theme_system")
-                                        ThemeMode.LIGHT -> viewModel.string("theme_light")
-                                        ThemeMode.DARK -> viewModel.string("theme_dark")
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Icon(
-                            imageVector = if (isThemeExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (isThemeExpanded) "Comprimir" else "Desplegar",
-                            tint = CaminoBlue
-                        )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Feedback, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Sugerencias y Errores", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = CaminoBlue)
                     }
-
-                    AnimatedVisibility(
-                        visible = isThemeExpanded,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "¿Tienes alguna idea para mejorar Ultreia o has detectado algún problema? Tu opinión es muy valiosa para nosotros. Pulsa abajo para escribirnos.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:sugerenciastravelcash@gmail.com")
+                                putExtra(Intent.EXTRA_SUBJECT, "Sugerencia / Error - Ultreia")
+                            }
+                            try {
+                                context.startActivity(Intent.createChooser(intent, "Enviar correo"))
+                            } catch (_: Exception) {}
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
-                            ThemeOptionRow(
-                                title = viewModel.string("theme_system"),
-                                subtitle = "Sigue la configuración de Android",
-                                isSelected = currentTheme == ThemeMode.SYSTEM,
-                                onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) }
-                            )
-                            ThemeOptionRow(
-                                title = viewModel.string("theme_light"),
-                                subtitle = "Fondo claro y tonos frescos",
-                                isSelected = currentTheme == ThemeMode.LIGHT,
-                                onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) }
-                            )
-                            ThemeOptionRow(
-                                title = viewModel.string("theme_dark"),
-                                subtitle = "Ahorro de batería y visión nocturna",
-                                isSelected = currentTheme == ThemeMode.DARK,
-                                onClick = { viewModel.setThemeMode(ThemeMode.DARK) }
-                            )
-                        }
+                        Icon(Icons.Default.Mail, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("sugerenciastravelcash@gmail.com", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -698,7 +749,7 @@ fun SettingsScreen(
 
                             // 2. Extra Button: "Exportar Backup Completo"
                             OutlinedButton(
-                                onClick = { viewModel.exportAllBackupZip(context) },
+                                onClick = { showGlobalExportDialog = true },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
@@ -706,6 +757,13 @@ fun SettingsScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Text(viewModel.string("export_complete_backup"), fontWeight = FontWeight.Bold)
                             }
+                            Text(
+                                text = "Exporta todos los datos guardados de ambos perfiles (Caminos y Viajes)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp)
+                            )
 
                             // 3. Extra Button: "Importar Backup Completo"
                             FilledTonalButton(
@@ -719,13 +777,135 @@ fun SettingsScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Text(viewModel.string("import_complete_backup"), fontWeight = FontWeight.Bold)
                             }
+                            Text(
+                                text = "Restaura y clasifica automáticamente los datos de ambos perfiles (Caminos y Viajes)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp)
+                            )
                         }
                     }
                 }
             }
         }
 
+        // Apartado final: Dedicatoria y Agradecimiento
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = PilgrimYellow.copy(alpha = 0.12f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, PilgrimYellow.copy(alpha = 0.35f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Explore,
+                        contentDescription = null,
+                        tint = CaminoBlueDark,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "\"Cada kilómetro de esta app está dedicado a quienes hacen el camino más bonito. Gracias infinitas a mi madre Tere, a mi padre Juanchu, a mis hermanas, cuñados y sobrinos, a Jorge, a mis amigos y a los nuevos amigos que deja el camino... y, en especial, a mi mujer y a mis hijas, Ángela y María, por acompañarme (y aguantarme) en todas mis locas aventuras.\"",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontStyle = FontStyle.Italic,
+                            lineHeight = 21.sp
+                        ),
+                        color = CaminoBlueDark,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
         item { Spacer(Modifier.height(32.dp)) }
+    }
+
+    // Dialog para seleccionar tipo de Backup Global: Caminos, Viajes o Completo
+    if (showGlobalExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showGlobalExportDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Archive, contentDescription = null, tint = CaminoBlue)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Copia de Seguridad Global", fontWeight = FontWeight.Bold, color = CaminoBlue)
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Elige qué datos deseas respaldar en el archivo ZIP:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Opción 1: Caminos
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.exportGlobalBackup(context, GlobalBackupType.CAMINOS_ONLY)
+                                showGlobalExportDialog = false
+                            },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Caminos (Todos los caminos)", fontWeight = FontWeight.Bold, color = CaminoBlue)
+                            Text("Respalda únicamente las rutas del perfil de Caminos.", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+
+                    // Opción 2: Viajes
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.exportGlobalBackup(context, GlobalBackupType.VIAJES_ONLY)
+                                showGlobalExportDialog = false
+                            },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Viajes (Todos los viajes)", fontWeight = FontWeight.Bold, color = CaminoBlue)
+                            Text("Respalda únicamente los viajes del perfil de Viajes.", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+
+                    // Opción 3: Completo (Caminos y Viajes)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.exportGlobalBackup(context, GlobalBackupType.COMPLETE_ALL)
+                                showGlobalExportDialog = false
+                            },
+                        colors = CardDefaults.cardColors(containerColor = PilgrimYellow.copy(alpha = 0.25f)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Completo (Todos los Caminos y Viajes)", fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                            Text("Copia de seguridad total con ambos perfiles.", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showGlobalExportDialog = false }) {
+                    Text(viewModel.string("cancel"))
+                }
+            }
+        )
     }
 
     // Export Selection Dialog: All vs Individual (Generates ZIP)
