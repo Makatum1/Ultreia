@@ -53,25 +53,22 @@ object SampleData {
 
     val PREDEFINED_ROUTES = listOf(
         PredefinedRouteInfo(
-            title = "Camino Francés",
-            subtitle = "De los Pirineos a la tumba del Apóstol Santiago",
-            totalKm = 780.0,
+            title = "Camino Francés (Sarria a Santiago)",
+            subtitle = "Los últimos 100 km de Sarria a Santiago de Compostela",
+            totalKm = 114.2,
             note = null,
             stages = listOf(
-                PredefinedStageInfo(1, "Etapa 1: Saint-Jean-Pied-de-Port a Roncesvalles", "Saint-Jean-Pied-de-Port", "Roncesvalles", 25.1, 1250, 480, "7h 30m", "Muy exigente", "Ruta de Napoleón por el Collado de Lepoeder."),
-                PredefinedStageInfo(2, "Etapa 2: Roncesvalles a Zubiri", "Roncesvalles", "Zubiri", 21.4, 290, 750, "5h 45m", "Moderada", "Bosques de hayas navarros y Puente de la Rabia."),
-                PredefinedStageInfo(3, "Etapa 3: Zubiri a Pamplona", "Zubiri", "Pamplona", 20.4, 210, 310, "5h 00m", "Fácil", "Entrada por el portal de Francia y las murallas históricas."),
-                PredefinedStageInfo(4, "Etapa 4: Sarria a Portomarín", "Sarria", "Portomarín", 22.2, 350, 420, "5h 30m", "Moderada", "Comienzo de los últimos 100 km tradicionales gallegos."),
-                PredefinedStageInfo(5, "Etapa 5: Portomarín a Palas de Rei", "Portomarín", "Palas de Rei", 24.8, 450, 320, "6h 00m", "Moderada", "Ascenso hacia la Sierra de Ligonde y cruceiros."),
-                PredefinedStageInfo(6, "Etapa 6: Palas de Rei a Arzúa", "Palas de Rei", "Arzúa", 28.5, 410, 480, "6h 45m", "Moderada", "Unión con el Camino del Norte en Arzúa."),
-                PredefinedStageInfo(7, "Etapa 7: Arzúa a O Pedrouzo", "Arzúa", "O Pedrouzo", 19.3, 280, 320, "4h 45m", "Fácil", "Senderos flanqueados por robles y eucaliptos."),
-                PredefinedStageInfo(8, "Etapa 8: O Pedrouzo a Santiago de Compostela", "O Pedrouzo", "Santiago de Compostela", 19.4, 310, 350, "4h 45m", "Fácil", "Subida al Monte do Gozo y llegada a la Plaza del Obradoiro.")
+                PredefinedStageInfo(1, "Etapa 1: Sarria a Portomarín", "Sarria", "Portomarín", 22.2, 350, 420, "5h 30m", "Moderada", "Comienzo de los últimos 100 km tradicionales gallegos."),
+                PredefinedStageInfo(2, "Etapa 2: Portomarín a Palas de Rei", "Portomarín", "Palas de Rei", 24.8, 450, 320, "6h 00m", "Moderada", "Ascenso hacia la Sierra de Ligonde y cruceiros."),
+                PredefinedStageInfo(3, "Etapa 3: Palas de Rei a Arzúa", "Palas de Rei", "Arzúa", 28.5, 410, 480, "6h 45m", "Moderada", "Paso por Melide y unión con el Camino Primitivo."),
+                PredefinedStageInfo(4, "Etapa 4: Arzúa a O Pedrouzo", "Arzúa", "O Pedrouzo", 19.3, 280, 320, "4h 45m", "Fácil", "Senderos flanqueados por robles y eucaliptos."),
+                PredefinedStageInfo(5, "Etapa 5: O Pedrouzo a Santiago de Compostela", "O Pedrouzo", "Santiago de Compostela", 19.4, 310, 350, "4h 45m", "Fácil", "Subida al Monte do Gozo y llegada a la Plaza del Obradoiro.")
             )
         ),
         PredefinedRouteInfo(
             title = "Camino Portugués Central",
             subtitle = "De Tui a Santiago entre viñedos de albariño y rías gallegas",
-            totalKm = 118.0,
+            totalKm = 115.5,
             note = null,
             stages = listOf(
                 PredefinedStageInfo(1, "Etapa 1: Tui a O Porriño", "Tui", "O Porriño", 16.5, 190, 180, "4h 00m", "Fácil", "Cruce del Puente Internacional y catedral de Tui."),
@@ -84,8 +81,8 @@ object SampleData {
         ),
         PredefinedRouteInfo(
             title = "Camino del Norte",
-            subtitle = "Por la costa cantábrica hacia Santiago de Compostela",
-            totalKm = 195.0,
+            subtitle = "De Ribadeo a Santiago por el interior de Galicia",
+            totalKm = 195.9,
             note = null,
             stages = listOf(
                 PredefinedStageInfo(1, "Etapa 1: Ribadeo a Lourenzá", "Ribadeo", "Lourenzá", 28.4, 620, 480, "7h 00m", "Exigente", "Entrada a Galicia desde la ría del Eo."),
@@ -94,47 +91,48 @@ object SampleData {
                 PredefinedStageInfo(4, "Etapa 4: Vilalba a Baamonde", "Vilalba", "Baamonde", 20.7, 160, 180, "5h 00m", "Fácil", "Puente medieval de Saa y castaño milenario."),
                 PredefinedStageInfo(5, "Etapa 5: Baamonde a Sobrado dos Monxes", "Baamonde", "Sobrado dos Monxes", 40.3, 620, 540, "9h 30m", "Muy exigente", "Monasterio cisterciense de Santa María."),
                 PredefinedStageInfo(6, "Etapa 6: Sobrado dos Monxes a Arzúa", "Sobrado dos Monxes", "Arzúa", 21.4, 260, 340, "5h 15m", "Fácil", "Enlace con el Camino Francés."),
-                PredefinedStageInfo(7, "Etapa 7: Arzúa a Santiago de Compostela", "Arzúa", "Santiago de Compostela", 38.7, 590, 670, "8h 30m", "Exigente", "Tramo final hasta la Plaza del Obradoiro.")
+                PredefinedStageInfo(7, "Etapa 7: Arzúa a O Pedrouzo", "Arzúa", "O Pedrouzo", 19.3, 280, 320, "4h 45m", "Fácil", "Senderos comunes arbolados hacia Santiago."),
+                PredefinedStageInfo(8, "Etapa 8: O Pedrouzo a Santiago de Compostela", "O Pedrouzo", "Santiago de Compostela", 19.4, 310, 350, "4h 45m", "Fácil", "Tramo final hasta la Plaza del Obradoiro.")
             )
         ),
         PredefinedRouteInfo(
             title = "Camino Primitivo",
             subtitle = "La primera ruta de peregrinación por la montaña astur-galaica",
-            totalKm = 313.0,
+            totalKm = 309.2,
             note = null,
             stages = listOf(
                 PredefinedStageInfo(1, "Etapa 1: Oviedo a Grado", "Oviedo", "Grado", 25.6, 420, 610, "6h 30m", "Moderada", "Salida de la catedral de San Salvador."),
                 PredefinedStageInfo(2, "Etapa 2: Grado a Salas", "Grado", "Salas", 22.2, 580, 410, "5h 45m", "Moderada", "Alto del Fresno y santuario de la Virgen."),
-                PredefinedStageInfo(3, "Etapa 3: Salas a Tineo", "Salas", "Tineo", 19.8, 690, 180, "5h 30m", "Exigente", "Subida pronunciada hacia las brañas de Tineo."),
+                PredefinedStageInfo(3, "Etapa 3: Salas a Tineo", "Salas", "Tineo", 20.2, 690, 180, "5h 30m", "Exigente", "Subida pronunciada hacia las brañas de Tineo."),
                 PredefinedStageInfo(4, "Etapa 4: Tineo a Pola de Allande", "Tineo", "Pola de Allande", 28.2, 580, 720, "7h 00m", "Exigente", "Paso por el monasterio de Obona."),
-                PredefinedStageInfo(5, "Etapa 5: Pola de Allande a La Mesa", "Pola de Allande", "La Mesa", 21.4, 980, 510, "6h 30m", "Muy exigente", "Paso mítico por el Puerto del Palo y Hospitales."),
-                PredefinedStageInfo(6, "Etapa 6: La Mesa a Grandas de Salime", "La Mesa", "Grandas de Salime", 15.3, 290, 780, "4h 30m", "Moderada", "Descenso al embalse de Salime y vistas increíbles."),
+                PredefinedStageInfo(5, "Etapa 5: Pola de Allande a La Mesa", "Pola de Allande", "La Mesa", 23.3, 980, 510, "6h 30m", "Muy exigente", "Paso mítico por el Puerto del Palo y Hospitales."),
+                PredefinedStageInfo(6, "Etapa 6: La Mesa a Grandas de Salime", "La Mesa", "Grandas de Salime", 15.5, 290, 780, "4h 30m", "Moderada", "Descenso al embalse de Salime y vistas increíbles."),
                 PredefinedStageInfo(7, "Etapa 7: Grandas de Salime a A Fonsagrada", "Grandas de Salime", "A Fonsagrada", 25.2, 850, 310, "7h 00m", "Muy exigente", "Entrada a Galicia por el Alto do Acebo."),
-                PredefinedStageInfo(8, "Etapa 8: A Fonsagrada a O Cádavo", "A Fonsagrada", "O Cádavo", 24.3, 560, 710, "6h 30m", "Moderada", "Hospital de Montouto y molinos de viento."),
-                PredefinedStageInfo(9, "Etapa 9: O Cádavo a Lugo", "O Cádavo", "Lugo", 29.5, 340, 680, "7h 15m", "Moderada", "Entrada a la ciudad amurallada de Lugo."),
-                PredefinedStageInfo(10, "Etapa 10: Lugo a San Romao da Retorta", "Lugo", "San Romao da Retorta", 19.7, 260, 180, "5h 00m", "Fácil", "Vía romana y entorno rural apacible."),
-                PredefinedStageInfo(11, "Etapa 11: San Romao a Melide", "San Romao", "Melide", 28.3, 380, 460, "7h 00m", "Moderada", "Unión en Melide con el Camino Francés."),
-                PredefinedStageInfo(12, "Etapa 12: Melide a Santiago de Compostela", "Melide", "Santiago de Compostela", 53.3, 810, 920, "12h 00m", "Muy exigente", "Etapa final épica hasta la Catedral de Santiago.")
+                PredefinedStageInfo(8, "Etapa 8: A Fonsagrada a O Cádavo", "A Fonsagrada", "O Cádavo", 23.4, 560, 710, "6h 30m", "Moderada", "Hospital de Montouto y molinos de viento."),
+                PredefinedStageInfo(9, "Etapa 9: O Cádavo a Lugo", "O Cádavo", "Lugo", 30.3, 340, 680, "7h 15m", "Moderada", "Entrada a la ciudad amurallada de Lugo."),
+                PredefinedStageInfo(10, "Etapa 10: Lugo a San Romao da Retorta", "Lugo", "San Romao da Retorta", 19.6, 260, 180, "5h 00m", "Fácil", "Vía romana y entorno rural apacible."),
+                PredefinedStageInfo(11, "Etapa 11: San Romao a Melide", "San Romao", "Melide", 28.1, 380, 460, "7h 00m", "Moderada", "Unión en Melide con el Camino Francés."),
+                PredefinedStageInfo(12, "Etapa 12: Melide a O Pedrouzo", "Melide", "O Pedrouzo", 33.3, 450, 510, "8h 00m", "Exigente", "Paso por Arzúa y bosques gallegos."),
+                PredefinedStageInfo(13, "Etapa 13: O Pedrouzo a Santiago de Compostela", "O Pedrouzo", "Santiago de Compostela", 19.2, 310, 350, "4h 45m", "Fácil", "Llegada triunfal a la Plaza del Obradoiro.")
             )
         ),
         PredefinedRouteInfo(
             title = "Finisterre y Muxía",
             subtitle = "El epílogo hacia el Fin del Mundo y la Costa da Morte",
-            totalKm = 116.5,
+            totalKm = 117.2,
             note = null,
             stages = listOf(
-                PredefinedStageInfo(1, "Etapa 1: Santiago de Compostela a Negreira", "Santiago de Compostela", "Negreira", 21.2, 420, 560, "5h 30m", "Moderada", "Ponte Maceira sobre el río Tambre."),
+                PredefinedStageInfo(1, "Etapa 1: Santiago de Compostela a Negreira", "Santiago de Compostela", "Negreira", 21.0, 420, 560, "5h 30m", "Moderada", "Ponte Maceira sobre el río Tambre."),
                 PredefinedStageInfo(2, "Etapa 2: Negreira a Olveiroa", "Negreira", "Olveiroa", 33.4, 610, 480, "8h 15m", "Exigente", "Montes gallegos y aldeas de hórreos."),
-                PredefinedStageInfo(3, "Etapa 3: Olveiroa a Cee / Corcubión", "Olveiroa", "Cee", 19.8, 220, 480, "5h 00m", "Fácil", "Primera vista al mar Atlántico desde lo alto."),
-                PredefinedStageInfo(4, "Etapa 4: Cee a Fisterra (Faro)", "Cee", "Fisterra", 13.7, 290, 280, "3h 45m", "Fácil", "Llegada al Faro de Finisterre, el fin de la tierra."),
-                PredefinedStageInfo(5, "Etapa 5: Fisterra a Lires", "Fisterra", "Lires", 13.6, 280, 270, "3h 45m", "Fácil", "Playa de O Rostro y acantilados salvajes."),
-                PredefinedStageInfo(6, "Etapa 6: Lires a Muxía", "Lires", "Muxía", 14.8, 310, 320, "4h 00m", "Fácil", "Santuario da Virxe da Barca y la Pedra de Abalar.")
+                PredefinedStageInfo(3, "Etapa 3: Olveiroa a Cee", "Olveiroa", "Cee", 19.8, 220, 480, "5h 00m", "Fácil", "Primera vista al mar Atlántico desde lo alto."),
+                PredefinedStageInfo(4, "Etapa 4: Cee a Fisterra", "Cee", "Fisterra", 13.7, 290, 280, "3h 45m", "Fácil", "Llegada al Faro de Finisterre, el fin de la tierra."),
+                PredefinedStageInfo(5, "Etapa 5: Fisterra a Muxía", "Fisterra", "Muxía", 29.3, 590, 590, "7h 30m", "Exigente", "Santuario da Virxe da Barca y la Costa da Morte.")
             )
         ),
         PredefinedRouteInfo(
             title = "Camino Inglés",
             subtitle = "De Ferrol a Santiago de Compostela",
-            totalKm = 110.8,
+            totalKm = 120.8,
             note = "Se recomienda realizar el Camino por el trazado antiguo",
             stages = listOf(
                 PredefinedStageInfo(1, "Etapa 1: Ferrol a Neda", "Ferrol", "Neda", 15.0, 160, 150, "3h 45m", "Fácil", "Paseo por la ría de Ferrol."),

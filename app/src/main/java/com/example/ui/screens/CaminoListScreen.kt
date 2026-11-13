@@ -134,7 +134,12 @@ fun CaminoListScreen(
                     ExtendedFloatingActionButton(
                         onClick = { showMainRoutesDialog = true },
                         icon = { Icon(Icons.Default.Explore, contentDescription = null) },
-                        text = { Text("Principales Rutas") },
+                        text = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Principales Rutas", style = MaterialTheme.typography.labelLarge)
+                                Text("(Ejemplos)", style = MaterialTheme.typography.labelSmall)
+                            }
+                        },
                         containerColor = PilgrimYellow,
                         contentColor = CaminoBlueDark,
                         shape = RoundedCornerShape(16.dp),
@@ -781,7 +786,14 @@ fun MainRoutesDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Explore, contentDescription = null, tint = CaminoBlue)
                 Spacer(Modifier.width(8.dp))
-                Text("Principales Rutas", fontWeight = FontWeight.Bold, color = CaminoBlue)
+                Column {
+                    Text("Principales Rutas", fontWeight = FontWeight.Bold, color = CaminoBlue)
+                    Text(
+                        "(Ejemplos)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         },
         text = {
