@@ -29,8 +29,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -621,25 +624,40 @@ fun StageCardItem(
                 // Day badge circle
                 Box(
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(48.dp)
                         .background(
                             if (stage.isCompleted) CaminoGreen else CaminoBlueLight,
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         Text(
                             text = "DÍA",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (stage.isCompleted) Color.White.copy(alpha = 0.8f) else CaminoBlue
+                            style = TextStyle(
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (stage.isCompleted) Color.White.copy(alpha = 0.85f) else CaminoBlue,
+                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                lineHeight = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
                         )
+                        Spacer(Modifier.height(1.dp))
                         Text(
                             text = "${stage.dayNumber}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (stage.isCompleted) Color.White else CaminoBlueDark
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (stage.isCompleted) Color.White else CaminoBlueDark,
+                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                lineHeight = 17.sp,
+                                textAlign = TextAlign.Center
+                            )
                         )
                     }
                 }
@@ -832,15 +850,51 @@ fun AddStageDialog(
                 }
                 item {
                     Text("Dificultad:", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        difficulties.forEach { diff ->
+                        listOf("Fácil", "Moderada").forEach { diff ->
                             FilterChip(
                                 selected = difficulty == diff,
                                 onClick = { difficulty = diff },
-                                label = { Text(diff, fontSize = 11.sp) }
+                                label = {
+                                    Text(
+                                        diff,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .defaultMinSize(minHeight = 40.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Exigente", "Muy exigente").forEach { diff ->
+                            FilterChip(
+                                selected = difficulty == diff,
+                                onClick = { difficulty = diff },
+                                label = {
+                                    Text(
+                                        diff,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .defaultMinSize(minHeight = 40.dp)
                             )
                         }
                     }
@@ -928,7 +982,12 @@ fun AttachedFilesSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                ) {
                     Icon(Icons.Default.AttachFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -941,12 +1000,13 @@ fun AttachedFilesSection(
 
                 FilledTonalButton(
                     onClick = { filePickerLauncher.launch(arrayOf("*/*")) },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(8.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.defaultMinSize(minHeight = 40.dp)
                 ) {
                     Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Subir archivo", fontSize = 12.sp)
+                    Text("Subir archivo", fontSize = 12.sp, maxLines = 1)
                 }
             }
 
