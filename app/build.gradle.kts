@@ -75,6 +75,16 @@ android {
     includeInApk = false
     includeInBundle = true
   }
+
+  applicationVariants.all {
+    val variant = this
+    outputs.all {
+      val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+      if (variant.buildType.name == "release") {
+        output?.outputFileName = "Ultreia.apk"
+      }
+    }
+  }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
@@ -150,3 +160,19 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+  doLast {
+    val releaseApk = layout.buildDirectory.file("outputs/apk/release/Ultreia.apk").get().asFile
+    val fallbackApk = layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile
+    val sourceApk = if (releaseApk.exists()) releaseApk else fallbackApk
+    if (sourceApk.exists()) {
+      sourceApk.copyTo(file("${rootDir}/Ultreia.apk"), overwrite = true)
+      val destFolder = file("C:/Users/perez/Desktop/basura/13nov")
+      if (destFolder.exists()) {
+        sourceApk.copyTo(file("${destFolder}/Ultreia.apk"), overwrite = true)
+      }
+    }
+  }
+}
+
