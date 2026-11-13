@@ -4,27 +4,31 @@ import android.annotation.SuppressLint
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import com.example.R
 import com.example.data.gpx.GpxParser
 import com.example.data.model.CaminoEntity
 import com.example.data.model.GpxPoint
@@ -400,6 +404,23 @@ fun InteractiveMapScreen(
 
     var showStagesDropdown by remember { mutableStateOf(false) }
 
+    // Estadísticas para el encabezado idéntico a la pantalla de Etapas
+    val totalKm = remember(stages, camino) {
+        if (stages.isNotEmpty()) stages.sumOf { it.distanceKm } else camino.totalEstimatedKm
+    }
+    val completedKm = remember(stages) {
+        stages.filter { it.isCompleted }.sumOf { it.distanceKm }
+    }
+    val progressPercent = remember(totalKm, completedKm) {
+        if (totalKm > 0) ((completedKm / totalKm) * 100).toInt() else 0
+    }
+    val totalKmStr = remember(totalKm) {
+        String.format(java.util.Locale.US, "%.1f", totalKm)
+    }
+    val completedKmStr = remember(completedKm) {
+        String.format(java.util.Locale.US, "%.1f", completedKm)
+    }
+
     // Prepare JSON payload for the Leaflet WebView with stage-specific colors and route points
     val stagesJson = remember(stages, selectedStageIds, focusedStage) {
         val root = JSONArray()
@@ -445,7 +466,7 @@ fun InteractiveMapScreen(
             .fillMaxSize()
             .background(Color(0xFFF1F5F9))
     ) {
-        // Embedded Interactive Map with Google Maps Standard Road Layer
+        // Mapa interactivo integrado con capa estándar de Google Maps
         AndroidView(
             modifier = Modifier
                 .fillMaxSize()
@@ -471,287 +492,269 @@ fun InteractiveMapScreen(
             }
         )
 
-        // BOTTOM CONTROLS OVERLAY:
-        // 1. Etapas (desplegable)
+        // TARJETA DE TÍTULO SUPERIOR: Idéntica a la vista en "Etapas" (CaminoHeaderBanner)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp, start = 14.dp, end = 14.dp)
+                .align(Alignment.TopCenter)
+                .shadow(6.dp, RoundedCornerShape(18.dp)),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                // Imagen de fondo / Marca de agua
+                if (!camino.coverPhotoUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = camino.coverPhotoUri,
+                        contentDescription = camino.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(145.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_ultreia_logo),
+                        contentDescription = camino.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(145.dp)
+                            .background(CaminoBlue),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+
+                // Superposición de degradado oscuro para legibilidad óptima
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(145.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                                startY = 25f
+                            )
+                        )
+                )
+
+                // Textos de cabecera
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = PilgrimYellow,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CaminoBlueDark,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        if (camino.startDate.isNotBlank()) {
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "📅 ${camino.startDate}",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Text(
+                        text = camino.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (camino.subtitle.isNotBlank()) {
+                        Text(
+                            text = camino.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(Modifier.height(6.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${completedKmStr} / ${totalKmStr} km",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PilgrimYellow,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "•",
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "${progressPercent}% completado",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+
+        // PANEL DE CONTROL INFERIOR (Solo los 3 botones, sin carrusel ni ficha):
+        // 1. Etapas (con desplegable vertical)
         // 2. Todos
         // 3. Ocultar Etapas
-        // Seguido del carrusel de etapas y ficha rápida
         Card(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 14.dp)
-                .shadow(10.dp, RoundedCornerShape(18.dp)),
+                .shadow(10.dp, RoundedCornerShape(16.dp)),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(18.dp)
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp)
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Header of stages controller: Exact buttons in order: 1. "Etapas", 2. "Todos", 3. "Ocultar Etapas"
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Botón 1: "Etapas" con menú desplegable vertical
-                    Box(modifier = Modifier.weight(1f)) {
-                        Button(
-                            onClick = { showStagesDropdown = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("btn_map_control_etapas")
-                        ) {
-                            Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = "Etapas",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-
-                        DropdownMenu(
-                            expanded = showStagesDropdown,
-                            onDismissRequest = { showStagesDropdown = false },
-                            modifier = Modifier
-                                .fillMaxWidth(0.85f)
-                                .heightIn(max = 350.dp)
-                        ) {
-                            sortedStages.forEach { stg ->
-                                val isChecked = selectedStageIds.contains(stg.id)
-                                val stageColor = getStageComposeColor(stg.dayNumber)
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .background(stageColor, CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "${stg.dayNumber}",
-                                                    color = Color.White,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                            Spacer(Modifier.width(8.dp))
-                                            Column {
-                                                Text(
-                                                    text = "Día ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = "${stg.distanceKm} km • +${stg.elevationGainM}m",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    },
-                                    onClick = {
-                                        selectedStageIds = setOf(stg.id)
-                                        focusedStage = stg
-                                        showStagesDropdown = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    // Botón 2: "Todos" (Muestra todas las etapas en el mapa)
+                // Botón 1: "Etapas" con menú desplegable vertical
+                Box(modifier = Modifier.weight(1f)) {
                     Button(
-                        onClick = {
-                            selectedStageIds = sortedStages.map { it.id }.toSet()
-                            focusedStage = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
+                        onClick = { showStagesDropdown = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                         modifier = Modifier
-                            .weight(1f)
-                            .testTag("btn_map_control_todos")
+                            .fillMaxWidth()
+                            .testTag("btn_map_control_etapas")
                     ) {
-                        Icon(Icons.Default.SelectAll, contentDescription = null, tint = CaminoBlueDark, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "Todos",
-                            color = CaminoBlueDark,
+                            text = "Etapas",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1
                         )
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
 
-                    // Botón 3: "Ocultar Etapas" (Oculta las líneas y puntos del mapa)
-                    OutlinedButton(
-                        onClick = {
-                            selectedStageIds = emptySet()
-                            focusedStage = null
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                    DropdownMenu(
+                        expanded = showStagesDropdown,
+                        onDismissRequest = { showStagesDropdown = false },
                         modifier = Modifier
-                            .weight(1.2f)
-                            .testTag("btn_map_control_ocultar")
+                            .fillMaxWidth(0.85f)
+                            .heightIn(max = 350.dp)
                     ) {
-                        Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "Ocultar Etapas",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                // Carrusel horizontal de etapas con distintivos de color, selector y estado GPX
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(sortedStages) { stg ->
-                        val isChecked = selectedStageIds.contains(stg.id)
-                        val isFocused = focusedStage?.id == stg.id
-                        val stageColor = getStageComposeColor(stg.dayNumber)
-                        val hasGpx = !stg.gpxTrackJson.isNullOrBlank()
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isChecked) stageColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            border = androidx.compose.foundation.BorderStroke(
-                                width = if (isFocused) 2.dp else 1.dp,
-                                color = if (isFocused) stageColor else if (isChecked) stageColor.copy(alpha = 0.4f) else Color.LightGray.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier
-                                .clickable {
-                                    // Enfocar la etapa seleccionada en el mapa
-                                    selectedStageIds = setOf(stg.id)
-                                    focusedStage = stg
-                                }
-                                .testTag("chip_stage_${stg.dayNumber}")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Badge circular con el número de día
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .background(stageColor, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${stg.dayNumber}",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                Spacer(Modifier.width(8.dp))
-
-                                Column {
+                        sortedStages.forEach { stg ->
+                            val isChecked = selectedStageIds.contains(stg.id)
+                            val stageColor = getStageComposeColor(stg.dayNumber)
+                            DropdownMenuItem(
+                                text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "Día ${stg.dayNumber}",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = if (isChecked) CaminoBlueDark else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        if (hasGpx) {
-                                            Surface(
-                                                color = CaminoGreen.copy(alpha = 0.2f),
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = "GPX",
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = CaminoGreen,
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                )
-                                            }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .background(stageColor, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "${stg.dayNumber}",
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = "Día ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${stg.distanceKm} km • +${stg.elevationGainM}m",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
                                     }
-                                    Text(
-                                        text = "${stg.origin} → ${stg.destination}",
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = "${stg.distanceKm} km",
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                },
+                                onClick = {
+                                    selectedStageIds = setOf(stg.id)
+                                    focusedStage = stg
+                                    showStagesDropdown = false
                                 }
-
-                                Spacer(Modifier.width(6.dp))
-
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = { checked ->
-                                        selectedStageIds = if (checked) {
-                                            selectedStageIds + stg.id
-                                        } else {
-                                            selectedStageIds - stg.id
-                                        }
-                                        focusedStage = if (checked) stg else null
-                                    },
-                                    colors = CheckboxDefaults.colors(
-                                        checkedColor = stageColor,
-                                        uncheckedColor = Color.Gray
-                                    ),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                            )
                         }
                     }
                 }
 
-                // Barra de acción rápida para la etapa enfocada
-                if (focusedStage != null) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Etapa: Día ${focusedStage!!.dayNumber} (${focusedStage!!.origin} a ${focusedStage!!.destination})",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
+                // Botón 2: "Todos" (Muestra todas las etapas en el mapa)
+                Button(
+                    onClick = {
+                        selectedStageIds = sortedStages.map { it.id }.toSet()
+                        focusedStage = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("btn_map_control_todos")
+                ) {
+                    Icon(Icons.Default.SelectAll, contentDescription = null, tint = CaminoBlueDark, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Todos",
+                        color = CaminoBlueDark,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
 
-                        TextButton(
-                            onClick = { onStageClick(focusedStage!!.id) },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text("Ver Ficha de Etapa →", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CaminoBlue)
-                        }
-                    }
+                // Botón 3: "Ocultar Etapas" (Oculta las líneas y puntos del mapa)
+                OutlinedButton(
+                    onClick = {
+                        selectedStageIds = emptySet()
+                        focusedStage = null
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .testTag("btn_map_control_ocultar")
+                ) {
+                    Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Ocultar Etapas",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -759,8 +762,7 @@ fun InteractiveMapScreen(
 }
 
 /**
- * Genera el documento HTML con la capa estándar de Google Maps (vía satélites/calles Google Tiles)
- * y renderiza los trazados coloreados de cada etapa.
+ * Genera el documento HTML con la capa estándar de Google Maps y renderiza los trazados de las etapas.
  */
 private fun generateOsmMapHtml(stagesJson: String): String {
     return """
@@ -809,14 +811,14 @@ private fun generateOsmMapHtml(stagesJson: String): String {
                     attributionControl: false
                 }).setView([42.8, -6.0], 7);
 
-                // Capa estándar de Google Maps (calles, carreteras, pueblos en español)
+                // Capa estándar oficial de Google Maps (vía satélites/servidores de Google)
                 L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
                     maxZoom: 20,
                     subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
                 }).addTo(map);
 
-                // Control de zoom en la esquina superior izquierda
-                L.control.zoom({ position: 'topleft' }).addTo(map);
+                // Control de zoom en la parte derecha
+                L.control.zoom({ position: 'topright' }).addTo(map);
 
                 var stagesData = ${stagesJson};
                 var allLatLngs = [];
@@ -864,10 +866,10 @@ private fun generateOsmMapHtml(stagesJson: String): String {
                         map.invalidateSize();
                         if (focusedLatLngs.length > 0) {
                             var bounds = L.latLngBounds(focusedLatLngs);
-                            map.fitBounds(bounds, { padding: [60, 60], maxZoom: 13 });
+                            map.fitBounds(bounds, { padding: [175, 45], maxZoom: 13 });
                         } else if (allLatLngs.length > 0) {
                             var bounds = L.latLngBounds(allLatLngs);
-                            map.fitBounds(bounds, { padding: [60, 60] });
+                            map.fitBounds(bounds, { padding: [175, 45] });
                         }
                     } catch(e) {}
                 }
