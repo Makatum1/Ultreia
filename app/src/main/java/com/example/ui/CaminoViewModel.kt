@@ -1045,4 +1045,41 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
         return array.toString()
     }
+
+    /**
+     * Asegura que el archivo GPX del Camino Inglés por Trazado Antiguo (Wikiloc ID: 128031925)
+     * esté disponible en Archivos y Documentos del Camino.
+     */
+    fun checkAndAttachCaminoInglesGpx(camino: CaminoEntity) {
+        if (camino.title.contains("Inglés", ignoreCase = true) || camino.title.contains("Ingles", ignoreCase = true)) {
+            val list = parseAttachedFiles(camino.attachedFilesJson)
+            if (list.none { it.name == com.example.data.gpx.CaminoInglesGpxProvider.FILE_NAME || it.id == "wikiloc_camino_ingles_128031925" }) {
+                viewModelScope.launch {
+                    val attached = com.example.data.gpx.CaminoInglesGpxProvider.createAttachedFile(getApplication())
+                    val updatedList = list.toMutableList().apply { add(0, attached) }
+                    val updatedJson = serializeAttachedFiles(updatedList)
+                    repository.updateCamino(camino.copy(attachedFilesJson = updatedJson))
+                }
+            }
+        }
+    }
+
+    /**
+     * Asegura que el archivo GPX del Camino Inglés por Trazado Antiguo (Wikiloc ID: 128031925)
+     * esté disponible en Archivos y Documentos de las etapas del Camino Inglés.
+     */
+    fun checkAndAttachStageCaminoInglesGpx(stage: StageEntity, camino: CaminoEntity?) {
+        val isCaminoIngles = camino?.title?.let { it.contains("Inglés", ignoreCase = true) || it.contains("Ingles", ignoreCase = true) } == true
+        if (isCaminoIngles) {
+            val list = parseAttachedFiles(stage.attachedFilesJson)
+            if (list.none { it.name == com.example.data.gpx.CaminoInglesGpxProvider.FILE_NAME || it.id == "wikiloc_camino_ingles_128031925" }) {
+                viewModelScope.launch {
+                    val attached = com.example.data.gpx.CaminoInglesGpxProvider.createAttachedFile(getApplication())
+                    val updatedList = list.toMutableList().apply { add(0, attached) }
+                    val updatedJson = serializeAttachedFiles(updatedList)
+                    repository.updateStage(stage.copy(attachedFilesJson = updatedJson))
+                }
+            }
+        }
+    }
 }

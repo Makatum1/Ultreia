@@ -312,6 +312,28 @@ object SampleData {
         repository: CaminoRepository,
         startDate: String = "15/05/2026"
     ): Long {
+        val isCaminoIngles = routeInfo.title.contains("Inglés", ignoreCase = true) || routeInfo.title.contains("Ingles", ignoreCase = true)
+        val initialAttachedFilesJson = if (isCaminoIngles) {
+            try {
+                val attached = com.example.data.gpx.CaminoInglesGpxProvider.createAttachedFile(repository.context)
+                org.json.JSONArray().apply {
+                    val obj = org.json.JSONObject().apply {
+                        put("id", attached.id)
+                        put("name", attached.name)
+                        put("uri", attached.uri)
+                        put("mimeType", attached.mimeType)
+                        put("sizeBytes", attached.sizeBytes)
+                        put("addedAt", attached.addedAt)
+                    }
+                    put(obj)
+                }.toString()
+            } catch (_: Exception) {
+                "[]"
+            }
+        } else {
+            "[]"
+        }
+
         val camino = CaminoEntity(
             title = routeInfo.title,
             subtitle = routeInfo.subtitle,
@@ -319,7 +341,8 @@ object SampleData {
             pilgrimName = "Peregrino Ultreia",
             startDate = startDate,
             totalEstimatedKm = routeInfo.totalKm,
-            isTravelGuide = false
+            isTravelGuide = false,
+            attachedFilesJson = initialAttachedFilesJson
         )
         val caminoId = repository.insertCamino(camino)
 
@@ -363,6 +386,7 @@ object SampleData {
                 difficulty = stage.difficulty,
                 isCompleted = false,
                 stageNotes = if (routeInfo.note != null && stage.dayNumber == 1) "${stage.notes} (${routeInfo.note})" else stage.notes,
+                attachedFilesJson = initialAttachedFilesJson,
                 gpxTrackJson = gpxJson
             )
             repository.insertStage(stageEntity)

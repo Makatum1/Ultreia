@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,6 +64,11 @@ fun CaminoDetailScreen(
     var selectedTab by remember { mutableIntStateOf(initialTab) }
     var showAddStageDialog by remember { mutableStateOf(false) }
     var stageToEdit by remember { mutableStateOf<StageEntity?>(null) }
+
+    // Asegura que el GPX del Camino Inglés por Trazado Antiguo esté en Archivos y Documentos
+    LaunchedEffect(camino.id) {
+        viewModel.checkAndAttachCaminoInglesGpx(camino)
+    }
 
     Scaffold(
         topBar = {
@@ -1040,12 +1046,14 @@ fun AttachedFilesSection(
                                     Icon(
                                         imageVector = if (file.name.endsWith(".pdf", ignoreCase = true))
                                             Icons.Default.PictureAsPdf
+                                        else if (file.name.endsWith(".gpx", ignoreCase = true))
+                                            Icons.Default.Route
                                         else if (file.mimeType.startsWith("image/"))
                                             Icons.Default.Image
                                         else
-                                            Icons.Default.InsertDriveFile,
+                                            Icons.AutoMirrored.Filled.InsertDriveFile,
                                         contentDescription = null,
-                                        tint = CaminoBlue,
+                                        tint = if (file.name.endsWith(".gpx", ignoreCase = true)) CaminoGreen else CaminoBlue,
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(Modifier.width(8.dp))
@@ -1062,12 +1070,21 @@ fun AttachedFilesSection(
                                         onClick = {
                                             try {
                                                 val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                    setDataAndType(Uri.parse(file.uri), file.mimeType)
+                                                    setDataAndType(Uri.parse(file.uri), file.mimeType.ifBlank { "*/*" })
                                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                 }
                                                 context.startActivity(intent)
                                             } catch (e: Exception) {
-                                                android.widget.Toast.makeText(context, "No se puede abrir este tipo de archivo", android.widget.Toast.LENGTH_SHORT).show()
+                                                try {
+                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                        type = file.mimeType.ifBlank { "*/*" }
+                                                        putExtra(Intent.EXTRA_STREAM, Uri.parse(file.uri))
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(Intent.createChooser(shareIntent, "Compartir o Abrir: ${file.name}"))
+                                                } catch (_: Exception) {
+                                                    android.widget.Toast.makeText(context, "Archivo disponible en tu dispositivo: ${file.name}", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
                                             }
                                         },
                                         modifier = Modifier.size(32.dp)

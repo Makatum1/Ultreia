@@ -24,7 +24,7 @@ data class CaminoStats(
     val progressPercent: Int
 )
 
-class CaminoRepository(context: Context) {
+class CaminoRepository(val context: Context) {
 
     private val db = AppDatabase.getInstance(context)
     private val dao = db.caminoDao()

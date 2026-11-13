@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
@@ -79,6 +80,11 @@ fun StageDetailScreen(
 
     // Consejos del día expanded state
     var isTipsExpanded by remember { mutableStateOf(false) }
+
+    // Asegura que el GPX del Camino Inglés esté adjunto en Archivos y Documentos de la etapa
+    LaunchedEffect(stage.id, activeCamino) {
+        viewModel.checkAndAttachStageCaminoInglesGpx(stage, activeCamino)
+    }
 
     // Vivencias State
     var showAddVivenciaDialog by remember { mutableStateOf(false) }
@@ -1760,19 +1766,30 @@ fun StageAttachedFilesSection(
                                                 }
                                                 context.startActivity(intent)
                                             } catch (e: Exception) {
-                                                Toast.makeText(context, "No se puede abrir el archivo", Toast.LENGTH_SHORT).show()
+                                                try {
+                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                        type = file.mimeType.ifBlank { "*/*" }
+                                                        putExtra(Intent.EXTRA_STREAM, Uri.parse(file.uri))
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(Intent.createChooser(shareIntent, "Compartir o Abrir: ${file.name}"))
+                                                } catch (_: Exception) {
+                                                    Toast.makeText(context, "Archivo disponible en tu dispositivo: ${file.name}", Toast.LENGTH_SHORT).show()
+                                                }
                                             }
                                         }
                                 ) {
                                     Icon(
                                         imageVector = if (file.name.endsWith(".pdf", ignoreCase = true))
                                             Icons.Default.PictureAsPdf
+                                        else if (file.name.endsWith(".gpx", ignoreCase = true))
+                                            Icons.Default.Route
                                         else if (file.mimeType.startsWith("image/"))
                                             Icons.Default.Image
                                         else
-                                            Icons.Default.InsertDriveFile,
+                                            Icons.AutoMirrored.Filled.InsertDriveFile,
                                         contentDescription = null,
-                                        tint = CaminoBlue,
+                                        tint = if (file.name.endsWith(".gpx", ignoreCase = true)) CaminoGreen else CaminoBlue,
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(Modifier.width(10.dp))
