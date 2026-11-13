@@ -1,15 +1,31 @@
 package com.example.ui.screens
 
-import android.annotation.SuppressLint
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.DashPathEffect
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.location.LocationManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,6 +36,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -27,16 +44,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.gpx.GpxParser
 import com.example.data.model.CaminoEntity
 import com.example.data.model.GpxPoint
 import com.example.data.model.StageEntity
-import com.example.data.sample.SampleData
 import com.example.ui.theme.*
-import org.json.JSONArray
-import org.json.JSONObject
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import java.util.Locale
 
 val STAGE_COLORS = listOf(
     "#2563EB", // Azul vibrante
@@ -331,8 +358,6 @@ object TownCoordinates {
         "somport" to Pair(42.7972, -0.5283),
 
         // Camino de San Salvador
-        "león" to Pair(42.5987, -5.5671),
-        "leon" to Pair(42.5987, -5.5671),
         "la robla" to Pair(42.8025, -5.6286),
         "poladura de la tercia" to Pair(42.9806, -5.7486),
         "poladura" to Pair(42.9806, -5.7486),
@@ -422,8 +447,7 @@ object TownCoordinates {
         "benavente" to Pair(42.0033, -5.6783),
         "alija del infantado" to Pair(42.1361, -5.8306),
         "la bañeza" to Pair(42.2986, -5.8986),
-        "la baneza" to Pair(42.2986, -5.8986),
-        "astorga" to Pair(42.4589, -6.0564)
+        "la baneza" to Pair(42.2986, -5.8986)
     )
 
     fun findCoordinates(name: String): Pair<Double, Double>? {
@@ -438,42 +462,99 @@ object TownCoordinates {
 }
 
 /**
- * Obtiene los puntos del recorrido:
- * 1. Si existe GPX en la etapa, utiliza sus coordenadas exactas.
- * 2. Si no hay GPX subido, resuelve los nombres de origen y destino e interpola
- *    un recorrido con curva natural y elevación para que siempre se visualice en el mapa.
+ * Capas de mapa disponibles mediante OnlineTileSourceBase
  */
-fun getStageRoutePoints(stg: StageEntity): List<GpxPoint> {
-    val existing = GpxParser.deserializePoints(stg.gpxTrackJson)
-    if (existing.isNotEmpty()) return existing
-
-    val startCoord = TownCoordinates.findCoordinates(stg.origin)
-    val endCoord = TownCoordinates.findCoordinates(stg.destination)
-
-    val (sLat, sLon) = when {
-        startCoord != null -> startCoord
-        endCoord != null -> Pair(endCoord.first + 0.12, endCoord.second + 0.12)
-        else -> Pair(42.88 - (stg.dayNumber * 0.06), -8.54 - (stg.dayNumber * 0.09))
-    }
-
-    val (eLat, eLon) = when {
-        endCoord != null -> endCoord
-        startCoord != null -> Pair(startCoord.first - 0.12, startCoord.second - 0.12)
-        else -> Pair(sLat - 0.08, sLon - 0.12)
-    }
-
-    return SampleData.generateTrackPoints(
-        startLat = sLat,
-        startLon = sLon,
-        endLat = eLat,
-        endLon = eLon,
-        startEle = 250.0,
-        endEle = 320.0,
-        numPoints = 25
-    )
+enum class MapLayerType(val label: String, val iconDescription: String) {
+    ROADMAP("Callejero", "Mapa Callejero de Google"),
+    HYBRID("Satélite", "Satélite con etiquetas de Google"),
+    TERRAIN("Relieve", "Relieve y Terreno de Google"),
+    OSM("OpenStreetMap", "OpenStreetMap estándar")
 }
 
-@SuppressLint("SetJavaScriptEnabled")
+class GoogleMapsTileSource(
+    name: String,
+    lyrs: String,
+    lang: String = Locale.getDefault().language
+) : OnlineTileSourceBase(
+    name,
+    0,
+    20,
+    256,
+    ".png",
+    arrayOf(
+        "https://mt0.google.com/vt/lyrs=$lyrs&hl=$lang&",
+        "https://mt1.google.com/vt/lyrs=$lyrs&hl=$lang&",
+        "https://mt2.google.com/vt/lyrs=$lyrs&hl=$lang&",
+        "https://mt3.google.com/vt/lyrs=$lyrs&hl=$lang&"
+    )
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        val zoom = MapTileIndex.getZoom(pMapTileIndex)
+        val x = MapTileIndex.getX(pMapTileIndex)
+        val y = MapTileIndex.getY(pMapTileIndex)
+        return "${baseUrl}x=$x&y=$y&z=$zoom"
+    }
+}
+
+/**
+ * Generador de marcadores personalizados (chinchetas con color y número de etapa)
+ */
+fun createStageMarkerDrawable(
+    context: Context,
+    number: Int,
+    colorHex: String,
+    isDestination: Boolean = false
+): Drawable {
+    val density = context.resources.displayMetrics.density
+    val sizeDp = if (isDestination) 22 else 30
+    val sizePx = (sizeDp * density).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val colorInt = try {
+        android.graphics.Color.parseColor(colorHex)
+    } catch (_: Exception) {
+        android.graphics.Color.BLUE
+    }
+
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    if (isDestination) {
+        // Marcador de destino: Anillo exterior con punto interior
+        paint.color = android.graphics.Color.WHITE
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f, paint)
+
+        paint.color = colorInt
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 3f * density
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, (sizePx / 2f) - (1.5f * density), paint)
+
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 4.5f, paint)
+    } else {
+        // Marcador de salida: Círculo con borde blanco y número de etapa centrado
+        paint.color = colorInt
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f, paint)
+
+        paint.color = android.graphics.Color.WHITE
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2.5f * density
+        canvas.drawCircle(sizePx / 2f, sizePx / 2f, (sizePx / 2f) - (1.25f * density), paint)
+
+        paint.color = android.graphics.Color.WHITE
+        paint.style = Paint.Style.FILL
+        paint.textSize = 12f * density
+        paint.isFakeBoldText = true
+        paint.textAlign = Paint.Align.CENTER
+        val yOffset = (sizePx / 2f) - ((paint.descent() + paint.ascent()) / 2f)
+        canvas.drawText("$number", sizePx / 2f, yOffset, paint)
+    }
+
+    return BitmapDrawable(context.resources, bitmap)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InteractiveMapScreen(
@@ -482,24 +563,52 @@ fun InteractiveMapScreen(
     onStageClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Sorted stages by day number
+    val context = LocalContext.current
+
+    // Inicializar configuración de OSMDroid con User-Agent seguro
+    LaunchedEffect(Unit) {
+        Configuration.getInstance().load(context, context.getSharedPreferences("${context.packageName}_osmdroid", Context.MODE_PRIVATE))
+        Configuration.getInstance().userAgentValue = context.packageName
+    }
+
+    // Etapas ordenadas
     val sortedStages = remember(stages) {
         stages.sortedBy { it.dayNumber }
     }
 
-    // Individual or all stages marked/visible on the map
+    // Etapas seleccionadas / visibles
     var selectedStageIds by remember(stages) {
         mutableStateOf(stages.map { it.id }.toSet())
     }
 
-    // Currently focused stage for detailed popup / zoom
-    var focusedStage by remember {
+    // Etapa seleccionada para la tarjeta flotante inferior
+    var selectedDetailStage by remember {
         mutableStateOf<StageEntity?>(null)
     }
 
     var showStagesDropdown by remember { mutableStateOf(false) }
+    var showLayersMenu by remember { mutableStateOf(false) }
+    var currentLayer by remember { mutableStateOf(MapLayerType.ROADMAP) }
 
-    // Estadísticas para el encabezado idéntico a la pantalla de Etapas
+    // Referencia al MapView y Overlay de ubicación
+    var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+    var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+
+    // Launcher de permisos de ubicación
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val granted = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            locationOverlayRef?.enableMyLocation()
+            centerMapOnUser(context, mapViewRef, locationOverlayRef)
+        } else {
+            Toast.makeText(context, "Permiso de ubicación denegado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Estadísticas para la cabecera idéntica a la pantalla de Etapas
     val totalKm = remember(stages, camino) {
         if (stages.isNotEmpty()) stages.sumOf { it.distanceKm } else camino.totalEstimatedKm
     }
@@ -510,50 +619,146 @@ fun InteractiveMapScreen(
         if (totalKm > 0) ((completedKm / totalKm) * 100).toInt() else 0
     }
     val totalKmStr = remember(totalKm) {
-        String.format(java.util.Locale.US, "%.1f", totalKm)
+        String.format(Locale.US, "%.1f", totalKm)
     }
     val completedKmStr = remember(completedKm) {
-        String.format(java.util.Locale.US, "%.1f", completedKm)
+        String.format(Locale.US, "%.1f", completedKm)
     }
 
-    // Prepare JSON payload for the Leaflet WebView with stage-specific colors and route points
-    val stagesJson = remember(stages, selectedStageIds, focusedStage) {
-        val root = JSONArray()
-        for (stg in sortedStages) {
-            val isVisible = selectedStageIds.contains(stg.id)
-            val isFocused = focusedStage?.id == stg.id
-            val obj = JSONObject()
-            obj.put("id", stg.id)
-            obj.put("dayNumber", stg.dayNumber)
-            obj.put("origin", stg.origin)
-            obj.put("destination", stg.destination)
-            obj.put("distanceKm", stg.distanceKm)
-            obj.put("elevationGainM", stg.elevationGainM)
-            obj.put("isCompleted", stg.isCompleted)
-            obj.put("color", getStageColor(stg.dayNumber))
-            obj.put("visible", isVisible)
-            obj.put("isFocused", isFocused)
+    // Efecto para actualizar overlays del mapa cuando cambian las etapas seleccionadas o capas
+    LaunchedEffect(selectedStageIds, sortedStages, mapViewRef, currentLayer) {
+        val map = mapViewRef ?: return@LaunchedEffect
 
-            if (isVisible) {
-                val points = getStageRoutePoints(stg)
-                val ptsArray = JSONArray()
-                for (p in points) {
-                    val pObj = JSONObject()
-                    pObj.put("lat", p.lat)
-                    pObj.put("lon", p.lon)
-                    ptsArray.put(pObj)
-                }
-                obj.put("points", ptsArray)
-            } else {
-                obj.put("points", JSONArray())
-            }
-            root.put(obj)
+        // Actualizar TileSource según la capa seleccionada
+        val tileSource = when (currentLayer) {
+            MapLayerType.ROADMAP -> GoogleMapsTileSource("GoogleRoadmap", "m")
+            MapLayerType.HYBRID -> GoogleMapsTileSource("GoogleHybrid", "y")
+            MapLayerType.TERRAIN -> GoogleMapsTileSource("GoogleTerrain", "p")
+            MapLayerType.OSM -> TileSourceFactory.MAPNIK
         }
-        root.toString()
-    }
+        map.setTileSource(tileSource)
 
-    val htmlContent = remember(stagesJson) {
-        generateOsmMapHtml(stagesJson)
+        // Limpiar overlays previos preservando el locationOverlay si existe
+        val locOverlay = locationOverlayRef
+        map.overlays.clear()
+        if (locOverlay != null) {
+            map.overlays.add(locOverlay)
+        }
+
+        val allGeoPoints = mutableListOf<GeoPoint>()
+
+        for (stg in sortedStages) {
+            if (!selectedStageIds.contains(stg.id)) continue
+
+            val colorHex = getStageColor(stg.dayNumber)
+            val colorInt = try {
+                android.graphics.Color.parseColor(colorHex)
+            } catch (_: Exception) {
+                android.graphics.Color.BLUE
+            }
+
+            // REGLA ESTRICTA DE GPX:
+            // 1. Si TIENE GPX adjunto / subido: Dibujar EXCLUSIVAMENTE la polilínea del GPX real.
+            //    Bajo ninguna circunstancia dibujar la línea discontinua cuando exista GPX.
+            // 2. Si NO TIENE GPX: Dibujar ÚNICAMENTE la polilínea estándar con estilo discontinuo
+            //    (dashed) conectando origen a destino.
+            val gpxPoints = GpxParser.deserializePoints(stg.gpxTrackJson)
+            val hasGpx = gpxPoints.size >= 2
+
+            val stagePoints: List<GeoPoint> = if (hasGpx) {
+                gpxPoints.map { GeoPoint(it.lat, it.lon) }
+            } else {
+                val startCoord = TownCoordinates.findCoordinates(stg.origin)
+                val endCoord = TownCoordinates.findCoordinates(stg.destination)
+
+                val (sLat, sLon) = when {
+                    startCoord != null -> startCoord
+                    endCoord != null -> Pair(endCoord.first + 0.12, endCoord.second + 0.12)
+                    else -> Pair(42.88 - (stg.dayNumber * 0.06), -8.54 - (stg.dayNumber * 0.09))
+                }
+                val (eLat, eLon) = when {
+                    endCoord != null -> endCoord
+                    startCoord != null -> Pair(startCoord.first - 0.12, startCoord.second - 0.12)
+                    else -> Pair(sLat - 0.08, sLon - 0.12)
+                }
+                listOf(GeoPoint(sLat, sLon), GeoPoint(eLat, eLon))
+            }
+
+            if (stagePoints.size >= 2) {
+                allGeoPoints.addAll(stagePoints)
+
+                // Polyline
+                val polyline = Polyline(map)
+                polyline.setPoints(stagePoints)
+                polyline.outlinePaint.color = colorInt
+
+                if (hasGpx) {
+                    // Recorrido real continuo
+                    polyline.outlinePaint.pathEffect = null
+                    polyline.outlinePaint.strokeWidth = 10f
+                } else {
+                    // Línea discontinua / dashed estándar
+                    polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(24f, 16f), 0f)
+                    polyline.outlinePaint.strokeWidth = 6f
+                }
+
+                polyline.setOnClickListener { _, _, _ ->
+                    selectedDetailStage = stg
+                    true
+                }
+                map.overlays.add(polyline)
+
+                // Marcador de Inicio de Etapa (número de día)
+                val startPoint = stagePoints.first()
+                val startMarker = Marker(map).apply {
+                    position = startPoint
+                    icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    title = "Día ${stg.dayNumber}: ${stg.origin}"
+                    snippet = "${stg.distanceKm} km"
+                    setOnMarkerClickListener { _, _ ->
+                        selectedDetailStage = stg
+                        true
+                    }
+                }
+                map.overlays.add(startMarker)
+
+                // Marcador de Fin de Etapa
+                val endPoint = stagePoints.last()
+                val endMarker = Marker(map).apply {
+                    position = endPoint
+                    icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    title = "Llegada: ${stg.destination}"
+                    snippet = "Fin de etapa ${stg.dayNumber}"
+                    setOnMarkerClickListener { _, _ ->
+                        selectedDetailStage = stg
+                        true
+                    }
+                }
+                map.overlays.add(endMarker)
+            }
+        }
+
+        // Ajuste automático de cámara mediante BoundingBox con padding
+        if (allGeoPoints.isNotEmpty()) {
+            try {
+                val baseBox = BoundingBox.fromGeoPoints(allGeoPoints)
+                val latSpan = (baseBox.latNorth - baseBox.latSouth).coerceAtLeast(0.04)
+                val lonSpan = (baseBox.lonEast - baseBox.lonWest).coerceAtLeast(0.04)
+                val paddedBox = BoundingBox(
+                    baseBox.latNorth + (latSpan * 0.45), // espacio para tarjeta superior
+                    baseBox.lonEast + (lonSpan * 0.15),
+                    baseBox.latSouth - (latSpan * 0.35), // espacio para controles inferiores
+                    baseBox.lonWest - (lonSpan * 0.15)
+                )
+                map.post {
+                    map.zoomToBoundingBox(paddedBox, true, 80)
+                }
+            } catch (_: Exception) {}
+        }
+
+        map.invalidate()
     }
 
     Box(
@@ -561,33 +766,40 @@ fun InteractiveMapScreen(
             .fillMaxSize()
             .background(Color(0xFFF1F5F9))
     ) {
-        // Mapa interactivo integrado con capa estándar de Google Maps
+        // MAPA NATIVO INTERACTIVO JETPACK COMPOSE + OSMDROID
         AndroidView(
             modifier = Modifier
                 .fillMaxSize()
-                .testTag("osm_interactive_map_webview"),
+                .testTag("osmdroid_map_view"),
             factory = { ctx ->
-                WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.allowFileAccess = true
-                    settings.allowContentAccess = true
-                    settings.cacheMode = WebSettings.LOAD_DEFAULT
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            view?.evaluateJavascript("if (typeof adjustView === 'function') { adjustView(); }", null)
-                        }
+                MapView(ctx).apply {
+                    setMultiTouchControls(true)
+                    isTilesScaledToDpi = true
+
+                    val initialTileSource = when (currentLayer) {
+                        MapLayerType.ROADMAP -> GoogleMapsTileSource("GoogleRoadmap", "m")
+                        MapLayerType.HYBRID -> GoogleMapsTileSource("GoogleHybrid", "y")
+                        MapLayerType.TERRAIN -> GoogleMapsTileSource("GoogleTerrain", "p")
+                        MapLayerType.OSM -> TileSourceFactory.MAPNIK
                     }
-                    loadDataWithBaseURL("https://www.google.com", htmlContent, "text/html", "UTF-8", null)
+                    setTileSource(initialTileSource)
+
+                    controller.setZoom(8.0)
+                    controller.setCenter(GeoPoint(42.88, -7.50))
+
+                    // Overlay de Mi Ubicación
+                    val myLocOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
+                    overlays.add(myLocOverlay)
+                    locationOverlayRef = myLocOverlay
+                    mapViewRef = this
                 }
             },
-            update = { webView ->
-                webView.loadDataWithBaseURL("https://www.google.com", htmlContent, "text/html", "UTF-8", null)
+            update = { mapView ->
+                mapViewRef = mapView
             }
         )
 
-        // TARJETA DE TÍTULO SUPERIOR: Idéntica a la vista en "Etapas" (CaminoHeaderBanner)
+        // TARJETA DE TÍTULO SUPERIOR: Idéntica a la pantalla de Etapas (CaminoHeaderBanner)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -598,7 +810,6 @@ fun InteractiveMapScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
-                // Imagen de fondo / Marca de agua
                 if (!camino.coverPhotoUri.isNullOrBlank()) {
                     AsyncImage(
                         model = camino.coverPhotoUri,
@@ -620,7 +831,6 @@ fun InteractiveMapScreen(
                     )
                 }
 
-                // Superposición de degradado oscuro para legibilidad óptima
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -633,7 +843,6 @@ fun InteractiveMapScreen(
                         )
                 )
 
-                // Textos de cabecera
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -711,7 +920,255 @@ fun InteractiveMapScreen(
             }
         }
 
-        // PANEL DE CONTROL INFERIOR (Solo los 3 botones, sin carrusel ni ficha):
+        // BOTONES FLOTANTES LATERALES: Selector de Capas de Mapa y Mi Ubicación
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            // Botón Selector de Capas
+            Box {
+                SmallFloatingActionButton(
+                    onClick = { showLayersMenu = true },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = CaminoBlue,
+                    modifier = Modifier
+                        .shadow(4.dp, CircleShape)
+                        .testTag("btn_map_layers")
+                ) {
+                    Icon(Icons.Default.Layers, contentDescription = "Capas del mapa")
+                }
+
+                DropdownMenu(
+                    expanded = showLayersMenu,
+                    onDismissRequest = { showLayersMenu = false }
+                ) {
+                    Text(
+                        text = "Capas de Mapa",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = CaminoBlue,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                    HorizontalDivider()
+
+                    MapLayerType.values().forEach { layer ->
+                        val isSelected = currentLayer == layer
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = null
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = layer.label,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                        Text(
+                                            text = layer.iconDescription,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                currentLayer = layer
+                                showLayersMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Botón "Mi Ubicación"
+            SmallFloatingActionButton(
+                onClick = {
+                    val fineGranted = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val coarseGranted = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (fineGranted || coarseGranted) {
+                        locationOverlayRef?.enableMyLocation()
+                        centerMapOnUser(context, mapViewRef, locationOverlayRef)
+                    } else {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = CaminoBlue,
+                modifier = Modifier
+                    .shadow(4.dp, CircleShape)
+                    .testTag("btn_my_location")
+            ) {
+                Icon(Icons.Default.MyLocation, contentDescription = "Mi Ubicación")
+            }
+        }
+
+        // TARJETA INFERIOR INTERACTIVA: Muestra resumen de la etapa al pulsar marcador o polyline
+        AnimatedVisibility(
+            visible = selectedDetailStage != null,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 14.dp, end = 14.dp, bottom = 82.dp)
+        ) {
+            val stage = selectedDetailStage
+            if (stage != null) {
+                val hasGpx = !stage.gpxTrackJson.isNullOrBlank()
+                val stageColor = getStageComposeColor(stage.dayNumber)
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(12.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .background(stageColor, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${stage.dayNumber}",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Día ${stage.dayNumber}: ${stage.origin} → ${stage.destination}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${stage.distanceKm} km • +${stage.elevationGainM}m desnivel",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { selectedDetailStage = null },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Cerrar", modifier = Modifier.size(18.dp))
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = if (hasGpx) Color(0xFFDCFCE7) else Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = if (hasGpx) "📍 Recorrido GPX Real" else "〰️ Trazado Estándar",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (hasGpx) Color(0xFF16A34A) else CaminoBlueDark,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            Surface(
+                                color = if (stage.isCompleted) CaminoBlue.copy(alpha = 0.15f) else PilgrimYellow.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = if (stage.isCompleted) "✓ Completada" else "Pendiente",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (stage.isCompleted) CaminoBlue else PilgrimYellowDark,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onStageClick(stage.id) },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Ver Detalles", fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val points = if (hasGpx) {
+                                        GpxParser.deserializePoints(stage.gpxTrackJson).map { GeoPoint(it.lat, it.lon) }
+                                    } else {
+                                        val sCoord = TownCoordinates.findCoordinates(stage.origin)
+                                        val eCoord = TownCoordinates.findCoordinates(stage.destination)
+                                        if (sCoord != null && eCoord != null) {
+                                            listOf(GeoPoint(sCoord.first, sCoord.second), GeoPoint(eCoord.first, eCoord.second))
+                                        } else emptyList()
+                                    }
+                                    if (points.isNotEmpty()) {
+                                        try {
+                                            val bBox = BoundingBox.fromGeoPoints(points)
+                                            mapViewRef?.zoomToBoundingBox(bBox, true, 120)
+                                        } catch (_: Exception) {}
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.CenterFocusStrong, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Centrar", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // PANEL DE CONTROL INFERIOR (Los 3 botones en el orden exacto solicitado):
         // 1. Etapas (con desplegable vertical)
         // 2. Todos
         // 3. Ocultar Etapas
@@ -798,7 +1255,7 @@ fun InteractiveMapScreen(
                                 },
                                 onClick = {
                                     selectedStageIds = setOf(stg.id)
-                                    focusedStage = stg
+                                    selectedDetailStage = stg
                                     showStagesDropdown = false
                                 }
                             )
@@ -810,7 +1267,7 @@ fun InteractiveMapScreen(
                 Button(
                     onClick = {
                         selectedStageIds = sortedStages.map { it.id }.toSet()
-                        focusedStage = null
+                        selectedDetailStage = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
                     shape = RoundedCornerShape(10.dp),
@@ -834,7 +1291,7 @@ fun InteractiveMapScreen(
                 OutlinedButton(
                     onClick = {
                         selectedStageIds = emptySet()
-                        focusedStage = null
+                        selectedDetailStage = null
                     },
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
@@ -857,122 +1314,34 @@ fun InteractiveMapScreen(
 }
 
 /**
- * Genera el documento HTML con la capa estándar de Google Maps y renderiza los trazados de las etapas.
+ * Centra el mapa en la ubicación del usuario de forma suave
  */
-private fun generateOsmMapHtml(stagesJson: String): String {
-    return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <style>
-                html, body, #map {
-                    height: 100%;
-                    width: 100%;
-                    margin: 0;
-                    padding: 0;
-                    background-color: #f1f5f9;
-                }
-                .custom-badge {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: 50%;
-                    color: white;
-                    border: 2px solid #ffffff;
-                    font-weight: bold;
-                    font-size: 11px;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
-                }
-                .dest-badge {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: 50%;
-                    background: #ffffff;
-                    border: 2px solid #0E4C99;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-                }
-            </style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                var map = L.map('map', { 
-                    zoomControl: false,
-                    attributionControl: false
-                }).setView([42.8, -6.0], 7);
+private fun centerMapOnUser(
+    context: Context,
+    mapView: MapView?,
+    locationOverlay: MyLocationNewOverlay?
+) {
+    val map = mapView ?: return
+    val loc = locationOverlay?.myLocation
 
-                // Capa estándar oficial de Google Maps (vía satélites/servidores de Google)
-                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-                }).addTo(map);
-
-                // Control de zoom en la parte derecha
-                L.control.zoom({ position: 'topright' }).addTo(map);
-
-                var stagesData = ${stagesJson};
-                var allLatLngs = [];
-                var focusedLatLngs = [];
-
-                stagesData.forEach(function(stage) {
-                    if (!stage.visible) return;
-                    var pts = stage.points;
-                    if (pts && pts.length > 0) {
-                        var latlngs = pts.map(function(p) { return [p.lat, p.lon]; });
-                        allLatLngs = allLatLngs.concat(latlngs);
-                        if (stage.isFocused) {
-                            focusedLatLngs = latlngs;
-                        }
-
-                        var color = stage.color || '#0E4C99';
-
-                        // Trazado de la etapa con el color asignado
-                        var polyline = L.polyline(latlngs, {
-                            color: color,
-                            weight: stage.isFocused ? 6 : 4,
-                            opacity: stage.isFocused ? 1.0 : 0.85
-                        }).addTo(map);
-
-                        polyline.bindPopup("<b>Día " + stage.dayNumber + ": " + stage.origin + " → " + stage.destination + "</b><br>" + stage.distanceKm + " km • +" + stage.elevationGainM + "m");
-
-                        // Marcador de salida con el número de etapa
-                        var pStart = pts[0];
-                        var markerHtml = "<div class='custom-badge' style='background:" + color + "; width:26px; height:26px;'>" + stage.dayNumber + "</div>";
-                        var iconStart = L.divIcon({ className: '', html: markerHtml, iconSize: [26, 26], iconAnchor: [13, 13] });
-                        L.marker([pStart.lat, pStart.lon], { icon: iconStart }).addTo(map)
-                            .bindPopup("<b>Día " + stage.dayNumber + ": " + stage.origin + "</b><br>Salida de etapa");
-
-                        // Marcador de llegada
-                        var pEnd = pts[pts.length - 1];
-                        var endHtml = "<div class='dest-badge' style='border-color:" + color + "; width:16px; height:16px;'><div style='width:8px; height:8px; background:" + color + "; border-radius:50%;'></div></div>";
-                        var iconEnd = L.divIcon({ className: '', html: endHtml, iconSize: [16, 16], iconAnchor: [8, 8] });
-                        L.marker([pEnd.lat, pEnd.lon], { icon: iconEnd }).addTo(map)
-                            .bindPopup("<b>Llegada Día " + stage.dayNumber + ": " + stage.destination + "</b>");
-                    }
-                });
-
-                function adjustView() {
-                    try {
-                        map.invalidateSize();
-                        if (focusedLatLngs.length > 0) {
-                            var bounds = L.latLngBounds(focusedLatLngs);
-                            map.fitBounds(bounds, { padding: [175, 45], maxZoom: 13 });
-                        } else if (allLatLngs.length > 0) {
-                            var bounds = L.latLngBounds(allLatLngs);
-                            map.fitBounds(bounds, { padding: [175, 45] });
-                        }
-                    } catch(e) {}
-                }
-
-                setTimeout(adjustView, 250);
-                setTimeout(adjustView, 750);
-            </script>
-        </body>
-        </html>
-    """.trimIndent()
+    if (loc != null) {
+        map.controller.animateTo(loc)
+        map.controller.setZoom(15.0)
+    } else {
+        try {
+            val locManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            val lastGps = locManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val lastNet = locManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            val best = lastGps ?: lastNet
+            if (best != null) {
+                val pt = GeoPoint(best.latitude, best.longitude)
+                map.controller.animateTo(pt)
+                map.controller.setZoom(15.0)
+            } else {
+                Toast.makeText(context, "Obteniendo posición GPS...", Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: SecurityException) {
+            Toast.makeText(context, "Permiso de ubicación no disponible", Toast.LENGTH_SHORT).show()
+        }
+    }
 }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
@@ -37,6 +38,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,6 +64,13 @@ fun StageDetailScreen(
 ) {
     BackHandler { onBack() }
     val context = LocalContext.current
+
+    val activeCamino by viewModel.selectedCamino.collectAsStateWithLifecycle()
+    val isCaminoIngles = remember(activeCamino) {
+        val title = activeCamino?.title ?: ""
+        title.contains("Inglés", ignoreCase = true) || title.contains("Ingles", ignoreCase = true)
+    }
+    val hasGpx = !stage.gpxTrackJson.isNullOrBlank()
 
     var showEditStageDialog by remember { mutableStateOf(false) }
     var showEditTipsDialog by remember { mutableStateOf(false) }
@@ -105,7 +114,6 @@ fun StageDetailScreen(
             TopAppBar(
                 title = {
                     Column {
-                        val activeCamino by viewModel.selectedCamino.collectAsStateWithLifecycle()
                         val caminoName = activeCamino?.title ?: "Ruta"
                         Text(
                             text = "Estás en: $caminoName",
@@ -153,7 +161,11 @@ fun StageDetailScreen(
                         onClick = { showGpxImportDialog = true },
                         modifier = Modifier.testTag("stage_gpx_button")
                     ) {
-                        Icon(Icons.Default.FileUpload, contentDescription = "Subir GPX", tint = CaminoBlue)
+                        Icon(
+                            if (hasGpx) Icons.Default.Sync else Icons.Default.FileUpload,
+                            contentDescription = if (hasGpx) "Sustituir GPX" else "Subir GPX",
+                            tint = CaminoBlue
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -368,9 +380,13 @@ fun StageDetailScreen(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = CaminoBlue)
                     ) {
-                        Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            if (hasGpx) Icons.Default.Sync else Icons.Default.UploadFile,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(Modifier.width(6.dp))
-                        Text("Subir GPX", fontSize = 12.sp)
+                        Text(if (hasGpx) "Sustituir GPX" else "Subir GPX", fontSize = 12.sp)
                     }
                 }
             }
@@ -449,6 +465,57 @@ fun StageDetailScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = CaminoBlue
                                 )
+                            }
+                        }
+
+                        if (isCaminoIngles) {
+                            Spacer(Modifier.height(12.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.OpenInNew,
+                                        contentDescription = null,
+                                        tint = CaminoBlue,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "Variante recomendada:",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = CaminoBlue
+                                        )
+                                        Text(
+                                            text = "Ruta por el Trazado Antiguo",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                textDecoration = TextDecoration.Underline
+                                            ),
+                                            color = CaminoBlue,
+                                            modifier = Modifier.clickable {
+                                                try {
+                                                    val intent = Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse("https://es.wikiloc.com/rutas-senderismo/ferrol-a-santiago-camino-ingles-por-trazado-antiguo-128031925")
+                                                    )
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "No se pudo abrir el navegador", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1401,22 +1468,38 @@ fun GpxImportDialog(
     onDismiss: () -> Unit,
     onPickFile: () -> Unit
 ) {
+    val hasGpx = !stage.gpxTrackJson.isNullOrBlank()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Route, contentDescription = null, tint = CaminoBlue)
+                Icon(if (hasGpx) Icons.Default.Sync else Icons.Default.Route, contentDescription = null, tint = CaminoBlue)
                 Spacer(Modifier.width(8.dp))
-                Text("Sincronizar GPX de Etapa")
+                Text(if (hasGpx) "Sustituir Archivo GPX" else "Sincronizar GPX de Etapa")
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "Sube tu archivo .GPX grabado durante la ruta. Se actualizarán automáticamente la distancia, desnivel, tiempo y se sincronizará el recorrido en el mapa.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (hasGpx) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Esta etapa ya cuenta con un archivo GPX registrado (máximo 1 archivo por etapa). Si seleccionas un nuevo archivo, se sustituirá por completo el recorrido anterior.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(10.dp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Sube tu archivo .GPX grabado durante la ruta. Se actualizarán automáticamente la distancia, desnivel, tiempo y se sincronizará el recorrido en el mapa (máximo 1 archivo GPX por etapa).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 Button(
                     onClick = onPickFile,
@@ -1424,9 +1507,9 @@ fun GpxImportDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Default.FolderOpen, contentDescription = null)
+                    Icon(if (hasGpx) Icons.Default.Sync else Icons.Default.FolderOpen, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Seleccionar archivo GPX del dispositivo")
+                    Text(if (hasGpx) "Sustituir por nuevo archivo GPX" else "Seleccionar archivo GPX del dispositivo")
                 }
             }
         },
