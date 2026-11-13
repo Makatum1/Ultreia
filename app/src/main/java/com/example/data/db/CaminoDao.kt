@@ -65,6 +65,13 @@ interface CaminoDao {
         INNER JOIN stages s ON a.stageId = s.id
         WHERE s.caminoId = :caminoId
     """)
+    fun getAccommodationsForCamino(caminoId: Long): Flow<List<AccommodationEntity>>
+
+    @Query("""
+        SELECT a.* FROM accommodations a
+        INNER JOIN stages s ON a.stageId = s.id
+        WHERE s.caminoId = :caminoId
+    """)
     suspend fun getAllAccommodationsForCaminoOnce(caminoId: Long): List<AccommodationEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

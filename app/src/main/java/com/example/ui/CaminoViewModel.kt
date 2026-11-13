@@ -367,6 +367,17 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val caminoAccommodations: StateFlow<List<AccommodationEntity>> = _selectedCaminoId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList())
+            else repository.getAccommodationsForCamino(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun getAccommodationsForStageFlow(stageId: Long): Flow<List<AccommodationEntity>> =
+        repository.getAccommodationsForStage(stageId)
+
     private val _isExportingPdf = MutableStateFlow(false)
     val isExportingPdf: StateFlow<Boolean> = _isExportingPdf.asStateFlow()
 

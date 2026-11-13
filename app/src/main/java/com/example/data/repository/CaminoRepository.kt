@@ -100,6 +100,9 @@ class CaminoRepository(context: Context) {
     fun getAccommodationsForStage(stageId: Long): Flow<List<AccommodationEntity>> =
         dao.getAccommodationsForStage(stageId)
 
+    fun getAccommodationsForCamino(caminoId: Long): Flow<List<AccommodationEntity>> =
+        dao.getAccommodationsForCamino(caminoId)
+
     suspend fun getAccommodationsForStageOnce(stageId: Long): List<AccommodationEntity> = withContext(Dispatchers.IO) {
         dao.getAccommodationsForStageOnce(stageId)
     }
