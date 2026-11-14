@@ -209,7 +209,8 @@ fun CaminoDetailScreen(
                     InteractiveMapScreen(
                         camino = camino,
                         stages = stages,
-                        onStageClick = onStageClick
+                        onStageClick = onStageClick,
+                        viewModel = viewModel
                     )
                 }
                 2 -> {

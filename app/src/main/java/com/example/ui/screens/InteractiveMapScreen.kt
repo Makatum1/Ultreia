@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.CaminoViewModel
 import com.example.R
 import com.example.data.gpx.GpxParser
 import com.example.data.model.CaminoEntity
@@ -92,6 +94,43 @@ fun getStageComposeColor(dayNumber: Int): Color {
     } catch (_: Exception) {
         CaminoBlue
     }
+}
+
+/**
+ * Modos de visualización del mapa: Este Camino activo o Red Total de todos los caminos
+ */
+enum class MapScopeMode {
+    CURRENT_CAMINO, // "Este Camino"
+    TOTAL           // "Total"
+}
+
+/**
+ * Paleta de colores predefinida de alta visibilidad para distinguir cada Camino en la vista Total
+ */
+val CAMINO_PALETTE_HEX = listOf(
+    "#2563EB", // Azul Real
+    "#DC2626", // Rojo Carmín
+    "#16A34A", // Verde Esmeralda
+    "#D97706", // Ámbar / Naranja dorado
+    "#9333EA", // Púrpura Intenso
+    "#0891B2", // Cian / Turquesa
+    "#EA580C", // Naranja Vivo
+    "#4F46E5", // Índigo Profundo
+    "#059669", // Verde Jade
+    "#DB2777", // Rosa Fucsia
+    "#0284C7", // Azul Océano
+    "#CA8A04", // Mostaza
+    "#7C3AED", // Violeta
+    "#B45309"  // Marrón Cobrizo
+)
+
+fun getCaminoColorHex(caminoId: Long, index: Int = -1): String {
+    val idx = if (index >= 0) {
+        index % CAMINO_PALETTE_HEX.size
+    } else {
+        kotlin.math.abs(caminoId.hashCode()) % CAMINO_PALETTE_HEX.size
+    }
+    return CAMINO_PALETTE_HEX[idx]
 }
 
 /**
@@ -561,9 +600,20 @@ fun InteractiveMapScreen(
     camino: CaminoEntity,
     stages: List<StageEntity>,
     onStageClick: (Long) -> Unit,
+    viewModel: CaminoViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+
+    // Datos reactivos globales de todos los caminos
+    val allCaminosState = viewModel?.caminos?.collectAsStateWithLifecycle(emptyList())
+    val allStagesState = viewModel?.allStages?.collectAsStateWithLifecycle(emptyList())
+    val allCaminos = allCaminosState?.value?.ifEmpty { listOf(camino) } ?: listOf(camino)
+    val allStages = allStagesState?.value?.ifEmpty { stages } ?: stages
+
+    // Modo de visualización: "Este Camino" (por defecto) vs "Total" (todas las rutas)
+    var mapScopeMode by remember { mutableStateOf(MapScopeMode.CURRENT_CAMINO) }
+    var showScopeDropdown by remember { mutableStateOf(false) }
 
     // Inicializar configuración de OSMDroid con User-Agent seguro
     LaunchedEffect(Unit) {
@@ -625,8 +675,8 @@ fun InteractiveMapScreen(
         String.format(Locale.US, "%.1f", completedKm)
     }
 
-    // Efecto para actualizar overlays del mapa cuando cambian las etapas seleccionadas o capas
-    LaunchedEffect(selectedStageIds, sortedStages, mapViewRef, currentLayer) {
+    // Efecto para actualizar overlays del mapa cuando cambian las etapas seleccionadas, capas o modo de filtro
+    LaunchedEffect(selectedStageIds, sortedStages, allStages, allCaminos, mapViewRef, currentLayer, mapScopeMode) {
         val map = mapViewRef ?: return@LaunchedEffect
 
         // Actualizar TileSource según la capa seleccionada
@@ -638,7 +688,7 @@ fun InteractiveMapScreen(
         }
         map.setTileSource(tileSource)
 
-        // Limpiar overlays previos preservando el locationOverlay si existe
+        // Limpiar overlays previos preservando el locationOverlay si existe (evita problemas de rendimiento y duplicados)
         val locOverlay = locationOverlayRef
         map.overlays.clear()
         if (locOverlay != null) {
@@ -647,100 +697,187 @@ fun InteractiveMapScreen(
 
         val allGeoPoints = mutableListOf<GeoPoint>()
 
-        for (stg in sortedStages) {
-            if (!selectedStageIds.contains(stg.id)) continue
+        if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) {
+            // ==========================================
+            // LÓGICA: ESTE CAMINO
+            // ==========================================
+            for (stg in sortedStages) {
+                if (!selectedStageIds.contains(stg.id)) continue
 
-            val colorHex = getStageColor(stg.dayNumber)
-            val colorInt = try {
-                android.graphics.Color.parseColor(colorHex)
-            } catch (_: Exception) {
-                android.graphics.Color.BLUE
-            }
-
-            // REGLA ESTRICTA DE GPX:
-            // 1. Si TIENE GPX adjunto / subido: Dibujar EXCLUSIVAMENTE la polilínea del GPX real.
-            //    Bajo ninguna circunstancia dibujar la línea discontinua cuando exista GPX.
-            // 2. Si NO TIENE GPX: Dibujar ÚNICAMENTE la polilínea estándar con estilo discontinuo
-            //    (dashed) conectando origen a destino.
-            val gpxPoints = GpxParser.deserializePoints(stg.gpxTrackJson)
-            val hasGpx = gpxPoints.size >= 2
-
-            val stagePoints: List<GeoPoint> = if (hasGpx) {
-                gpxPoints.map { GeoPoint(it.lat, it.lon) }
-            } else {
-                val startCoord = TownCoordinates.findCoordinates(stg.origin)
-                val endCoord = TownCoordinates.findCoordinates(stg.destination)
-
-                val (sLat, sLon) = when {
-                    startCoord != null -> startCoord
-                    endCoord != null -> Pair(endCoord.first + 0.12, endCoord.second + 0.12)
-                    else -> Pair(42.88 - (stg.dayNumber * 0.06), -8.54 - (stg.dayNumber * 0.09))
+                val colorHex = getStageColor(stg.dayNumber)
+                val colorInt = try {
+                    android.graphics.Color.parseColor(colorHex)
+                } catch (_: Exception) {
+                    android.graphics.Color.BLUE
                 }
-                val (eLat, eLon) = when {
-                    endCoord != null -> endCoord
-                    startCoord != null -> Pair(startCoord.first - 0.12, startCoord.second - 0.12)
-                    else -> Pair(sLat - 0.08, sLon - 0.12)
-                }
-                listOf(GeoPoint(sLat, sLon), GeoPoint(eLat, eLon))
-            }
 
-            if (stagePoints.size >= 2) {
-                allGeoPoints.addAll(stagePoints)
+                val gpxPoints = GpxParser.deserializePoints(stg.gpxTrackJson)
+                val hasGpx = gpxPoints.size >= 2
 
-                // Polyline
-                val polyline = Polyline(map)
-                polyline.setPoints(stagePoints)
-                polyline.outlinePaint.color = colorInt
-
-                if (hasGpx) {
-                    // Recorrido real continuo
-                    polyline.outlinePaint.pathEffect = null
-                    polyline.outlinePaint.strokeWidth = 10f
+                val stagePoints: List<GeoPoint> = if (hasGpx) {
+                    gpxPoints.map { GeoPoint(it.lat, it.lon) }
                 } else {
-                    // Línea discontinua / dashed estándar
-                    polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(24f, 16f), 0f)
-                    polyline.outlinePaint.strokeWidth = 6f
+                    val startCoord = TownCoordinates.findCoordinates(stg.origin)
+                    val endCoord = TownCoordinates.findCoordinates(stg.destination)
+
+                    val (sLat, sLon) = when {
+                        startCoord != null -> startCoord
+                        endCoord != null -> Pair(endCoord.first + 0.12, endCoord.second + 0.12)
+                        else -> Pair(42.88 - (stg.dayNumber * 0.06), -8.54 - (stg.dayNumber * 0.09))
+                    }
+                    val (eLat, eLon) = when {
+                        endCoord != null -> endCoord
+                        startCoord != null -> Pair(startCoord.first - 0.12, startCoord.second - 0.12)
+                        else -> Pair(sLat - 0.08, sLon - 0.12)
+                    }
+                    listOf(GeoPoint(sLat, sLon), GeoPoint(eLat, eLon))
                 }
 
-                polyline.setOnClickListener { _, _, _ ->
-                    selectedDetailStage = stg
-                    true
-                }
-                map.overlays.add(polyline)
+                if (stagePoints.size >= 2) {
+                    allGeoPoints.addAll(stagePoints)
 
-                // Marcador de Inicio de Etapa (número de día)
-                val startPoint = stagePoints.first()
-                val startMarker = Marker(map).apply {
-                    position = startPoint
-                    icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    title = "Día ${stg.dayNumber}: ${stg.origin}"
-                    snippet = "${stg.distanceKm} km"
-                    setOnMarkerClickListener { _, _ ->
+                    val polyline = Polyline(map)
+                    polyline.setPoints(stagePoints)
+                    polyline.outlinePaint.color = colorInt
+
+                    if (hasGpx) {
+                        polyline.outlinePaint.pathEffect = null
+                        polyline.outlinePaint.strokeWidth = 10f
+                    } else {
+                        polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(24f, 16f), 0f)
+                        polyline.outlinePaint.strokeWidth = 6f
+                    }
+
+                    polyline.setOnClickListener { _, _, _ ->
                         selectedDetailStage = stg
                         true
                     }
-                }
-                map.overlays.add(startMarker)
+                    map.overlays.add(polyline)
 
-                // Marcador de Fin de Etapa
-                val endPoint = stagePoints.last()
-                val endMarker = Marker(map).apply {
-                    position = endPoint
-                    icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    title = "Llegada: ${stg.destination}"
-                    snippet = "Fin de etapa ${stg.dayNumber}"
-                    setOnMarkerClickListener { _, _ ->
+                    val startPoint = stagePoints.first()
+                    val startMarker = Marker(map).apply {
+                        position = startPoint
+                        icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        title = "Día ${stg.dayNumber}: ${stg.origin}"
+                        snippet = "${stg.distanceKm} km"
+                        setOnMarkerClickListener { _, _ ->
+                            selectedDetailStage = stg
+                            true
+                        }
+                    }
+                    map.overlays.add(startMarker)
+
+                    val endPoint = stagePoints.last()
+                    val endMarker = Marker(map).apply {
+                        position = endPoint
+                        icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        title = "Llegada: ${stg.destination}"
+                        snippet = "Fin de etapa ${stg.dayNumber}"
+                        setOnMarkerClickListener { _, _ ->
+                            selectedDetailStage = stg
+                            true
+                        }
+                    }
+                    map.overlays.add(endMarker)
+                }
+            }
+        } else {
+            // ==========================================
+            // LÓGICA: TOTAL (DISTINCIÓN POR COLORES DE CADA CAMINO)
+            // ==========================================
+            val caminoColorMap = allCaminos.mapIndexed { index, c ->
+                c.id to getCaminoColorHex(c.id, index)
+            }.toMap()
+
+            val stagesToDraw = if (allStages.isNotEmpty()) allStages else sortedStages
+            for (stg in stagesToDraw) {
+                // Color único e idéntico para todas las etapas, polilíneas y marcadores del mismo camino
+                val colorHex = caminoColorMap[stg.caminoId] ?: getCaminoColorHex(stg.caminoId)
+                val colorInt = try {
+                    android.graphics.Color.parseColor(colorHex)
+                } catch (_: Exception) {
+                    android.graphics.Color.BLUE
+                }
+
+                val gpxPoints = GpxParser.deserializePoints(stg.gpxTrackJson)
+                val hasGpx = gpxPoints.size >= 2
+
+                val stagePoints: List<GeoPoint> = if (hasGpx) {
+                    gpxPoints.map { GeoPoint(it.lat, it.lon) }
+                } else {
+                    val startCoord = TownCoordinates.findCoordinates(stg.origin)
+                    val endCoord = TownCoordinates.findCoordinates(stg.destination)
+
+                    val (sLat, sLon) = when {
+                        startCoord != null -> startCoord
+                        endCoord != null -> Pair(endCoord.first + 0.12, endCoord.second + 0.12)
+                        else -> Pair(42.88 - (stg.dayNumber * 0.06), -8.54 - (stg.dayNumber * 0.09))
+                    }
+                    val (eLat, eLon) = when {
+                        endCoord != null -> endCoord
+                        startCoord != null -> Pair(startCoord.first - 0.12, startCoord.second - 0.12)
+                        else -> Pair(sLat - 0.08, sLon - 0.12)
+                    }
+                    listOf(GeoPoint(sLat, sLon), GeoPoint(eLat, eLon))
+                }
+
+                if (stagePoints.size >= 2) {
+                    allGeoPoints.addAll(stagePoints)
+
+                    val polyline = Polyline(map)
+                    polyline.setPoints(stagePoints)
+                    polyline.outlinePaint.color = colorInt
+
+                    if (hasGpx) {
+                        polyline.outlinePaint.pathEffect = null
+                        polyline.outlinePaint.strokeWidth = 9f
+                    } else {
+                        polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(24f, 16f), 0f)
+                        polyline.outlinePaint.strokeWidth = 6f
+                    }
+
+                    polyline.setOnClickListener { _, _, _ ->
                         selectedDetailStage = stg
                         true
                     }
+                    map.overlays.add(polyline)
+
+                    val cName = allCaminos.find { it.id == stg.caminoId }?.title ?: ""
+
+                    val startPoint = stagePoints.first()
+                    val startMarker = Marker(map).apply {
+                        position = startPoint
+                        icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        title = "$cName - Día ${stg.dayNumber}: ${stg.origin}"
+                        snippet = "${stg.distanceKm} km"
+                        setOnMarkerClickListener { _, _ ->
+                            selectedDetailStage = stg
+                            true
+                        }
+                    }
+                    map.overlays.add(startMarker)
+
+                    val endPoint = stagePoints.last()
+                    val endMarker = Marker(map).apply {
+                        position = endPoint
+                        icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        title = "$cName - Llegada: ${stg.destination}"
+                        snippet = "Fin de etapa ${stg.dayNumber}"
+                        setOnMarkerClickListener { _, _ ->
+                            selectedDetailStage = stg
+                            true
+                        }
+                    }
+                    map.overlays.add(endMarker)
                 }
-                map.overlays.add(endMarker)
             }
         }
 
-        // Ajuste automático de cámara mediante BoundingBox con padding
+        // Ajuste automático de cámara mediante BoundingBox con padding (para Este Camino o Total)
         if (allGeoPoints.isNotEmpty()) {
             try {
                 val baseBox = BoundingBox.fromGeoPoints(allGeoPoints)
@@ -858,7 +995,13 @@ fun InteractiveMapScreen(
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
+                                text = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                    "RED GLOBAL DE RUTAS"
+                                } else if (camino.isTravelGuide) {
+                                    "ULTREIA VIAJE"
+                                } else {
+                                    "ULTREIA GUÍA"
+                                },
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = CaminoBlueDark,
@@ -866,10 +1009,18 @@ fun InteractiveMapScreen(
                             )
                         }
 
-                        if (camino.startDate.isNotBlank()) {
+                        if (mapScopeMode == MapScopeMode.CURRENT_CAMINO && camino.startDate.isNotBlank()) {
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = "📅 ${camino.startDate}",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        } else if (mapScopeMode == MapScopeMode.TOTAL) {
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "🌍 ${allCaminos.size} caminos guardados",
                                 fontSize = 11.sp,
                                 color = Color.White,
                                 fontWeight = FontWeight.SemiBold
@@ -880,7 +1031,7 @@ fun InteractiveMapScreen(
                     Spacer(Modifier.height(4.dp))
 
                     Text(
-                        text = camino.title,
+                        text = if (mapScopeMode == MapScopeMode.TOTAL) "Red Total de Caminos" else camino.title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
@@ -888,15 +1039,17 @@ fun InteractiveMapScreen(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    if (camino.subtitle.isNotBlank()) {
-                        Text(
-                            text = camino.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = if (mapScopeMode == MapScopeMode.TOTAL) {
+                            "Todas las etapas mostradas con colores diferenciados por camino"
+                        } else {
+                            camino.subtitle
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
                     Spacer(Modifier.height(6.dp))
 
@@ -905,7 +1058,11 @@ fun InteractiveMapScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${completedKmStr} / ${totalKmStr} km",
+                            text = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                "${allStages.filter { it.isCompleted }.sumOf { it.distanceKm }.toInt()} / ${allStages.sumOf { it.distanceKm }.toInt()} km"
+                            } else {
+                                "${completedKmStr} / ${totalKmStr} km"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = PilgrimYellow,
                             fontWeight = FontWeight.Bold
@@ -915,7 +1072,11 @@ fun InteractiveMapScreen(
                             color = Color.White.copy(alpha = 0.5f)
                         )
                         Text(
-                            text = "${progressPercent}% completado",
+                            text = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                "${allStages.size} etapas totales"
+                            } else {
+                                "${progressPercent}% completado"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White
                         )
@@ -1267,28 +1428,95 @@ fun InteractiveMapScreen(
                     }
                 }
 
-                // Botón 2: "Todos" (Muestra todas las etapas en el mapa)
-                Button(
-                    onClick = {
-                        selectedStageIds = sortedStages.map { it.id }.toSet()
-                        selectedDetailStage = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("btn_map_control_todos")
-                ) {
-                    Icon(Icons.Default.SelectAll, contentDescription = null, tint = CaminoBlueDark, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = "Todos",
-                        color = CaminoBlueDark,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
+                // Botón 2: Menú Desplegable con opciones "Este Camino" y "Total"
+                Box(modifier = Modifier.weight(1.1f)) {
+                    Button(
+                        onClick = { showScopeDropdown = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_map_control_todos")
+                    ) {
+                        Icon(
+                            imageVector = if (mapScopeMode == MapScopeMode.TOTAL) Icons.Default.Public else Icons.Default.SelectAll,
+                            contentDescription = null,
+                            tint = CaminoBlueDark,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = if (mapScopeMode == MapScopeMode.TOTAL) "Total" else "Este Camino",
+                            color = CaminoBlueDark,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = CaminoBlueDark,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showScopeDropdown,
+                        onDismissRequest = { showScopeDropdown = false },
+                        modifier = Modifier
+                            .width(180.dp)
+                            .background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Hiking,
+                                        contentDescription = null,
+                                        tint = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) CaminoBlue else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "Este Camino",
+                                        fontWeight = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) CaminoBlue else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            },
+                            onClick = {
+                                mapScopeMode = MapScopeMode.CURRENT_CAMINO
+                                selectedStageIds = sortedStages.map { it.id }.toSet()
+                                selectedDetailStage = null
+                                showScopeDropdown = false
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Public,
+                                        contentDescription = null,
+                                        tint = if (mapScopeMode == MapScopeMode.TOTAL) CaminoBlue else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "Total",
+                                        fontWeight = if (mapScopeMode == MapScopeMode.TOTAL) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (mapScopeMode == MapScopeMode.TOTAL) CaminoBlue else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            },
+                            onClick = {
+                                mapScopeMode = MapScopeMode.TOTAL
+                                selectedDetailStage = null
+                                showScopeDropdown = false
+                            }
+                        )
+                    }
                 }
 
                 // Botón 3: "Ocultar Etapas" (Oculta las líneas y puntos del mapa)
@@ -1300,7 +1528,7 @@ fun InteractiveMapScreen(
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                     modifier = Modifier
-                        .weight(1.2f)
+                        .weight(1.1f)
                         .testTag("btn_map_control_ocultar")
                 ) {
                     Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))

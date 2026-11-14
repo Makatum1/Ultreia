@@ -352,7 +352,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                             InteractiveMapScreen(
                                 camino = selectedCamino!!,
                                 stages = stages,
-                                onStageClick = { stageId -> viewModel.navigateToStage(stageId) }
+                                onStageClick = { stageId -> viewModel.navigateToStage(stageId) },
+                                viewModel = viewModel
                             )
                         } else {
                             NoCaminoSelectedState(
