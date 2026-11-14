@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,30 +65,40 @@ fun StatsScreen(
     val allStages by viewModel.allStages.collectAsStateWithLifecycle()
     val allAccommodations by viewModel.allAccommodations.collectAsStateWithLifecycle()
 
-    // --- SEPARACIÓN DE ESTADOS: DATOS DEL CAMINO ACTIVO ---
+    // --- SEPARACIÓN DE ESTADOS: DATOS DEL CAMINO ACTIVO (Basados en etapas completadas) ---
+    val completedStagesList = remember(stages) { stages.filter { it.isCompleted } }
     val totalCaminoKm = remember(stages) {
         stages.sumOf { it.distanceKm }
     }
-    val completedCaminoKm = remember(stages) {
-        stages.filter { it.isCompleted }.sumOf { it.distanceKm }
+    val completedCaminoKm = remember(completedStagesList) {
+        completedStagesList.sumOf { it.distanceKm }
     }
     val totalCaminoElevationGain = remember(stages) {
         stages.sumOf { it.elevationGainM }
     }
-    val completedCaminoElevationGain = remember(stages) {
-        stages.filter { it.isCompleted }.sumOf { it.elevationGainM }
+    val completedCaminoElevationGain = remember(completedStagesList) {
+        completedStagesList.sumOf { it.elevationGainM }
+    }
+    val completedCaminoElevationLoss = remember(completedStagesList) {
+        completedStagesList.sumOf { it.elevationLossM }
     }
     val totalCaminoStagesCount = remember(stages) {
         stages.size
     }
-    val completedCaminoStagesCount = remember(stages) {
-        stages.count { it.isCompleted }
+    val completedCaminoStagesCount = remember(completedStagesList) {
+        completedStagesList.size
     }
     val pendingCaminoStagesCount = remember(totalCaminoStagesCount, completedCaminoStagesCount) {
         (totalCaminoStagesCount - completedCaminoStagesCount).coerceAtLeast(0)
     }
     val caminoProgressPercent = remember(totalCaminoKm, completedCaminoKm) {
         if (totalCaminoKm > 0) ((completedCaminoKm / totalCaminoKm) * 100).toInt().coerceIn(0, 100) else 0
+    }
+    val completedCaminoTimeStr = remember(completedStagesList) {
+        calculateTotalTimeString(completedStagesList)
+    }
+    val avgKmPerCaminoCompletedStage = remember(completedCaminoKm, completedCaminoStagesCount) {
+        if (completedCaminoStagesCount > 0) completedCaminoKm / completedCaminoStagesCount else 0.0
     }
     val caminoExpenseEur = remember(caminoAccommodations) {
         caminoAccommodations.sumOf { acc ->
@@ -95,7 +107,8 @@ fun StatsScreen(
         }
     }
 
-    // --- SEPARACIÓN DE ESTADOS: DATOS TOTALES GLOBALES (TODOS LOS CAMINOS) ---
+    // --- SEPARACIÓN DE ESTADOS: DATOS TOTALES GLOBALES (Basados en etapas completadas de todos los caminos) ---
+    val completedGlobalStagesList = remember(allStages) { allStages.filter { it.isCompleted } }
     val totalGlobalCaminosRealizados = remember(allCaminos, allStages) {
         allCaminos.count { c ->
             val cStages = allStages.filter { it.caminoId == c.id }
@@ -105,23 +118,32 @@ fun StatsScreen(
     val totalGlobalKm = remember(allStages) {
         allStages.sumOf { it.distanceKm }
     }
-    val completedGlobalKm = remember(allStages) {
-        allStages.filter { it.isCompleted }.sumOf { it.distanceKm }
+    val completedGlobalKm = remember(completedGlobalStagesList) {
+        completedGlobalStagesList.sumOf { it.distanceKm }
     }
     val totalGlobalElevationGain = remember(allStages) {
         allStages.sumOf { it.elevationGainM }
     }
-    val completedGlobalElevationGain = remember(allStages) {
-        allStages.filter { it.isCompleted }.sumOf { it.elevationGainM }
+    val completedGlobalElevationGain = remember(completedGlobalStagesList) {
+        completedGlobalStagesList.sumOf { it.elevationGainM }
+    }
+    val completedGlobalElevationLoss = remember(completedGlobalStagesList) {
+        completedGlobalStagesList.sumOf { it.elevationLossM }
     }
     val totalGlobalStagesCount = remember(allStages) {
         allStages.size
     }
-    val completedGlobalStagesCount = remember(allStages) {
-        allStages.count { it.isCompleted }
+    val completedGlobalStagesCount = remember(completedGlobalStagesList) {
+        completedGlobalStagesList.size
     }
     val pendingGlobalStagesCount = remember(totalGlobalStagesCount, completedGlobalStagesCount) {
         (totalGlobalStagesCount - completedGlobalStagesCount).coerceAtLeast(0)
+    }
+    val completedGlobalTimeStr = remember(completedGlobalStagesList) {
+        calculateTotalTimeString(completedGlobalStagesList)
+    }
+    val avgKmPerGlobalCompletedStage = remember(completedGlobalKm, completedGlobalStagesCount) {
+        if (completedGlobalStagesCount > 0) completedGlobalKm / completedGlobalStagesCount else 0.0
     }
     val totalGlobalExpenseEur = remember(allAccommodations) {
         allAccommodations.sumOf { acc ->
@@ -252,6 +274,9 @@ fun StatsScreen(
                     completedKm = completedCaminoKm,
                     totalElevationGain = totalCaminoElevationGain,
                     completedElevationGain = completedCaminoElevationGain,
+                    completedElevationLoss = completedCaminoElevationLoss,
+                    completedTimeStr = completedCaminoTimeStr,
+                    avgKmPerStage = avgKmPerCaminoCompletedStage,
                     totalStages = totalCaminoStagesCount,
                     completedStages = completedCaminoStagesCount,
                     pendingStages = pendingCaminoStagesCount,
@@ -270,6 +295,9 @@ fun StatsScreen(
                     completedKm = completedGlobalKm,
                     totalElevationGain = totalGlobalElevationGain,
                     completedElevationGain = completedGlobalElevationGain,
+                    completedElevationLoss = completedGlobalElevationLoss,
+                    completedTimeStr = completedGlobalTimeStr,
+                    avgKmPerStage = avgKmPerGlobalCompletedStage,
                     totalStages = totalGlobalStagesCount,
                     completedStages = completedGlobalStagesCount,
                     pendingStages = pendingGlobalStagesCount,
@@ -295,6 +323,9 @@ private fun ActiveCaminoDataContent(
     completedKm: Double,
     totalElevationGain: Int,
     completedElevationGain: Int,
+    completedElevationLoss: Int,
+    completedTimeStr: String,
+    avgKmPerStage: Double,
     totalStages: Int,
     completedStages: Int,
     pendingStages: Int,
@@ -345,17 +376,7 @@ private fun ActiveCaminoDataContent(
         return
     }
 
-    val totalKmStr = remember(totalKm) { String.format(Locale.US, "%.1f", totalKm) }
     val completedKmStr = remember(completedKm) { String.format(Locale.US, "%.1f", completedKm) }
-    val remainingKm = remember(totalKm, completedKm) { kotlin.math.max(0.0, totalKm - completedKm) }
-    val remainingKmStr = remember(remainingKm) { String.format(Locale.US, "%.1f", remainingKm) }
-
-    val avgKmPerStage = remember(totalKm, totalStages) {
-        if (totalStages > 0) totalKm / totalStages else 0.0
-    }
-    val avgElevationPerStage = remember(totalElevationGain, totalStages) {
-        if (totalStages > 0) totalElevationGain / totalStages else 0
-    }
 
     LazyColumn(
         modifier = Modifier
@@ -378,24 +399,16 @@ private fun ActiveCaminoDataContent(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Icono: Compostela si llega al 100%, Medalla en caso contrario
+                    // Icono: Compostela completa si llega al 100% (sin círculo), Medalla en caso contrario
                     if (progressPercent >= 100) {
-                        Box(
+                        Image(
+                            painter = painterResource(id = R.drawable.compostela),
+                            contentDescription = "Compostela",
                             modifier = Modifier
-                                .size(74.dp)
-                                .clip(CircleShape)
-                                .background(PilgrimYellow),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.compostela),
-                                contentDescription = "Compostela",
-                                modifier = Modifier
-                                    .size(70.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
+                                .height(74.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Fit
+                        )
                     } else {
                         Box(
                             modifier = Modifier
@@ -465,7 +478,7 @@ private fun ActiveCaminoDataContent(
             )
         }
 
-        // FILA 1: DISTANCIA TOTAL Y DESNIVEL TOTAL ACUMULADO
+        // FILA 1: DISTANCIA TOTAL Y MEDIA KM/ETAPA (Basados en etapas completadas)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -474,76 +487,76 @@ private fun ActiveCaminoDataContent(
                 StatMetricCard(
                     title = "Distancia Total",
                     value = "$completedKmStr km",
-                    sub = "de $totalKmStr km totales",
+                    sub = "En etapas completadas",
                     icon = Icons.AutoMirrored.Filled.DirectionsWalk,
                     color = CaminoGreen,
                     modifier = Modifier.weight(1f)
                 )
 
                 StatMetricCard(
-                    title = "Desnivel Total",
-                    value = "+$totalElevationGain m",
-                    sub = "+$completedElevationGain m completados",
-                    icon = Icons.Default.Landscape,
-                    color = CaminoBlue,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // FILA 2: TOTAL DE ETAPAS Y GASTO TOTAL DEL CAMINO
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetricCard(
-                    title = "Total de $stageTermPlural",
-                    value = "$totalStages",
-                    sub = "$completedStages completadas • $pendingStages pendientes",
-                    icon = Icons.Default.ViewDay,
-                    color = PilgrimYellow,
-                    modifier = Modifier.weight(1f)
-                )
-
-                StatMetricCard(
-                    title = "Gasto en Alojamiento",
-                    value = "${String.format(Locale.US, "%.2f", totalExpenseEur)} €",
-                    sub = "en ${caminoAccommodations.size} alojamientos",
-                    icon = Icons.Default.Euro,
-                    color = CaminoGreen,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // FILA 3: PROMEDIOS POR ETAPA
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetricCard(
                     title = "Media km / $stageTerm",
                     value = "${String.format(Locale.US, "%.1f", avgKmPerStage)} km",
-                    sub = "Promedio por etapa",
+                    sub = "Promedio completado",
                     icon = Icons.Default.Speed,
                     color = CaminoBlue,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+
+        // FILA 2: DESNIVEL POSITIVO Y DESNIVEL NEGATIVO (Basados en etapas completadas)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatMetricCard(
+                    title = "Desnivel Positivo",
+                    value = "+$completedElevationGain m",
+                    sub = "Ascenso completado",
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    color = CaminoBlue,
+                    modifier = Modifier.weight(1f)
+                )
 
                 StatMetricCard(
-                    title = "Media Desnivel",
-                    value = "+$avgElevationPerStage m",
-                    sub = "Promedio por $stageTerm",
-                    icon = Icons.Default.Terrain,
-                    color = PilgrimYellowDark,
+                    title = "Desnivel Negativo",
+                    value = "-$completedElevationLoss m",
+                    sub = "Descenso completado",
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
+                    color = CaminoBlueDark,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
-        // BALANCE GENERAL DEL CAMINO/VIAJE
+        // FILA 3: TIEMPO Y TOTAL DE ETAPAS (Basados en etapas completadas)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatMetricCard(
+                    title = "Tiempo",
+                    value = completedTimeStr,
+                    sub = "Tiempo en ruta",
+                    icon = Icons.Default.Schedule,
+                    color = PilgrimYellowDark,
+                    modifier = Modifier.weight(1f)
+                )
+
+                StatMetricCard(
+                    title = "Total de $stageTermPlural",
+                    value = "$completedStages de $totalStages",
+                    sub = "Etapas completadas",
+                    icon = Icons.Default.ViewDay,
+                    color = PilgrimYellow,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // BALANCE GENERAL DEL CAMINO/VIAJE (Mostrando lo realizado)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -577,24 +590,40 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Distancia por recorrer:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("$remainingKmStr km", fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                        Text("Distancia completada:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$completedKmStr km", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel positivo restante:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("+${(totalElevationGain - completedElevationGain).coerceAtLeast(0)} m", fontWeight = FontWeight.Bold)
+                        Text("Desnivel positivo superado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("+$completedElevationGain m", fontWeight = FontWeight.Bold)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("$stageTermPlural pendientes:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("$pendingStages", fontWeight = FontWeight.Bold)
+                        Text("Desnivel negativo completado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("-$completedElevationLoss m", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Tiempo en ruta completado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(completedTimeStr, fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("$stageTermPlural completadas:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$completedStages de $totalStages", fontWeight = FontWeight.Bold)
                     }
 
                     Row(
@@ -603,6 +632,14 @@ private fun ActiveCaminoDataContent(
                     ) {
                         Text("Alojamientos registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${caminoAccommodations.size}", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Gasto en alojamientos:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${String.format(Locale.US, "%.2f", totalExpenseEur)} €", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
                 }
             }
@@ -724,6 +761,9 @@ private fun GlobalTotalDataContent(
     completedKm: Double,
     totalElevationGain: Int,
     completedElevationGain: Int,
+    completedElevationLoss: Int,
+    completedTimeStr: String,
+    avgKmPerStage: Double,
     totalStages: Int,
     completedStages: Int,
     pendingStages: Int,
@@ -731,17 +771,7 @@ private fun GlobalTotalDataContent(
     totalAccommodationsCount: Int,
     onExportPdf: () -> Unit
 ) {
-    val totalKmStr = remember(totalKm) { String.format(Locale.US, "%.1f", totalKm) }
     val completedKmStr = remember(completedKm) { String.format(Locale.US, "%.1f", completedKm) }
-    val remainingKm = remember(totalKm, completedKm) { kotlin.math.max(0.0, totalKm - completedKm) }
-    val remainingKmStr = remember(remainingKm) { String.format(Locale.US, "%.1f", remainingKm) }
-
-    val avgKmPerStage = remember(totalKm, totalStages) {
-        if (totalStages > 0) totalKm / totalStages else 0.0
-    }
-    val avgElevationPerStage = remember(totalElevationGain, totalStages) {
-        if (totalStages > 0) totalElevationGain / totalStages else 0
-    }
 
     LazyColumn(
         modifier = Modifier
@@ -814,7 +844,7 @@ private fun GlobalTotalDataContent(
             )
         }
 
-        // FILA 1: DISTANCIA TOTAL GLOBAL Y DESNIVEL TOTAL GLOBAL
+        // FILA 1: DISTANCIA TOTAL Y MEDIA KM/ETAPA (Basados en etapas completadas, sin lo que queda)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -823,76 +853,76 @@ private fun GlobalTotalDataContent(
                 StatMetricCard(
                     title = "Distancia Total",
                     value = "$completedKmStr km",
-                    sub = "de $totalKmStr km totales",
+                    sub = "En etapas completadas",
                     icon = Icons.AutoMirrored.Filled.DirectionsWalk,
                     color = CaminoGreen,
                     modifier = Modifier.weight(1f)
                 )
 
                 StatMetricCard(
-                    title = "Desnivel Total",
-                    value = "+$totalElevationGain m",
-                    sub = "+$completedElevationGain m completados",
-                    icon = Icons.Default.Landscape,
-                    color = CaminoBlue,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // FILA 2: TOTAL GLOBAL DE ETAPAS Y GASTO TOTAL GLOBAL
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetricCard(
-                    title = "Total de Etapas",
-                    value = "$totalStages",
-                    sub = "$completedStages completadas • $pendingStages pendientes",
-                    icon = Icons.Default.ViewDay,
-                    color = PilgrimYellow,
-                    modifier = Modifier.weight(1f)
-                )
-
-                StatMetricCard(
-                    title = "Gasto Total Estimado",
-                    value = "${String.format(Locale.US, "%.2f", totalExpenseEur)} €",
-                    sub = "en $totalAccommodationsCount alojamientos",
-                    icon = Icons.Default.Euro,
-                    color = CaminoGreen,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // FILA 3: PROMEDIOS GLOBALES
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetricCard(
                     title = "Media km / Etapa",
                     value = "${String.format(Locale.US, "%.1f", avgKmPerStage)} km",
-                    sub = "Promedio global diario",
+                    sub = "Promedio global completado",
                     icon = Icons.Default.Speed,
                     color = CaminoBlue,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+
+        // FILA 2: DESNIVEL POSITIVO Y DESNIVEL NEGATIVO (Basados en etapas completadas)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatMetricCard(
+                    title = "Desnivel Positivo",
+                    value = "+$completedElevationGain m",
+                    sub = "Ascenso completado",
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    color = CaminoBlue,
+                    modifier = Modifier.weight(1f)
+                )
 
                 StatMetricCard(
-                    title = "Media Desnivel",
-                    value = "+$avgElevationPerStage m",
-                    sub = "Promedio global por etapa",
-                    icon = Icons.Default.Terrain,
-                    color = PilgrimYellowDark,
+                    title = "Desnivel Negativo",
+                    value = "-$completedElevationLoss m",
+                    sub = "Descenso completado",
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
+                    color = CaminoBlueDark,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
-        // BALANCE GENERAL GLOBAL (Sin 'del Camino')
+        // FILA 3: TIEMPO Y CAMINOS COMPLETADOS (Basados en etapas completadas)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatMetricCard(
+                    title = "Tiempo",
+                    value = completedTimeStr,
+                    sub = "Tiempo en ruta",
+                    icon = Icons.Default.Schedule,
+                    color = PilgrimYellowDark,
+                    modifier = Modifier.weight(1f)
+                )
+
+                StatMetricCard(
+                    title = "Caminos Completados",
+                    value = "$totalCaminosRealizados de $totalCaminosCount",
+                    sub = "Rutas finalizadas",
+                    icon = Icons.Default.EmojiEvents,
+                    color = PilgrimYellow,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // BALANCE GENERAL GLOBAL (Mostrando lo realizado, no lo que queda)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -918,32 +948,48 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Rutas y caminos registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("$totalCaminosCount", fontWeight = FontWeight.Bold)
+                        Text("Caminos completados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$totalCaminosRealizados de $totalCaminosCount", fontWeight = FontWeight.Bold)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Distancia global por recorrer:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("$remainingKmStr km", fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                        Text("Distancia total recorrida:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$completedKmStr km", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel positivo restante:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("+${(totalElevationGain - completedElevationGain).coerceAtLeast(0)} m", fontWeight = FontWeight.Bold)
+                        Text("Desnivel positivo superado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("+$completedElevationGain m", fontWeight = FontWeight.Bold)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Etapas pendientes totales:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("$pendingStages", fontWeight = FontWeight.Bold)
+                        Text("Desnivel negativo completado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("-$completedElevationLoss m", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Tiempo total en ruta:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(completedTimeStr, fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Etapas completadas totales:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$completedStages de $totalStages", fontWeight = FontWeight.Bold)
                     }
 
                     Row(
@@ -1046,4 +1092,33 @@ private fun StatMetricCard(
             }
         }
     }
+}
+
+/**
+ * Calcula el tiempo total acumulado en minutos y lo devuelve en formato "Xh Ym"
+ */
+private fun calculateTotalTimeString(stages: List<StageEntity>): String {
+    var totalMinutes = 0
+    for (stage in stages) {
+        val str = stage.estimatedTime.trim()
+        if (str.isBlank()) continue
+        val hMatch = Regex("(\\d+)\\s*h", RegexOption.IGNORE_CASE).find(str)
+        val mMatch = Regex("(\\d+)\\s*m", RegexOption.IGNORE_CASE).find(str)
+        if (hMatch != null || mMatch != null) {
+            val h = hMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val m = mMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            totalMinutes += h * 60 + m
+        } else if (str.contains(":")) {
+            val parts = str.split(":")
+            val h = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: 0
+            val m = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 0
+            totalMinutes += h * 60 + m
+        }
+    }
+    val hours = totalMinutes / 60
+    val mins = totalMinutes % 60
+    return if (hours > 0 && mins > 0) "${hours}h ${mins}m"
+    else if (hours > 0) "${hours}h"
+    else if (mins > 0) "${mins}m"
+    else "0h 00m"
 }
