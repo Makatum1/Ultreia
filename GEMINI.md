@@ -6,10 +6,13 @@ Cada vez que se realice cualquier modificación en el proyecto y se vaya a dar p
 - Revisar a fondo los cambios implementados para comprobar su funcionamiento y coherencia con la arquitectura.
 - Realizar pruebas o compilación de comprobación para garantizar que no existan errores de compilación ni regresiones.
 
-## 2. Compilación y Generación del APK
+## 2. Compilación y Generación del APK y Código Fuente ZIP
 - Compilar la aplicación en modo Release (`assembleRelease`).
 - Verificar que el archivo ejecutable se genere y sobreescriba en la raíz del proyecto bajo el nombre y ruta exactos:
   `C:\Users\perez\Desktop\basura\Aplicaciones\Ultreia\Ultreia.apk`
+- Generar y sobreescribir el archivo comprimido ZIP con todos los códigos y archivos necesarios para abrir y compilar en Android Studio (Google Studio) en la misma ruta y con el mismo nombre que el APK:
+  `C:\Users\perez\Desktop\basura\Aplicaciones\Ultreia\Ultreia.zip`
+  (Incluye el código fuente completo `app/src`, scripts de construcción `build.gradle.kts`, `settings.gradle.kts`, wrapper de gradle, `gradle.properties`, claves y recursos, excluyendo carpetas compiladas y temporales como `build`, `.gradle`, `.git`, `.kotlin`, etc.).
 
 ## 3. Sincronización con GitHub
 - Añadir los archivos modificados al control de versiones (`git add`).
