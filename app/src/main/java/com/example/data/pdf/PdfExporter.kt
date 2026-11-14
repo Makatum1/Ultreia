@@ -26,6 +26,29 @@ object PdfExporter {
     private const val PAGE_HEIGHT = 842 // Standard A4 height in points
     private const val MARGIN = 40f
 
+    // Official Travel Guide Luxury Editorial Palette
+    private val COLOR_NAVY = Color.rgb(15, 34, 64)
+    private val COLOR_NAVY_LIGHT = Color.rgb(24, 55, 98)
+    private val COLOR_GOLD = Color.rgb(245, 178, 30)
+    private val COLOR_GOLD_DARK = Color.rgb(194, 120, 3)
+    private val COLOR_GOLD_LIGHT = Color.rgb(254, 243, 199)
+    private val COLOR_EMERALD = Color.rgb(22, 163, 74)
+    private val COLOR_EMERALD_BG = Color.rgb(240, 253, 244)
+    private val COLOR_EMERALD_BORDER = Color.rgb(187, 247, 208)
+    private val COLOR_AMBER = Color.rgb(217, 119, 6)
+    private val COLOR_AMBER_BG = Color.rgb(255, 247, 237)
+    private val COLOR_AMBER_BORDER = Color.rgb(254, 215, 170)
+    private val COLOR_BLUE = Color.rgb(37, 99, 235)
+    private val COLOR_BLUE_BG = Color.rgb(239, 246, 255)
+    private val COLOR_BLUE_BORDER = Color.rgb(191, 219, 254)
+    private val COLOR_SLATE = Color.rgb(15, 23, 42)
+    private val COLOR_MUTED = Color.rgb(100, 116, 139)
+    private val COLOR_CARD_BG = Color.rgb(248, 250, 252)
+    private val COLOR_CARD_BORDER = Color.rgb(226, 232, 240)
+    private val COLOR_DIVIDER = Color.rgb(238, 242, 246)
+    private val COLOR_WARM_BG = Color.rgb(255, 253, 247)
+    private val COLOR_WARM_BORDER = Color.rgb(243, 230, 200)
+
     suspend fun generateAndSharePdf(
         context: Context,
         camino: CaminoEntity,
@@ -46,7 +69,6 @@ object PdfExporter {
             pageNumber++
 
             // ---------------- PAGES 2+: ETAPAS Y VIVENCIAS ----------------
-            // We group stages or allocate 1 page per stage for rich detailed layout with drawn route and accommodations
             val allAccommodations = repository.getAllAccommodationsForCaminoOnce(camino.id)
             val accMap = allAccommodations.groupBy { it.stageId }
 
@@ -68,7 +90,7 @@ object PdfExporter {
 
             // Open share intent
             withContext(Dispatchers.Main) {
-                sharePdfFile(context, pdfFile, camino.title)
+                sharePdfFile(context, pdfFile, camino.title, camino.isTravelGuide)
             }
 
             pdfFile
@@ -92,14 +114,19 @@ object PdfExporter {
             val page = pdfDocument.startPage(pageInfo)
             val canvas = page.canvas
 
-            val titleText = if (isTotal) "Estadísticas Totales del Viaje" else "Estadísticas: ${camino?.title ?: "Camino"}"
+            val isTravel = camino?.isTravelGuide == true
+            val titleText = if (isTotal) {
+                if (isTravel) "Estadísticas Totales de Viajes" else "Estadísticas Totales del Camino"
+            } else {
+                "Estadísticas: ${camino?.title ?: (if (isTravel) "Viaje" else "Camino")}"
+            }
             drawStatsPage(context, canvas, isTotal, camino, stats, stages)
             pdfDocument.finishPage(page)
 
             val outputDir = File(context.cacheDir, "shared_docs")
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val safeTitle = if (isTotal) "Totales" else (camino?.title?.replace("[^a-zA-Z0-9]".toRegex(), "_") ?: "Camino")
+            val safeTitle = if (isTotal) "Totales" else (camino?.title?.replace("[^a-zA-Z0-9]".toRegex(), "_") ?: "Ruta")
             val pdfFile = File(outputDir, "Ultreia_Estadisticas_${safeTitle}.pdf")
             val fos = FileOutputStream(pdfFile)
             pdfDocument.writeTo(fos)
@@ -115,7 +142,7 @@ object PdfExporter {
                     putExtra(Intent.EXTRA_TEXT, "Comparto la estadística de viaje generada con Ultreia.")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(Intent.createChooser(intent, "Compartir Estadística del Viaje en PDF"))
+                context.startActivity(Intent.createChooser(intent, "Compartir Estadística en PDF"))
             }
             pdfFile
         } catch (e: Exception) {
@@ -125,176 +152,9 @@ object PdfExporter {
         }
     }
 
-    private fun drawStatsPage(
-        context: Context,
-        canvas: Canvas,
-        isTotal: Boolean,
-        camino: CaminoEntity?,
-        stats: com.example.data.repository.CaminoStats,
-        stages: List<StageEntity>
-    ) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-        // Navy Header
-        paint.color = Color.rgb(14, 76, 153)
-        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 180f, paint)
-
-        // Yellow Accent
-        paint.color = Color.rgb(247, 190, 49)
-        canvas.drawRect(0f, 175f, PAGE_WIDTH.toFloat(), 180f, paint)
-
-        // App Logo
-        try {
-            val logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
-            if (logoBitmap != null) {
-                val scaled = Bitmap.createScaledBitmap(logoBitmap, 60, 60, true)
-                canvas.drawBitmap(scaled, MARGIN, 35f, paint)
-            }
-        } catch (_: Exception) {}
-
-        // Header Title
-        paint.color = Color.WHITE
-        paint.textSize = 22f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("ULTREIA", MARGIN + 72f, 55f, paint)
-
-        paint.textSize = 13f
-        paint.color = Color.rgb(247, 190, 49)
-        canvas.drawText(if (isTotal) "INFORME GLOBAL DE RENDIMIENTO Y VIAJES" else "ESTADÍSTICAS DETALLADAS DE RUTA", MARGIN + 72f, 75f, paint)
-
-        paint.color = Color.WHITE
-        paint.textSize = 18f
-        val subjectTitle = if (isTotal) "Resumen Total Acumulado" else (camino?.title ?: "Camino de Santiago")
-        canvas.drawText(subjectTitle, MARGIN + 72f, 105f, paint)
-
-        paint.textSize = 10f
-        paint.color = Color.rgb(220, 230, 245)
-        canvas.drawText("Generado el: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}", MARGIN + 72f, 125f, paint)
-
-        // 4 KPI Cards
-        var startY = 210f
-        val cardWidth = (PAGE_WIDTH - (MARGIN * 2) - 20f) / 2
-        val cardHeight = 90f
-
-        // Card 1: Etapas
-        drawMetricCard(canvas, MARGIN, startY, cardWidth, cardHeight, "ETAPAS COMPLETADAS", "${stats.completedStages} / ${stats.totalStages}", "${stats.totalStages - stats.completedStages} etapas restantes", Color.rgb(14, 76, 153))
-        // Card 2: Distancia
-        drawMetricCard(canvas, MARGIN + cardWidth + 20f, startY, cardWidth, cardHeight, "DISTANCIA RECORRIDA", "${String.format("%.1f", stats.completedKm)} km", "de ${String.format("%.1f", stats.totalKm)} km totales", Color.rgb(46, 125, 50))
-
-        startY += cardHeight + 15f
-        // Card 3: Desnivel
-        drawMetricCard(canvas, MARGIN, startY, cardWidth, cardHeight, "DESNIVEL POSITIVO", "+${stats.completedElevationGainM} m", "de +${stats.totalElevationGainM} m totales", Color.rgb(217, 119, 6))
-        // Card 4: Progreso
-        drawMetricCard(canvas, MARGIN + cardWidth + 20f, startY, cardWidth, cardHeight, "PROGRESO GLOBAL", "${stats.progressPercent}%", "Objetivo cumplido", Color.rgb(14, 76, 153))
-
-        // Progress bar visual
-        startY += cardHeight + 25f
-        paint.color = Color.rgb(235, 238, 242)
-        val barRect = RectF(MARGIN, startY, PAGE_WIDTH - MARGIN, startY + 14f)
-        canvas.drawRoundRect(barRect, 7f, 7f, paint)
-
-        val fillWidth = (PAGE_WIDTH - (MARGIN * 2)) * (stats.progressPercent / 100f).coerceIn(0f, 1f)
-        if (fillWidth > 0) {
-            paint.color = Color.rgb(46, 125, 50)
-            val fillRect = RectF(MARGIN, startY, MARGIN + fillWidth, startY + 14f)
-            canvas.drawRoundRect(fillRect, 7f, 7f, paint)
-        }
-
-        // Section breakdown title
-        startY += 40f
-        paint.color = Color.rgb(14, 76, 153)
-        paint.textSize = 14f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText(if (isTotal) "Resumen de Rutas y Métricas Globales" else "Detalle de Etapas del Camino", MARGIN, startY, paint)
-
-        startY += 20f
-        paint.textSize = 10f
-        paint.typeface = Typeface.DEFAULT
-        paint.color = Color.rgb(70, 80, 95)
-
-        if (stages.isNotEmpty() && !isTotal) {
-            for (st in stages.take(12)) {
-                val statusText = if (st.isCompleted) "✓ Completada" else "⏳ Planificada"
-                val line = "Día ${st.dayNumber}: ${st.origin} → ${st.destination}  |  ${st.distanceKm} km  |  +${st.elevationGainM}m  |  $statusText"
-                canvas.drawText(line, MARGIN, startY, paint)
-                startY += 16f
-            }
-        } else {
-            val avgKm = if (stats.completedStages > 0) (stats.completedKm / stats.completedStages) else 0.0
-            canvas.drawText("• Promedio de distancia por etapa completada: ${String.format("%.1f", avgKm)} km", MARGIN, startY, paint)
-            startY += 18f
-            val remainingKm = (stats.totalKm - stats.completedKm).coerceAtLeast(0.0)
-            canvas.drawText("• Distancia pendiente por recorrer: ${String.format("%.1f", remainingKm)} km", MARGIN, startY, paint)
-            startY += 18f
-            canvas.drawText("• Desnivel medio superado por jornada: ${if (stats.completedStages > 0) stats.completedElevationGainM / stats.completedStages else 0} metros", MARGIN, startY, paint)
-        }
-
-        // Stamp and Credential Footer
-        paint.color = Color.rgb(230, 235, 245)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1.5f
-        val stampBox = RectF(PAGE_WIDTH - MARGIN - 140f, PAGE_HEIGHT - 120f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 40f)
-        canvas.drawRoundRect(stampBox, 8f, 8f, paint)
-
-        paint.style = Paint.Style.FILL
-        paint.color = Color.rgb(140, 150, 165)
-        paint.textSize = 8.5f
-        canvas.drawText("SELLO Y VALIDACIÓN", PAGE_WIDTH - MARGIN - 130f, PAGE_HEIGHT - 100f, paint)
-        canvas.drawText("OFICINA DEL PEREGRINO", PAGE_WIDTH - MARGIN - 130f, PAGE_HEIGHT - 85f, paint)
-
-        paint.color = Color.rgb(14, 76, 153)
-        paint.textSize = 9f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("¡Ultreia et Suseia! — Guía de Viaje Oficial", MARGIN, PAGE_HEIGHT - 45f, paint)
-    }
-
-    private fun drawMetricCard(
-        canvas: Canvas,
-        x: Float,
-        y: Float,
-        w: Float,
-        h: Float,
-        title: String,
-        value: String,
-        sub: String,
-        accentColor: Int
-    ) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-        // Card background
-        paint.color = Color.rgb(248, 250, 252)
-        val rect = RectF(x, y, x + w, y + h)
-        canvas.drawRoundRect(rect, 10f, 10f, paint)
-
-        // Border
-        paint.style = Paint.Style.STROKE
-        paint.color = Color.rgb(226, 232, 240)
-        paint.strokeWidth = 1.2f
-        canvas.drawRoundRect(rect, 10f, 10f, paint)
-
-        // Left accent bar
-        paint.style = Paint.Style.FILL
-        paint.color = accentColor
-        canvas.drawRoundRect(RectF(x, y, x + 5f, y + h), 3f, 3f, paint)
-
-        // Title
-        paint.color = Color.rgb(100, 116, 139)
-        paint.textSize = 9.5f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText(title, x + 16f, y + 24f, paint)
-
-        // Value
-        paint.color = Color.rgb(15, 23, 42)
-        paint.textSize = 19f
-        canvas.drawText(value, x + 16f, y + 52f, paint)
-
-        // Sub
-        paint.color = Color.rgb(100, 116, 139)
-        paint.textSize = 9f
-        paint.typeface = Typeface.DEFAULT
-        canvas.drawText(sub, x + 16f, y + 74f, paint)
-    }
-
+    // ----------------------------------------------------
+    // COVER PAGE (PORTADA EDITORIAL PROFESIONAL)
+    // ----------------------------------------------------
     private fun drawCoverPage(
         context: Context,
         canvas: Canvas,
@@ -303,125 +163,260 @@ object PdfExporter {
         repository: CaminoRepository
     ) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val isTravel = camino.isTravelGuide
 
-        // Background header banner (Camino Navy Blue)
-        paint.color = Color.rgb(14, 76, 153)
-        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 260f, paint)
+        // 1. Cabecera principal (Banner Azul Marino de Lujo)
+        val bannerHeight = 245f
+        paint.color = COLOR_NAVY
+        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
 
-        // Golden accent stripe
-        paint.color = Color.rgb(247, 190, 49)
-        canvas.drawRect(0f, 255f, PAGE_WIDTH.toFloat(), 262f, paint)
+        // Doble Franja Dorada Inferior (Estilo Guía de Alta Gama)
+        paint.color = COLOR_GOLD
+        canvas.drawRect(0f, bannerHeight - 6f, PAGE_WIDTH.toFloat(), bannerHeight - 2f, paint)
+        paint.color = COLOR_GOLD_DARK
+        canvas.drawRect(0f, bannerHeight - 1.5f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
 
-        // Try drawing user icon or shell logo
+        // Logo oficial o emblema
+        var textLeftOffset = MARGIN
         try {
             val logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
             if (logoBitmap != null) {
-                val scaledLogo = Bitmap.createScaledBitmap(logoBitmap, 75, 75, true)
-                canvas.drawBitmap(scaledLogo, MARGIN, 35f, paint)
+                val scaledLogo = Bitmap.createScaledBitmap(logoBitmap, 64, 64, true)
+                canvas.drawBitmap(scaledLogo, MARGIN, 36f, paint)
+                textLeftOffset = MARGIN + 76f
             }
         } catch (_: Exception) {}
 
-        // App title / Brand
-        paint.color = Color.rgb(247, 190, 49)
-        paint.textSize = 14f
-        paint.isFakeBoldText = true
-        canvas.drawText("ULTREIA • GUÍA & MEMORIAS DEL CAMINO", MARGIN + 90f, 55f, paint)
-
-        // Camino Title
-        paint.color = Color.WHITE
-        paint.textSize = 26f
-        paint.isFakeBoldText = true
-        canvas.drawText(camino.title, MARGIN + 90f, 90f, paint)
-
-        // Subtitle
-        paint.textSize = 12f
-        paint.isFakeBoldText = false
-        paint.color = Color.rgb(220, 235, 255)
-        val sub = if (camino.subtitle.length > 55) camino.subtitle.take(52) + "..." else camino.subtitle
-        canvas.drawText(sub, MARGIN + 90f, 112f, paint)
-
-        // Pilgrim info pill
-        val pilgrimLabel = "Peregrino: ${camino.pilgrimName}  |  Fecha: ${camino.startDate.ifEmpty { "2026" }}"
-        paint.textSize = 11f
-        paint.color = Color.rgb(240, 240, 240)
-        canvas.drawText(pilgrimLabel, MARGIN, 215f, paint)
-
-        // Statistics Summary Card
-        val stats = repository.calculateStats(stages)
-        val cardTop = 290f
-        val cardBottom = 420f
-        val cardRect = RectF(MARGIN, cardTop, PAGE_WIDTH - MARGIN, cardBottom)
-
-        paint.color = Color.rgb(245, 248, 252)
-        canvas.drawRoundRect(cardRect, 12f, 12f, paint)
-
-        paint.color = Color.rgb(215, 228, 245)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1.5f
-        canvas.drawRoundRect(cardRect, 12f, 12f, paint)
-        paint.style = Paint.Style.FILL
-
-        // Card header
-        paint.color = Color.rgb(14, 76, 153)
-        paint.textSize = 15f
-        paint.isFakeBoldText = true
-        canvas.drawText("Resumen Estadístico del Viaje", MARGIN + 18f, cardTop + 32f, paint)
-
-        paint.isFakeBoldText = false
-        paint.textSize = 12f
-        paint.color = Color.rgb(55, 65, 81)
-
-        val col1 = MARGIN + 20f
-        val col2 = PAGE_WIDTH / 2f + 10f
-
-        canvas.drawText("• Distancia Total: ${stats.totalKm} km", col1, cardTop + 62f, paint)
-        canvas.drawText("• Distancia Completada: ${stats.completedKm} km", col1, cardTop + 86f, paint)
-        canvas.drawText("• Progreso General: ${stats.progressPercent}%", col1, cardTop + 110f, paint)
-
-        canvas.drawText("• Etapas Totales: ${stats.totalStages}", col2, cardTop + 62f, paint)
-        canvas.drawText("• Etapas Completadas: ${stats.completedStages}", col2, cardTop + 86f, paint)
-        canvas.drawText("• Desnivel Acumulado: +${stats.totalElevationGainM} m", col2, cardTop + 110f, paint)
-
-        // Itinerary index table
-        paint.color = Color.rgb(14, 76, 153)
-        paint.textSize = 15f
-        paint.isFakeBoldText = true
-        canvas.drawText("Índice de Etapas del Cuaderno", MARGIN, 455f, paint)
-
-        var yPos = 485f
+        // Etiqueta de Marca / Sello de Edición
+        paint.color = COLOR_GOLD
         paint.textSize = 10.5f
-        paint.isFakeBoldText = false
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val brandLabel = if (isTravel) "ULTREIA VIAJES  •  GUÍA OFICIAL & CUADERNO DE BITÁCORA" else "ULTREIA  •  GUÍA OFICIAL & MEMORIAS DEL CAMINO DE SANTIAGO"
+        canvas.drawText(brandLabel, textLeftOffset, 48f, paint)
 
-        for (i in stages.indices) {
-            if (yPos > PAGE_HEIGHT - 60f) break
-            val stg = stages[i]
-
-            // Status indicator icon
-            paint.color = if (stg.isCompleted) Color.rgb(46, 125, 50) else Color.rgb(156, 163, 175)
-            canvas.drawCircle(MARGIN + 6f, yPos - 3.5f, 4f, paint)
-
-            paint.color = Color.rgb(31, 41, 55)
-            val stgTitle = "Día ${stg.dayNumber}: ${stg.origin} → ${stg.destination}"
-            canvas.drawText(stgTitle, MARGIN + 18f, yPos, paint)
-
-            val meta = "${stg.distanceKm} km  |  +${stg.elevationGainM}m  |  ${stg.estimatedTime}"
-            paint.color = Color.rgb(107, 114, 128)
-            val metaWidth = paint.measureText(meta)
-            canvas.drawText(meta, PAGE_WIDTH - MARGIN - metaWidth, yPos, paint)
-
-            // subtle divider line
-            paint.color = Color.rgb(238, 242, 246)
-            canvas.drawLine(MARGIN, yPos + 6f, PAGE_WIDTH - MARGIN, yPos + 6f, paint)
-
-            yPos += 24f
+        // Título del Camino / Viaje con ajuste multilínea si es largo
+        paint.color = Color.WHITE
+        paint.textSize = 24f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val titleMaxWidth = PAGE_WIDTH - textLeftOffset - MARGIN
+        val titleWords = camino.title.split(" ")
+        var line1 = StringBuilder()
+        var line2 = StringBuilder()
+        for (word in titleWords) {
+            val test = if (line1.isEmpty()) word else "$line1 $word"
+            if (paint.measureText(test) <= titleMaxWidth && line2.isEmpty()) {
+                line1.append(if (line1.isEmpty()) word else " $word")
+            } else {
+                line2.append(if (line2.isEmpty()) word else " $word")
+            }
+        }
+        var titleY = 78f
+        canvas.drawText(line1.toString(), textLeftOffset, titleY, paint)
+        if (line2.isNotEmpty()) {
+            titleY += 26f
+            canvas.drawText(line2.toString(), textLeftOffset, titleY, paint)
         }
 
-        // Footer
-        paint.color = Color.rgb(156, 163, 175)
-        paint.textSize = 9.5f
-        canvas.drawText("Generado con Ultreia • ¡Buen Camino, Peregrino!", MARGIN, PAGE_HEIGHT - 25f, paint)
+        // Subtítulo
+        paint.textSize = 11.5f
+        paint.typeface = Typeface.DEFAULT
+        paint.color = Color.rgb(220, 235, 255)
+        val sub = if (camino.subtitle.length > 70) camino.subtitle.take(67) + "..." else camino.subtitle
+        canvas.drawText(sub, textLeftOffset, titleY + 20f, paint)
+
+        // Tarjeta de Credencial del Peregrino / Viajero en la cabecera
+        val credBoxTop = 185f
+        val credBoxHeight = 38f
+        val credRect = RectF(MARGIN, credBoxTop, PAGE_WIDTH - MARGIN, credBoxTop + credBoxHeight)
+        paint.color = Color.argb(45, 255, 255, 255)
+        canvas.drawRoundRect(credRect, 6f, 6f, paint)
+        paint.color = Color.argb(90, 255, 255, 255)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        canvas.drawRoundRect(credRect, 6f, 6f, paint)
+        paint.style = Paint.Style.FILL
+
+        paint.color = Color.WHITE
+        paint.textSize = 10f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val userRole = if (isTravel) "👤 VIAJERO / EXPLORADOR" else "🥾 PEREGRINO DEL CAMINO"
+        val userName = camino.pilgrimName.ifBlank { if (isTravel) "Viajero" else "Peregrino" }
+        canvas.drawText("$userRole: $userName", MARGIN + 14f, credBoxTop + 24f, paint)
+
+        val dateText = "📅 FECHA: ${camino.startDate.ifBlank { "2026" }}"
+        val dateWidth = paint.measureText(dateText)
+        canvas.drawText(dateText, PAGE_WIDTH - MARGIN - dateWidth - 14f, credBoxTop + 24f, paint)
+
+        // 2. RESUMEN ESTADÍSTICO EN 4 TARJETAS MODULARES DE COLOR
+        val stats = repository.calculateStats(stages)
+        val kpiTop = 265f
+        val kpiHeight = 56f
+        val kpiSpacing = 8f
+        val kpiWidth = (PAGE_WIDTH - (MARGIN * 2) - (kpiSpacing * 3)) / 4f
+
+        // Tarjeta 1: Distancia (Verde Esmeralda)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN,
+            y = kpiTop,
+            w = kpiWidth,
+            h = kpiHeight,
+            label = "DISTANCIA",
+            value = "${String.format(java.util.Locale.US, "%.1f", stats.completedKm)} km",
+            sub = "de ${String.format(java.util.Locale.US, "%.1f", stats.totalKm)} km",
+            accentColor = COLOR_EMERALD,
+            bgColor = COLOR_EMERALD_BG,
+            borderColor = COLOR_EMERALD_BORDER
+        )
+
+        // Tarjeta 2: Jornadas / Etapas (Azul Zafiro)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN + kpiWidth + kpiSpacing,
+            y = kpiTop,
+            w = kpiWidth,
+            h = kpiHeight,
+            label = if (isTravel) "JORNADAS" else "ETAPAS",
+            value = "${stats.completedStages} / ${stats.totalStages}",
+            sub = if (stats.completedStages == stats.totalStages) "Completadas" else "${stats.totalStages - stats.completedStages} pendientes",
+            accentColor = COLOR_BLUE,
+            bgColor = COLOR_BLUE_BG,
+            borderColor = COLOR_BLUE_BORDER
+        )
+
+        // Tarjeta 3: Desnivel Positivo (Ámbar)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN + (kpiWidth + kpiSpacing) * 2,
+            y = kpiTop,
+            w = kpiWidth,
+            h = kpiHeight,
+            label = "DESNIVEL +",
+            value = "+${stats.completedElevationGainM} m",
+            sub = "de +${stats.totalElevationGainM} m",
+            accentColor = COLOR_AMBER,
+            bgColor = COLOR_AMBER_BG,
+            borderColor = COLOR_AMBER_BORDER
+        )
+
+        // Tarjeta 4: Progreso Global (Dorado)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN + (kpiWidth + kpiSpacing) * 3,
+            y = kpiTop,
+            w = kpiWidth,
+            h = kpiHeight,
+            label = "PROGRESO",
+            value = "${stats.progressPercent}%",
+            sub = if (stats.progressPercent >= 100) "¡Objetivo Cumplido!" else "En itinerario",
+            accentColor = COLOR_GOLD_DARK,
+            bgColor = COLOR_WARM_BG,
+            borderColor = COLOR_WARM_BORDER
+        )
+
+        // Barra de progreso estilizada
+        val barY = kpiTop + kpiHeight + 12f
+        val barRect = RectF(MARGIN, barY, PAGE_WIDTH - MARGIN, barY + 7f)
+        paint.color = COLOR_CARD_BORDER
+        canvas.drawRoundRect(barRect, 4f, 4f, paint)
+
+        val fillW = (PAGE_WIDTH - (MARGIN * 2)) * (stats.progressPercent / 100f).coerceIn(0f, 1f)
+        if (fillW > 0) {
+            paint.color = COLOR_EMERALD
+            val fillRect = RectF(MARGIN, barY, MARGIN + fillW, barY + 7f)
+            canvas.drawRoundRect(fillRect, 4f, 4f, paint)
+        }
+
+        // 3. TABLA EDITORIAL DE ITINERARIO Y ETAPAS
+        var tableY = barY + 22f
+        val tableTitle = if (isTravel) "ITINERARIO Y CRONOGRAMA DE JORNADAS" else "ÍNDICE GENERAL DE ETAPAS DEL CAMINO"
+        tableY = drawSectionBanner(canvas, tableY, tableTitle, COLOR_NAVY, if (isTravel) "🗺️" else "🧭")
+
+        // Encabezado de la tabla
+        val headerH = 20f
+        val headerRect = RectF(MARGIN, tableY, PAGE_WIDTH - MARGIN, tableY + headerH)
+        paint.color = COLOR_NAVY_LIGHT
+        canvas.drawRoundRect(headerRect, 4f, 4f, paint)
+
+        paint.color = Color.WHITE
+        paint.textSize = 8.5f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("JORNADA", MARGIN + 10f, tableY + 13.5f, paint)
+        canvas.drawText("ITINERARIO (ORIGEN → DESTINO)", MARGIN + 68f, tableY + 13.5f, paint)
+        canvas.drawText("MÉTRICAS ESTIMADAS", PAGE_WIDTH - MARGIN - 170f, tableY + 13.5f, paint)
+        canvas.drawText("ESTADO", PAGE_WIDTH - MARGIN - 50f, tableY + 13.5f, paint)
+
+        tableY += headerH + 2f
+
+        // Filas de etapas
+        val rowH = 22f
+        for (i in stages.indices) {
+            if (tableY + rowH > PAGE_HEIGHT - 45f) break
+            val stg = stages[i]
+
+            // Color de fondo alterno (Zebra)
+            if (i % 2 == 1) {
+                paint.color = COLOR_CARD_BG
+                canvas.drawRect(MARGIN, tableY, PAGE_WIDTH - MARGIN, tableY + rowH, paint)
+            }
+
+            // Píldora de Día
+            val dayBadgeRect = RectF(MARGIN + 8f, tableY + 3f, MARGIN + 48f, tableY + rowH - 3f)
+            paint.color = COLOR_BLUE_BG
+            canvas.drawRoundRect(dayBadgeRect, 4f, 4f, paint)
+            paint.color = COLOR_NAVY
+            paint.textSize = 8.5f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            val dayPrefix = if (isTravel) "Día" else "Et."
+            canvas.drawText("$dayPrefix ${stg.dayNumber}", MARGIN + 14f, tableY + 14.5f, paint)
+
+            // Origen → Destino
+            paint.color = COLOR_SLATE
+            paint.textSize = 9.5f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            val routeText = "${stg.origin} → ${stg.destination}"
+            val truncatedRoute = if (paint.measureText(routeText) > 200f) routeText.take(28) + "..." else routeText
+            canvas.drawText(truncatedRoute, MARGIN + 68f, tableY + 14.5f, paint)
+
+            // Métricas (Distancia, Desnivel, Tiempo)
+            paint.color = COLOR_MUTED
+            paint.textSize = 8.5f
+            paint.typeface = Typeface.DEFAULT
+            val metricsText = "${stg.distanceKm} km  |  +${stg.elevationGainM}m  |  ${stg.estimatedTime}"
+            canvas.drawText(metricsText, PAGE_WIDTH - MARGIN - 170f, tableY + 14.5f, paint)
+
+            // Estado (Completada vs Planificada)
+            if (stg.isCompleted) {
+                val badgeRect = RectF(PAGE_WIDTH - MARGIN - 54f, tableY + 3.5f, PAGE_WIDTH - MARGIN - 6f, tableY + rowH - 3.5f)
+                paint.color = COLOR_EMERALD_BG
+                canvas.drawRoundRect(badgeRect, 3f, 3f, paint)
+                paint.color = COLOR_EMERALD
+                paint.textSize = 7.5f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                canvas.drawText("✓ HECHO", PAGE_WIDTH - MARGIN - 48f, tableY + 14f, paint)
+            } else {
+                val badgeRect = RectF(PAGE_WIDTH - MARGIN - 54f, tableY + 3.5f, PAGE_WIDTH - MARGIN - 6f, tableY + rowH - 3.5f)
+                paint.color = COLOR_CARD_BORDER
+                canvas.drawRoundRect(badgeRect, 3f, 3f, paint)
+                paint.color = COLOR_MUTED
+                paint.textSize = 7.5f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                canvas.drawText("PLAN", PAGE_WIDTH - MARGIN - 44f, tableY + 14f, paint)
+            }
+
+            // Divisor sutil
+            paint.color = COLOR_DIVIDER
+            canvas.drawLine(MARGIN, tableY + rowH, PAGE_WIDTH - MARGIN, tableY + rowH, paint)
+            tableY += rowH
+        }
+
+        // Pie de página de la portada
+        drawEditorialFooter(canvas, 1, isTravel)
     }
 
+    // ----------------------------------------------------
+    // STAGE PAGES (ETAPAS / JORNADAS DETALLADAS)
+    // ----------------------------------------------------
     private fun drawStagePages(
         context: Context,
         pdfDocument: PdfDocument,
@@ -439,15 +434,22 @@ object PdfExporter {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         fun drawStageHeader(c: Canvas, isContinuation: Boolean = false, subtitleText: String = "") {
-            paint.color = Color.rgb(14, 76, 153)
-            c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 55f, paint)
+            // Fondo Azul Marino
+            paint.color = COLOR_NAVY
+            c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 56f, paint)
 
-            paint.color = Color.rgb(247, 190, 49)
-            paint.textSize = 11f
-            paint.isFakeBoldText = true
+            // Franja Dorada Inferior
+            paint.color = COLOR_GOLD
+            c.drawRect(0f, 53f, PAGE_WIDTH.toFloat(), 56f, paint)
+
+            // Marca y Título del Viaje
+            paint.color = COLOR_GOLD
+            paint.textSize = 9.5f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
-            c.drawText("$brandPrefix • ${camino.title.uppercase()}", MARGIN, 24f, paint)
+            c.drawText("$brandPrefix  •  ${camino.title.uppercase()}", MARGIN, 22f, paint)
 
+            // Título de la Jornada
             val stageDate = if (stage.date.isNotBlank()) stage.date
             else if (camino.startDate.isNotBlank()) {
                 com.example.ui.settings.AppStrings.calculateStageDate(camino.startDate, stage.dayNumber - 1)
@@ -455,31 +457,26 @@ object PdfExporter {
 
             paint.color = Color.WHITE
             paint.textSize = 14f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             val dateLabel = if (stageDate.isNotBlank()) "  •  $stageDate" else ""
-            val contLabel = if (isContinuation) " ($subtitleText)" else ""
-            c.drawText("Día ${stage.dayNumber}: ${stage.origin} a ${stage.destination}$dateLabel$contLabel", MARGIN, 44f, paint)
+            val contLabel = if (isContinuation) " (Continuación: $subtitleText)" else ""
+            val dayWord = if (isTravel) "Día" else "Etapa"
+            c.drawText("$dayWord ${stage.dayNumber}: ${stage.origin} a ${stage.destination}$dateLabel$contLabel", MARGIN, 42f, paint)
 
+            // Badge de Estado Completada
             if (stage.isCompleted && !isContinuation) {
-                paint.color = Color.rgb(46, 125, 50)
-                val badgeRect = RectF(PAGE_WIDTH - MARGIN - 95f, 15f, PAGE_WIDTH - MARGIN, 42f)
-                c.drawRoundRect(badgeRect, 6f, 6f, paint)
+                paint.color = COLOR_EMERALD
+                val badgeRect = RectF(PAGE_WIDTH - MARGIN - 96f, 15f, PAGE_WIDTH - MARGIN, 42f)
+                c.drawRoundRect(badgeRect, 5f, 5f, paint)
                 paint.color = Color.WHITE
-                paint.textSize = 10f
-                paint.isFakeBoldText = true
-                c.drawText("✓ COMPLETADA", PAGE_WIDTH - MARGIN - 86f, 32f, paint)
+                paint.textSize = 9.5f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                c.drawText("✓ COMPLETADA", PAGE_WIDTH - MARGIN - 88f, 32f, paint)
             }
         }
 
-        fun drawFooter(c: Canvas) {
-            paint.color = Color.rgb(156, 163, 175)
-            paint.textSize = 9.5f
-            paint.isFakeBoldText = false
-            val footerBrand = if (isTravel) "Ultreia • Guía e Itinerario de Viaje" else "Ultreia • Memorias del Camino de Santiago"
-            c.drawText("$footerBrand  •  Página $currentPageNumber", MARGIN, PAGE_HEIGHT - 25f, paint)
-        }
-
         fun nextSubPage(continuationSubtitle: String) {
-            drawFooter(canvas)
+            drawEditorialFooter(canvas, currentPageNumber, isTravel)
             pdfDocument.finishPage(page)
             currentPageNumber++
             pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, currentPageNumber).create()
@@ -489,348 +486,801 @@ object PdfExporter {
         }
 
         drawStageHeader(canvas)
-        var currentY = 75f
+        var currentY = 74f
 
-        // 1. FICHA TÉCNICA (Regla estricta: en Viajes SOLO si hay GPX; en Caminos siempre)
+        // 1. FICHA TÉCNICA (En Viajes solo si hay GPX; en Caminos siempre)
         val points = GpxParser.deserializePoints(stage.gpxTrackJson)
         val hasGpx = !stage.gpxTrackJson.isNullOrBlank() && points.isNotEmpty()
         val showFichaTecnica = !isTravel || hasGpx
 
         if (showFichaTecnica) {
-            paint.color = Color.rgb(240, 245, 252)
-            val metricsRect = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + 45f)
-            canvas.drawRoundRect(metricsRect, 8f, 8f, paint)
+            currentY = drawSectionBanner(canvas, currentY, "FICHA TÉCNICA Y PERFIL DE RUTA", COLOR_BLUE, "📊")
 
-            paint.color = Color.rgb(14, 76, 153)
-            paint.textSize = 11f
-            paint.isFakeBoldText = true
-            val metricText = "Distancia: ${stage.distanceKm} km   |   Desnivel: +${stage.elevationGainM}m / -${stage.elevationLossM}m   |   Tiempo: ${stage.estimatedTime}   |   Dificultad: ${stage.difficulty}"
-            canvas.drawText(metricText, MARGIN + 14f, currentY + 28f, paint)
+            // 4 Micro-tarjetas Métricas en Fila
+            val cardH = 46f
+            val cardSpacing = 6f
+            val cardW = (PAGE_WIDTH - (MARGIN * 2) - (cardSpacing * 3)) / 4f
 
-            currentY += 60f
+            // Micro 1: Distancia
+            drawMetricBox(
+                canvas = canvas,
+                x = MARGIN,
+                y = currentY,
+                w = cardW,
+                h = cardH,
+                label = "DISTANCIA",
+                value = "${stage.distanceKm} km",
+                accentColor = COLOR_EMERALD,
+                bgColor = COLOR_EMERALD_BG,
+                borderColor = COLOR_EMERALD_BORDER
+            )
 
-            paint.color = Color.rgb(14, 76, 153)
-            paint.textSize = 13f
-            paint.isFakeBoldText = true
-            canvas.drawText(if (isTravel) "Trazado del Recorrido (GPX)" else "Trazado de la Ruta y Perfil de Terreno", MARGIN, currentY, paint)
-            currentY += 10f
+            // Micro 2: Desnivel (+/-)
+            drawMetricBox(
+                canvas = canvas,
+                x = MARGIN + cardW + cardSpacing,
+                y = currentY,
+                w = cardW,
+                h = cardH,
+                label = "DESNIVEL",
+                value = "+${stage.elevationGainM} / -${stage.elevationLossM}m",
+                accentColor = COLOR_AMBER,
+                bgColor = COLOR_AMBER_BG,
+                borderColor = COLOR_AMBER_BORDER
+            )
 
-            val chartBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + 110f)
-            paint.color = Color.rgb(250, 252, 255)
-            canvas.drawRoundRect(chartBox, 8f, 8f, paint)
-            paint.color = Color.rgb(218, 228, 240)
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 1f
-            canvas.drawRoundRect(chartBox, 8f, 8f, paint)
-            paint.style = Paint.Style.FILL
+            // Micro 3: Tiempo Estimado
+            drawMetricBox(
+                canvas = canvas,
+                x = MARGIN + (cardW + cardSpacing) * 2,
+                y = currentY,
+                w = cardW,
+                h = cardH,
+                label = "TIEMPO EST.",
+                value = stage.estimatedTime.ifBlank { "—" },
+                accentColor = COLOR_BLUE,
+                bgColor = COLOR_BLUE_BG,
+                borderColor = COLOR_BLUE_BORDER
+            )
+
+            // Micro 4: Dificultad
+            val diffColor = when (stage.difficulty.lowercase()) {
+                "fácil", "facil" -> COLOR_EMERALD
+                "moderada" -> COLOR_BLUE
+                "difícil", "dificil" -> COLOR_AMBER
+                else -> Color.rgb(220, 38, 38)
+            }
+            drawMetricBox(
+                canvas = canvas,
+                x = MARGIN + (cardW + cardSpacing) * 3,
+                y = currentY,
+                w = cardW,
+                h = cardH,
+                label = "DIFICULTAD",
+                value = stage.difficulty.ifBlank { "Moderada" },
+                accentColor = diffColor,
+                bgColor = COLOR_CARD_BG,
+                borderColor = COLOR_CARD_BORDER
+            )
+
+            currentY += cardH + 12f
+
+            // Tarjeta de Mapa / Perfil GPX Cartográfico
+            val mapBoxH = 100f
+            val chartBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + mapBoxH)
+            drawCardBox(canvas, chartBox.left, chartBox.top, chartBox.width(), chartBox.height(), COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_NAVY, 4f, 8f)
 
             if (points.isNotEmpty()) {
                 drawMiniTrackOnCanvas(canvas, points, chartBox)
             } else {
-                paint.color = Color.rgb(14, 76, 153)
+                paint.color = COLOR_NAVY
                 paint.strokeWidth = 2.5f
                 val path = Path()
-                path.moveTo(chartBox.left + 20f, chartBox.bottom - 25f)
+                path.moveTo(chartBox.left + 24f, chartBox.bottom - 25f)
                 path.cubicTo(
                     chartBox.left + 150f, chartBox.top + 30f,
                     chartBox.left + 300f, chartBox.bottom - 40f,
-                    chartBox.right - 20f, chartBox.bottom - 20f
+                    chartBox.right - 24f, chartBox.bottom - 20f
                 )
                 paint.style = Paint.Style.STROKE
                 canvas.drawPath(path, paint)
                 paint.style = Paint.Style.FILL
+
+                // Puntos de inicio y fin decorativos
+                paint.color = COLOR_EMERALD
+                canvas.drawCircle(chartBox.left + 24f, chartBox.bottom - 25f, 5f, paint)
+                paint.color = COLOR_GOLD
+                canvas.drawCircle(chartBox.right - 24f, chartBox.bottom - 20f, 5f, paint)
+
+                paint.color = COLOR_MUTED
+                paint.textSize = 8.5f
+                paint.typeface = Typeface.DEFAULT
+                canvas.drawText("Origen: ${stage.origin}", chartBox.left + 35f, chartBox.bottom - 22f, paint)
+                val destText = "Destino: ${stage.destination}"
+                val destW = paint.measureText(destText)
+                canvas.drawText(destText, chartBox.right - 35f - destW, chartBox.bottom - 17f, paint)
             }
 
-            currentY += 125f
+            currentY += mapBoxH + 16f
         }
 
-        // 2. CONSEJOS DEL DÍA (Caminos) O RESUMEN DEL DÍA (Viajes)
+        // 2. CONSEJOS DEL DÍA (Caminos) O RESUMEN EJECUTIVO (Viajes)
         if (stage.stageNotes.isNotBlank()) {
-            if (currentY + 60f > PAGE_HEIGHT - MARGIN - 40f) {
+            val contentH = measureMultilineTextHeight(stage.stageNotes, PAGE_WIDTH - 2 * MARGIN - 28f, paint.apply { textSize = 9.5f })
+            val cardH = contentH + 24f
+
+            if (currentY + cardH + 30f > PAGE_HEIGHT - MARGIN - 35f) {
                 nextSubPage(if (isTravel) "Resumen" else "Consejos")
-                currentY = 75f
+                currentY = 74f
             }
 
-            paint.color = Color.rgb(14, 76, 153)
-            paint.textSize = 13f
-            paint.isFakeBoldText = true
-            val titleText = if (isTravel) "Resumen del Día" else "Información y Consejos del Día"
-            canvas.drawText(titleText, MARGIN, currentY, paint)
-            currentY += 16f
+            val secTitle = if (isTravel) "RESUMEN EJECUTIVO DE LA JORNADA" else "INFORMACIÓN Y CONSEJOS CLAVE DEL DÍA"
+            val secAccent = if (isTravel) COLOR_NAVY else COLOR_AMBER
+            val secIcon = if (isTravel) "📝" else "💡"
+            currentY = drawSectionBanner(canvas, currentY, secTitle, secAccent, secIcon)
 
-            paint.color = Color.rgb(55, 65, 81)
-            paint.textSize = 10.5f
-            paint.isFakeBoldText = false
-            currentY = drawMultilineText(canvas, stage.stageNotes, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, paint)
-            currentY += 14f
+            val noteBg = if (isTravel) COLOR_CARD_BG else COLOR_AMBER_BG
+            val noteBorder = if (isTravel) COLOR_CARD_BORDER else COLOR_AMBER_BORDER
+            drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, cardH, noteBg, noteBorder, secAccent, 4f, 8f)
+
+            paint.color = COLOR_SLATE
+            paint.textSize = 9.5f
+            paint.typeface = Typeface.DEFAULT
+            drawMultilineText(canvas, stage.stageNotes, MARGIN + 14f, currentY + 16f, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
+
+            currentY += cardH + 16f
         }
 
-        // 3. AGENDA DEL DÍA (Solo en Viajes)
+        // 3. AGENDA DEL DÍA (Exclusivo Perfil Viajes)
         if (isTravel) {
             val agendaList = parseAgendaItems(stage.agendaJson)
             if (agendaList.isNotEmpty()) {
-                if (currentY + 50f > PAGE_HEIGHT - MARGIN - 40f) {
+                if (currentY + 50f > PAGE_HEIGHT - MARGIN - 35f) {
                     nextSubPage("Agenda")
-                    currentY = 75f
+                    currentY = 74f
                 }
 
-                paint.color = Color.rgb(14, 76, 153)
-                paint.textSize = 13f
-                paint.isFakeBoldText = true
-                canvas.drawText("Agenda del Día", MARGIN, currentY, paint)
-                currentY += 16f
+                currentY = drawSectionBanner(canvas, currentY, "AGENDA Y ACTIVIDADES PROGRAMADAS", COLOR_BLUE, "🗓️")
 
                 for (event in agendaList) {
-                    if (currentY + 45f > PAGE_HEIGHT - MARGIN - 40f) {
+                    val (imageFiles, docFiles) = event.files.partition { isImageAttachedFile(context, it) }
+                    val descHeight = if (event.description.isNotBlank()) {
+                        measureMultilineTextHeight(event.description, PAGE_WIDTH - 2 * MARGIN - 28f, paint.apply { textSize = 9f })
+                    } else 0f
+                    val docsHeight = docFiles.size * 28f
+                    val eventBaseH = 34f + descHeight + docsHeight
+
+                    if (currentY + eventBaseH > PAGE_HEIGHT - MARGIN - 35f) {
                         nextSubPage("Agenda")
-                        currentY = 75f
+                        currentY = 74f
                     }
 
-                    // Hora y Título
-                    paint.color = Color.rgb(14, 76, 153)
-                    paint.textSize = 11.5f
-                    paint.isFakeBoldText = true
-                    val eventHeader = "⏰ ${event.time}  —  ${event.title}"
-                    canvas.drawText(eventHeader, MARGIN + 4f, currentY, paint)
-                    currentY += 14f
+                    // Tarjeta de Actividad de Agenda
+                    val eventCardTop = currentY
+                    drawCardBox(canvas, MARGIN, eventCardTop, PAGE_WIDTH - 2 * MARGIN, eventBaseH, Color.WHITE, COLOR_CARD_BORDER, COLOR_BLUE, 4f, 6f)
 
-                    // Descripción multilínea
+                    // Píldora de Horario
+                    val timePillRect = RectF(MARGIN + 12f, eventCardTop + 8f, MARGIN + 68f, eventCardTop + 26f)
+                    paint.color = COLOR_NAVY
+                    canvas.drawRoundRect(timePillRect, 4f, 4f, paint)
+                    paint.color = Color.WHITE
+                    paint.textSize = 9f
+                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    canvas.drawText("⏰ ${event.time}", MARGIN + 18f, eventCardTop + 20.5f, paint)
+
+                    // Título de la Actividad
+                    paint.color = COLOR_SLATE
+                    paint.textSize = 10.5f
+                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    canvas.drawText(event.title, MARGIN + 76f, eventCardTop + 20.5f, paint)
+
+                    var innerY = eventCardTop + 36f
+
+                    // Descripción
                     if (event.description.isNotBlank()) {
                         paint.color = Color.rgb(55, 65, 81)
-                        paint.textSize = 10f
-                        paint.isFakeBoldText = false
-                        currentY = drawMultilineText(canvas, event.description, MARGIN + 12f, currentY, PAGE_WIDTH - 2 * MARGIN - 24f, paint)
-                        currentY += 6f
+                        paint.textSize = 9f
+                        paint.typeface = Typeface.DEFAULT
+                        innerY = drawMultilineText(canvas, event.description, MARGIN + 14f, innerY, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
+                        innerY += 4f
                     }
 
-                    // Separación estricta de archivos: Documentos vs Imágenes
-                    val (imageFiles, docFiles) = event.files.partition { isImageAttachedFile(context, it) }
-
-                    // A. Documentos no-imagen: listar como texto
+                    // A. Documentos no-imagen en píldoras estilizadas
                     for (doc in docFiles) {
-                        if (currentY + 20f > PAGE_HEIGHT - MARGIN - 40f) {
-                            nextSubPage("Agenda - Documentos")
-                            currentY = 75f
-                        }
-                        paint.color = Color.rgb(75, 85, 99)
-                        paint.textSize = 9.5f
-                        paint.isFakeBoldText = false
                         val docName = doc.name.ifBlank { extractFileName(doc.uri) }
-                        canvas.drawText("Archivo adjunto: $docName", MARGIN + 12f, currentY, paint)
-                        currentY += 14f
+                        innerY = drawDocumentChip(canvas, MARGIN + 14f, innerY, PAGE_WIDTH - 2 * MARGIN - 28f, docName)
                     }
 
-                    // B. Imágenes: incrustar justo debajo del texto manteniendo proporción y márgenes
+                    currentY = eventCardTop + eventBaseH + 8f
+
+                    // B. Imágenes adjuntas adaptadas en tarjeta enmarcada
                     for (photo in imageFiles) {
-                        val neededH = estimateImageHeight(context, photo.uri, PAGE_WIDTH - 2 * MARGIN - 24f, 220f)
-                        if (currentY + neededH + 10f > PAGE_HEIGHT - MARGIN - 40f) {
+                        val neededH = estimateImageHeight(context, photo.uri, PAGE_WIDTH - 2 * MARGIN - 28f, 220f)
+                        if (currentY + neededH + 12f > PAGE_HEIGHT - MARGIN - 35f) {
                             nextSubPage("Agenda - Fotos")
-                            currentY = 75f
+                            currentY = 74f
                         }
-                        val drawnH = drawImageFromUri(context, canvas, photo.uri, MARGIN + 12f, currentY, PAGE_WIDTH - 2 * MARGIN - 24f, 220f)
+                        val drawnH = drawImageFromUri(context, canvas, photo.uri, MARGIN + 14f, currentY, PAGE_WIDTH - 2 * MARGIN - 28f, 220f)
                         if (drawnH > 0f) {
                             currentY += drawnH + 8f
                         }
                     }
-                    currentY += 6f
+                    currentY += 4f
                 }
                 currentY += 8f
             }
         }
 
-        // 4. ALOJAMIENTOS
+        // 4. ALOJAMIENTOS Y HOSPEDAJE
         if (accommodations.isNotEmpty() || !isTravel) {
-            if (currentY + 60f > PAGE_HEIGHT - MARGIN - 40f) {
+            if (currentY + 50f > PAGE_HEIGHT - MARGIN - 35f) {
                 nextSubPage("Alojamientos")
-                currentY = 75f
+                currentY = 74f
             }
 
-            paint.color = Color.rgb(14, 76, 153)
-            paint.textSize = 13f
-            paint.isFakeBoldText = true
-            canvas.drawText(if (isTravel) "Alojamientos y Hoteles" else "Alojamientos y Opciones de Hospedaje", MARGIN, currentY, paint)
-            currentY += 16f
+            val accTitle = if (isTravel) "HOTELES Y ALOJAMIENTOS SELECCIONADOS" else "ALOJAMIENTOS Y OPCIONES DE HOSPEDAJE"
+            currentY = drawSectionBanner(canvas, currentY, accTitle, COLOR_EMERALD, "🏨")
 
             if (accommodations.isEmpty()) {
-                paint.color = Color.rgb(120, 120, 120)
-                paint.textSize = 10f
-                paint.isFakeBoldText = false
-                canvas.drawText("No se registraron alojamientos específicos para este día.", MARGIN, currentY, paint)
-                currentY += 16f
+                val emptyH = 34f
+                drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, emptyH, COLOR_CARD_BG, COLOR_CARD_BORDER, null, 0f, 6f)
+                paint.color = COLOR_MUTED
+                paint.textSize = 9f
+                paint.typeface = Typeface.DEFAULT
+                canvas.drawText("No se registraron alojamientos específicos para esta jornada.", MARGIN + 14f, currentY + 21f, paint)
+                currentY += emptyH + 12f
             } else {
                 for (acc in accommodations) {
-                    if (currentY + 35f > PAGE_HEIGHT - MARGIN - 40f) {
-                        nextSubPage("Alojamientos")
-                        currentY = 75f
-                    }
-
-                    paint.color = Color.rgb(17, 24, 39)
-                    paint.textSize = 11f
-                    paint.isFakeBoldText = true
-                    val accTitle = "• ${acc.name}" + if (acc.phone.isNotBlank()) " (Tel: ${acc.phone})" else ""
-                    canvas.drawText(accTitle, MARGIN + 4f, currentY, paint)
-                    currentY += 14f
-
-                    paint.isFakeBoldText = false
-                    paint.color = Color.rgb(75, 85, 99)
-                    paint.textSize = 10f
-                    if (acc.address.isNotBlank()) {
-                        canvas.drawText("  Dirección: ${acc.address}", MARGIN + 4f, currentY, paint)
-                        currentY += 13f
-                    }
-
                     val roomOptions = repository.parseRoomOptions(acc.roomOptionsJson)
-                    if (roomOptions.isNotEmpty()) {
-                        val pricesStr = roomOptions.joinToString("  |  ") { "${it.roomType}: ${it.priceEur}€" }
-                        paint.color = Color.rgb(46, 125, 50)
-                        canvas.drawText("  Precios: $pricesStr", MARGIN + 4f, currentY, paint)
-                        currentY += 14f
+                    val baseH = 26f + (if (acc.address.isNotBlank()) 14f else 0f) + (if (roomOptions.isNotEmpty()) 18f else 0f) + 8f
+
+                    if (currentY + baseH > PAGE_HEIGHT - MARGIN - 35f) {
+                        nextSubPage("Alojamientos")
+                        currentY = 74f
                     }
-                    currentY += 4f
+
+                    drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, baseH, COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_EMERALD, 4f, 6f)
+
+                    // Nombre y Teléfono
+                    paint.color = COLOR_SLATE
+                    paint.textSize = 10f
+                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    val phoneTag = if (acc.phone.isNotBlank()) "  •  📞 ${acc.phone}" else ""
+                    canvas.drawText("${acc.name}$phoneTag", MARGIN + 14f, currentY + 18f, paint)
+
+                    // Badge de reserva si aplica
+                    if (acc.isBooked) {
+                        val bookRect = RectF(PAGE_WIDTH - MARGIN - 72f, currentY + 6f, PAGE_WIDTH - MARGIN - 10f, currentY + 22f)
+                        paint.color = COLOR_EMERALD_BG
+                        canvas.drawRoundRect(bookRect, 3f, 3f, paint)
+                        paint.color = COLOR_EMERALD
+                        paint.textSize = 7.5f
+                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                        canvas.drawText("RESERVADO", PAGE_WIDTH - MARGIN - 66f, currentY + 17f, paint)
+                    }
+
+                    var innerAccY = currentY + 30f
+
+                    // Dirección
+                    if (acc.address.isNotBlank()) {
+                        paint.color = COLOR_MUTED
+                        paint.textSize = 8.5f
+                        paint.typeface = Typeface.DEFAULT
+                        canvas.drawText("📍 ${acc.address}", MARGIN + 14f, innerAccY, paint)
+                        innerAccY += 14f
+                    }
+
+                    // Píldoras de Precios por Habitación
+                    if (roomOptions.isNotEmpty()) {
+                        var chipX = MARGIN + 14f
+                        for (opt in roomOptions) {
+                            val pillText = "${opt.roomType}: ${opt.priceEur}€"
+                            paint.textSize = 8f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            val pillW = paint.measureText(pillText) + 12f
+                            val pillRect = RectF(chipX, innerAccY - 9f, chipX + pillW, innerAccY + 7f)
+                            paint.color = COLOR_EMERALD_BG
+                            canvas.drawRoundRect(pillRect, 3f, 3f, paint)
+                            paint.color = COLOR_EMERALD
+                            canvas.drawText(pillText, chipX + 6f, innerAccY + 3f, paint)
+                            chipX += pillW + 6f
+                        }
+                    }
+
+                    currentY += baseH + 8f
                 }
+                currentY += 6f
             }
-            currentY += 10f
         }
 
-        // 5. VIVENCIAS / NOTAS PERSONALES DE LA JORNADA
+        // 5. VIVENCIAS / DIARIO PERSONAL (Estilo Bitácora de Viajero)
         val vivenciasList = parseVivencias(stage.vivenciasJson, stage.diaryNotes, stage.diaryPhotoUri)
         if (vivenciasList.isNotEmpty() || !isTravel) {
-            if (currentY + 60f > PAGE_HEIGHT - MARGIN - 40f) {
+            if (currentY + 50f > PAGE_HEIGHT - MARGIN - 35f) {
                 nextSubPage(if (isTravel) "Notas" else "Vivencias")
-                currentY = 75f
+                currentY = 74f
             }
 
-            paint.color = Color.rgb(14, 76, 153)
-            paint.textSize = 13f
-            paint.isFakeBoldText = true
-            val vivenciasTitle = if (isTravel) "Notas Personales de la Jornada" else "Vivencias Personales de la Jornada"
-            canvas.drawText(vivenciasTitle, MARGIN, currentY, paint)
-            currentY += 16f
+            val vivTitle = if (isTravel) "CUADERNO DE BITÁCORA & NOTAS PERSONALES" else "VIVENCIAS & BITÁCORA DEL PEREGRINO"
+            currentY = drawSectionBanner(canvas, currentY, vivTitle, COLOR_GOLD_DARK, "📖")
 
             if (vivenciasList.isEmpty()) {
-                val boxHeight = 45f
-                val diaryBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + boxHeight)
-                paint.color = Color.rgb(255, 252, 245)
-                canvas.drawRoundRect(diaryBox, 8f, 8f, paint)
-                paint.color = Color.rgb(240, 225, 185)
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = 1f
-                canvas.drawRoundRect(diaryBox, 8f, 8f, paint)
-                paint.style = Paint.Style.FILL
-
-                paint.color = Color.rgb(120, 110, 95)
-                paint.textSize = 10f
-                paint.isFakeBoldText = false
-                canvas.drawText("Sin notas de vivencias registradas aún para este día.", MARGIN + 12f, currentY + 26f, paint)
-                currentY += boxHeight + 14f
+                val emptyH = 34f
+                drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, emptyH, COLOR_WARM_BG, COLOR_WARM_BORDER, null, 0f, 6f)
+                paint.color = Color.rgb(130, 115, 90)
+                paint.textSize = 9f
+                paint.typeface = Typeface.DEFAULT
+                canvas.drawText("Sin notas de vivencias registradas aún para este día.", MARGIN + 14f, currentY + 21f, paint)
+                currentY += emptyH + 12f
             } else {
                 for (vivencia in vivenciasList) {
-                    if (currentY + 45f > PAGE_HEIGHT - MARGIN - 40f) {
+                    val textH = if (vivencia.note.isNotBlank()) {
+                        measureMultilineTextHeight(vivencia.note, PAGE_WIDTH - 2 * MARGIN - 28f, paint.apply { textSize = 9.5f })
+                    } else 0f
+                    val dateH = if (vivencia.dateStr.isNotBlank()) 16f else 0f
+                    val isDoc = !vivencia.photoUri.isNullOrBlank() && !checkIsImage(context, null, extractFileName(vivencia.photoUri), vivencia.photoUri)
+                    val docChipH = if (isDoc) 28f else 0f
+                    val vivCardH = textH + dateH + docChipH + 20f
+
+                    if (currentY + vivCardH > PAGE_HEIGHT - MARGIN - 35f) {
                         nextSubPage(if (isTravel) "Notas" else "Vivencias")
-                        currentY = 75f
+                        currentY = 74f
                     }
 
-                    // Fecha si está disponible
+                    val vivCardTop = currentY
+                    drawCardBox(canvas, MARGIN, vivCardTop, PAGE_WIDTH - 2 * MARGIN, vivCardH, COLOR_WARM_BG, COLOR_WARM_BORDER, COLOR_GOLD, 4f, 6f)
+
+                    var innerY = vivCardTop + 14f
+
+                    // Fecha si existe
                     if (vivencia.dateStr.isNotBlank()) {
-                        paint.color = Color.rgb(107, 114, 128)
-                        paint.textSize = 9.5f
-                        paint.isFakeBoldText = true
-                        canvas.drawText("📅 ${vivencia.dateStr}", MARGIN + 4f, currentY, paint)
-                        currentY += 13f
+                        paint.color = COLOR_GOLD_DARK
+                        paint.textSize = 8.5f
+                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                        canvas.drawText("📅 ${vivencia.dateStr}", MARGIN + 14f, innerY, paint)
+                        innerY += 14f
                     }
 
                     // Texto de la vivencia
                     if (vivencia.note.isNotBlank()) {
-                        paint.color = Color.rgb(55, 65, 81)
-                        paint.textSize = 10f
-                        paint.isFakeBoldText = false
-                        currentY = drawMultilineText(canvas, vivencia.note, MARGIN + 8f, currentY, PAGE_WIDTH - 2 * MARGIN - 16f, paint)
-                        currentY += 6f
+                        paint.color = COLOR_SLATE
+                        paint.textSize = 9.5f
+                        paint.typeface = Typeface.DEFAULT
+                        innerY = drawMultilineText(canvas, vivencia.note, MARGIN + 14f, innerY, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
+                        innerY += 4f
                     }
 
-                    // Archivo / Foto adjunta a la vivencia
-                    if (!vivencia.photoUri.isNullOrBlank()) {
-                        val isImg = checkIsImage(context, null, extractFileName(vivencia.photoUri), vivencia.photoUri)
-                        if (isImg) {
-                            val neededH = estimateImageHeight(context, vivencia.photoUri, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
-                            if (currentY + neededH + 10f > PAGE_HEIGHT - MARGIN - 40f) {
-                                nextSubPage(if (isTravel) "Notas - Fotos" else "Vivencias - Fotos")
-                                currentY = 75f
-                            }
-                            val drawnH = drawImageFromUri(context, canvas, vivencia.photoUri, MARGIN + 8f, currentY, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
-                            if (drawnH > 0f) {
-                                currentY += drawnH + 8f
-                            }
-                        } else {
-                            // Documento no-imagen: nunca renderizar como imagen
-                            if (currentY + 20f > PAGE_HEIGHT - MARGIN - 40f) {
-                                nextSubPage(if (isTravel) "Notas" else "Vivencias")
-                                currentY = 75f
-                            }
-                            val fileName = extractFileName(vivencia.photoUri)
-                            paint.color = Color.rgb(75, 85, 99)
-                            paint.textSize = 9.5f
-                            paint.isFakeBoldText = false
-                            canvas.drawText("Archivo adjunto: $fileName", MARGIN + 8f, currentY, paint)
-                            currentY += 14f
+                    // Archivo no-imagen adjunto en la vivencia
+                    if (isDoc) {
+                        val fileName = extractFileName(vivencia.photoUri)
+                        drawDocumentChip(canvas, MARGIN + 14f, innerY, PAGE_WIDTH - 2 * MARGIN - 28f, fileName)
+                    }
+
+                    currentY = vivCardTop + vivCardH + 8f
+
+                    // Foto adjunta a la vivencia
+                    if (!vivencia.photoUri.isNullOrBlank() && !isDoc) {
+                        val neededH = estimateImageHeight(context, vivencia.photoUri, PAGE_WIDTH - 2 * MARGIN - 28f, 220f)
+                        if (currentY + neededH + 12f > PAGE_HEIGHT - MARGIN - 35f) {
+                            nextSubPage(if (isTravel) "Notas - Fotos" else "Vivencias - Fotos")
+                            currentY = 74f
+                        }
+                        val drawnH = drawImageFromUri(context, canvas, vivencia.photoUri, MARGIN + 14f, currentY, PAGE_WIDTH - 2 * MARGIN - 28f, 220f)
+                        if (drawnH > 0f) {
+                            currentY += drawnH + 8f
                         }
                     }
-                    currentY += 6f
+                    currentY += 4f
                 }
-                currentY += 8f
+                currentY += 6f
             }
         }
 
-        // 6. ARCHIVOS Y DOCUMENTOS ADJUNTOS DE LA ETAPA
+        // 6. ARCHIVOS Y DOCUMENTOS ADJUNTOS GENERALES DE LA ETAPA
         val stageAttachedFiles = parseAttachedFiles(stage.attachedFilesJson)
         if (stageAttachedFiles.isNotEmpty()) {
-            if (currentY + 50f > PAGE_HEIGHT - MARGIN - 40f) {
-                nextSubPage("Archivos Adjuntos")
-                currentY = 75f
+            if (currentY + 50f > PAGE_HEIGHT - MARGIN - 35f) {
+                nextSubPage("Archivos")
+                currentY = 74f
             }
 
-            paint.color = Color.rgb(14, 76, 153)
-            paint.textSize = 13f
-            paint.isFakeBoldText = true
-            canvas.drawText("Archivos y Documentos Adjuntos", MARGIN, currentY, paint)
-            currentY += 16f
-
+            currentY = drawSectionBanner(canvas, currentY, "DOCUMENTOS Y ARCHIVOS DE LA ETAPA", COLOR_SLATE, "📁")
             val (stageImages, stageDocs) = stageAttachedFiles.partition { isImageAttachedFile(context, it) }
 
             // Documentos no-imagen
             for (doc in stageDocs) {
-                if (currentY + 20f > PAGE_HEIGHT - MARGIN - 40f) {
-                    nextSubPage("Archivos Adjuntos")
-                    currentY = 75f
+                if (currentY + 28f > PAGE_HEIGHT - MARGIN - 35f) {
+                    nextSubPage("Archivos")
+                    currentY = 74f
                 }
-                paint.color = Color.rgb(75, 85, 99)
-                paint.textSize = 9.5f
-                paint.isFakeBoldText = false
                 val docName = doc.name.ifBlank { extractFileName(doc.uri) }
-                canvas.drawText("Archivo adjunto: $docName", MARGIN + 8f, currentY, paint)
-                currentY += 14f
+                currentY = drawDocumentChip(canvas, MARGIN + 14f, currentY, PAGE_WIDTH - 2 * MARGIN - 28f, docName)
             }
 
             // Imágenes adjuntas
             for (img in stageImages) {
-                val neededH = estimateImageHeight(context, img.uri, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
-                if (currentY + neededH + 10f > PAGE_HEIGHT - MARGIN - 40f) {
-                    nextSubPage("Archivos Adjuntos")
-                    currentY = 75f
+                val neededH = estimateImageHeight(context, img.uri, PAGE_WIDTH - 2 * MARGIN - 28f, 220f)
+                if (currentY + neededH + 12f > PAGE_HEIGHT - MARGIN - 35f) {
+                    nextSubPage("Archivos - Fotos")
+                    currentY = 74f
                 }
-                val drawnH = drawImageFromUri(context, canvas, img.uri, MARGIN + 8f, currentY, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
+                val drawnH = drawImageFromUri(context, canvas, img.uri, MARGIN + 14f, currentY, PAGE_WIDTH - 2 * MARGIN - 28f, 220f)
                 if (drawnH > 0f) {
                     currentY += drawnH + 8f
                 }
             }
-            currentY += 8f
+            currentY += 6f
         }
 
-        drawFooter(canvas)
+        drawEditorialFooter(canvas, currentPageNumber, isTravel)
         pdfDocument.finishPage(page)
         return currentPageNumber + 1
     }
 
+    // ----------------------------------------------------
+    // INFORME GLOBAL DE ESTADÍSTICAS
+    // ----------------------------------------------------
+    private fun drawStatsPage(
+        context: Context,
+        canvas: Canvas,
+        isTotal: Boolean,
+        camino: CaminoEntity?,
+        stats: com.example.data.repository.CaminoStats,
+        stages: List<StageEntity>
+    ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val isTravel = camino?.isTravelGuide == true
+
+        // Cabecera Azul Marino
+        val bannerH = 175f
+        paint.color = COLOR_NAVY
+        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerH, paint)
+
+        // Doble Franja Dorada
+        paint.color = COLOR_GOLD
+        canvas.drawRect(0f, bannerH - 5f, PAGE_WIDTH.toFloat(), bannerH - 2f, paint)
+        paint.color = COLOR_GOLD_DARK
+        canvas.drawRect(0f, bannerH - 1.5f, PAGE_WIDTH.toFloat(), bannerH, paint)
+
+        // Logo oficial
+        var textLeft = MARGIN
+        try {
+            val logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
+            if (logoBitmap != null) {
+                val scaled = Bitmap.createScaledBitmap(logoBitmap, 60, 60, true)
+                canvas.drawBitmap(scaled, MARGIN, 36f, paint)
+                textLeft = MARGIN + 72f
+            }
+        } catch (_: Exception) {}
+
+        // Títulos de Cabecera
+        paint.color = COLOR_GOLD
+        paint.textSize = 10f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
+        canvas.drawText("$brandPrefix  •  INFORME OFICIAL DE RENDIMIENTO", textLeft, 48f, paint)
+
+        paint.color = Color.WHITE
+        paint.textSize = 19f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val subjectTitle = if (isTotal) {
+            if (isTravel) "Balance Acumulado de Viajes" else "Balance Total de Caminos Realizados"
+        } else {
+            camino?.title ?: "Camino de Santiago"
+        }
+        canvas.drawText(subjectTitle, textLeft, 76f, paint)
+
+        paint.textSize = 9.5f
+        paint.typeface = Typeface.DEFAULT
+        paint.color = Color.rgb(215, 230, 250)
+        val dateGenerated = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+        canvas.drawText("Documento emitido y validado el: $dateGenerated", textLeft, 98f, paint)
+
+        // 4 Tarjetas KPI Principales
+        var startY = 198f
+        val cardSpacing = 12f
+        val cardWidth = (PAGE_WIDTH - (MARGIN * 2) - cardSpacing) / 2f
+        val cardHeight = 78f
+
+        // Card 1: Etapas (Azul)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN,
+            y = startY,
+            w = cardWidth,
+            h = cardHeight,
+            label = if (isTravel) "JORNADAS COMPLETADAS" else "ETAPAS COMPLETADAS",
+            value = "${stats.completedStages} / ${stats.totalStages}",
+            sub = "${stats.totalStages - stats.completedStages} pendientes para culminar",
+            accentColor = COLOR_BLUE,
+            bgColor = COLOR_BLUE_BG,
+            borderColor = COLOR_BLUE_BORDER
+        )
+
+        // Card 2: Distancia (Verde Esmeralda)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN + cardWidth + cardSpacing,
+            y = startY,
+            w = cardWidth,
+            h = cardHeight,
+            label = "DISTANCIA RECORRIDA",
+            value = "${String.format(java.util.Locale.US, "%.1f", stats.completedKm)} km",
+            sub = "de ${String.format(java.util.Locale.US, "%.1f", stats.totalKm)} km totales proyectados",
+            accentColor = COLOR_EMERALD,
+            bgColor = COLOR_EMERALD_BG,
+            borderColor = COLOR_EMERALD_BORDER
+        )
+
+        startY += cardHeight + 12f
+
+        // Card 3: Desnivel (Ámbar)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN,
+            y = startY,
+            w = cardWidth,
+            h = cardHeight,
+            label = "DESNIVEL POSITIVO SUPERADO",
+            value = "+${stats.completedElevationGainM} m",
+            sub = "de +${stats.totalElevationGainM} m de desnivel total",
+            accentColor = COLOR_AMBER,
+            bgColor = COLOR_AMBER_BG,
+            borderColor = COLOR_AMBER_BORDER
+        )
+
+        // Card 4: Progreso Global (Dorado)
+        drawMetricBox(
+            canvas = canvas,
+            x = MARGIN + cardWidth + cardSpacing,
+            y = startY,
+            w = cardWidth,
+            h = cardHeight,
+            label = "PROGRESO Y CUMPLIMIENTO",
+            value = "${stats.progressPercent}%",
+            sub = if (stats.progressPercent >= 100) "¡Ruta culminada con éxito!" else "Itinerario en curso",
+            accentColor = COLOR_GOLD_DARK,
+            bgColor = COLOR_WARM_BG,
+            borderColor = COLOR_WARM_BORDER
+        )
+
+        // Barra visual de progreso
+        startY += cardHeight + 16f
+        val barRect = RectF(MARGIN, startY, PAGE_WIDTH - MARGIN, startY + 8f)
+        paint.color = COLOR_CARD_BORDER
+        canvas.drawRoundRect(barRect, 4f, 4f, paint)
+
+        val fillW = (PAGE_WIDTH - (MARGIN * 2)) * (stats.progressPercent / 100f).coerceIn(0f, 1f)
+        if (fillW > 0) {
+            paint.color = COLOR_EMERALD
+            val fillRect = RectF(MARGIN, startY, MARGIN + fillW, startY + 8f)
+            canvas.drawRoundRect(fillRect, 4f, 4f, paint)
+        }
+
+        // Sección de Desglose
+        startY += 26f
+        startY = drawSectionBanner(canvas, startY, if (isTotal) "MÉTRICAS CONSOLIDADAS DE RENDIMIENTO" else "DETALLE DE JORNADAS REALIZADAS", COLOR_NAVY, "📈")
+
+        paint.textSize = 9.5f
+        paint.typeface = Typeface.DEFAULT
+        paint.color = COLOR_SLATE
+
+        if (stages.isNotEmpty() && !isTotal) {
+            for (st in stages.take(14)) {
+                val statusBadge = if (st.isCompleted) "✓ Completada" else "⏳ Planificada"
+                val lineText = "Día ${st.dayNumber}: ${st.origin} → ${st.destination}  |  ${st.distanceKm} km  |  +${st.elevationGainM}m  |  $statusBadge"
+                canvas.drawText(lineText, MARGIN + 8f, startY, paint)
+                startY += 18f
+            }
+        } else {
+            val avgKm = if (stats.completedStages > 0) (stats.completedKm / stats.completedStages) else 0.0
+            canvas.drawText("• Promedio de distancia por etapa completada: ${String.format(java.util.Locale.US, "%.1f", avgKm)} km", MARGIN + 8f, startY, paint)
+            startY += 18f
+            val remainingKm = (stats.totalKm - stats.completedKm).coerceAtLeast(0.0)
+            canvas.drawText("• Distancia pendiente por recorrer: ${String.format(java.util.Locale.US, "%.1f", remainingKm)} km", MARGIN + 8f, startY, paint)
+            startY += 18f
+            val avgElev = if (stats.completedStages > 0) stats.completedElevationGainM / stats.completedStages else 0
+            canvas.drawText("• Desnivel medio superado por jornada: +$avgElev metros", MARGIN + 8f, startY, paint)
+            startY += 18f
+            canvas.drawText("• Cumplimiento del plan de viaje: ${stats.completedStages} jornadas efectivas registradas en Ultreia", MARGIN + 8f, startY, paint)
+        }
+
+        // Cajetín de Certificación y Sello Oficial
+        val stampBox = RectF(PAGE_WIDTH - MARGIN - 160f, PAGE_HEIGHT - 125f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 45f)
+        paint.color = COLOR_WARM_BG
+        canvas.drawRoundRect(stampBox, 8f, 8f, paint)
+        paint.color = COLOR_WARM_BORDER
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.2f
+        canvas.drawRoundRect(stampBox, 8f, 8f, paint)
+        paint.style = Paint.Style.FILL
+
+        paint.color = COLOR_GOLD_DARK
+        paint.textSize = 8.5f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("SELLO Y CERTIFICACIÓN", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 100f, paint)
+        paint.color = COLOR_MUTED
+        paint.textSize = 7.5f
+        paint.typeface = Typeface.DEFAULT
+        val certSub = if (isTravel) "OFICINA DE EXPEDICIÓN" else "OFICINA DEL PEREGRINO"
+        canvas.drawText(certSub, PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 86f, paint)
+        canvas.drawText("SANTIAGO DE COMPOSTELA", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 74f, paint)
+
+        // Footer
+        drawEditorialFooter(canvas, 1, isTravel)
+    }
+
+    // ----------------------------------------------------
+    // COMPONENTES EDITORIALES COMUNES
+    // ----------------------------------------------------
+    private fun drawSectionBanner(
+        canvas: Canvas,
+        y: Float,
+        title: String,
+        accentColor: Int,
+        iconLabel: String = ""
+    ): Float {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Píldora de color del acento
+        paint.color = accentColor
+        canvas.drawRoundRect(RectF(MARGIN, y, MARGIN + 4f, y + 15f), 2f, 2f, paint)
+
+        // Título de la sección
+        paint.color = COLOR_SLATE
+        paint.textSize = 11.5f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val text = if (iconLabel.isNotBlank()) "$iconLabel  $title" else title
+        canvas.drawText(text, MARGIN + 10f, y + 12f, paint)
+
+        // Línea divisoria elegante
+        val textWidth = paint.measureText(text)
+        paint.color = COLOR_CARD_BORDER
+        paint.strokeWidth = 0.8f
+        canvas.drawLine(MARGIN + 16f + textWidth, y + 8f, PAGE_WIDTH - MARGIN, y + 8f, paint)
+
+        return y + 22f
+    }
+
+    private fun drawCardBox(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        bgColor: Int = COLOR_CARD_BG,
+        borderColor: Int = COLOR_CARD_BORDER,
+        accentColor: Int? = null,
+        accentWidth: Float = 4f,
+        cornerRadius: Float = 8f
+    ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val rect = RectF(x, y, x + w, y + h)
+
+        // Fondo de la tarjeta
+        paint.color = bgColor
+        paint.style = Paint.Style.FILL
+        canvas.drawRoundRect(rect, cornerRadius, cornerRadius, paint)
+
+        // Borde
+        paint.color = borderColor
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        canvas.drawRoundRect(rect, cornerRadius, cornerRadius, paint)
+
+        // Franja lateral de acento de color
+        if (accentColor != null) {
+            paint.style = Paint.Style.FILL
+            paint.color = accentColor
+            val accentRect = RectF(x, y, x + accentWidth, y + h)
+            canvas.drawRoundRect(accentRect, 2f, 2f, paint)
+        }
+    }
+
+    private fun drawMetricBox(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+        label: String,
+        value: String,
+        sub: String = "",
+        accentColor: Int,
+        bgColor: Int = COLOR_CARD_BG,
+        borderColor: Int = COLOR_CARD_BORDER
+    ) {
+        drawCardBox(canvas, x, y, w, h, bgColor, borderColor, accentColor, accentWidth = 4f, cornerRadius = 8f)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Etiqueta
+        paint.color = COLOR_MUTED
+        paint.textSize = 8f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText(label.uppercase(), x + 10f, y + 16f, paint)
+
+        // Valor principal
+        paint.color = COLOR_SLATE
+        paint.textSize = 14f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText(value, x + 10f, y + 34f, paint)
+
+        // Subtítulo
+        if (sub.isNotBlank()) {
+            paint.color = COLOR_MUTED
+            paint.textSize = 7.5f
+            paint.typeface = Typeface.DEFAULT
+            canvas.drawText(sub, x + 10f, y + 46f, paint)
+        }
+    }
+
+    private fun drawDocumentChip(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        maxWidth: Float,
+        fileName: String
+    ): Float {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val chipH = 22f
+        val text = "📎  Archivo adjunto: $fileName"
+        paint.textSize = 8.5f
+        paint.typeface = Typeface.DEFAULT
+
+        val textWidth = paint.measureText(text)
+        val chipW = minOf(textWidth + 20f, maxWidth)
+        val chipRect = RectF(x, y, x + chipW, y + chipH)
+
+        // Fondo y borde
+        paint.color = COLOR_BLUE_BG
+        canvas.drawRoundRect(chipRect, 4f, 4f, paint)
+        paint.color = COLOR_BLUE_BORDER
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        canvas.drawRoundRect(chipRect, 4f, 4f, paint)
+
+        // Texto
+        paint.style = Paint.Style.FILL
+        paint.color = COLOR_SLATE
+        val ellipText = if (textWidth > chipW - 14f) text.take(38) + "..." else text
+        canvas.drawText(ellipText, x + 8f, y + 14.5f, paint)
+
+        return y + chipH + 6f
+    }
+
+    private fun drawEditorialFooter(canvas: Canvas, pageNumber: Int, isTravel: Boolean) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Línea divisoria inferior
+        paint.color = COLOR_CARD_BORDER
+        paint.strokeWidth = 0.8f
+        canvas.drawLine(MARGIN, PAGE_HEIGHT - 34f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 34f, paint)
+
+        // Marca de la guía
+        paint.color = COLOR_MUTED
+        paint.textSize = 8.5f
+        paint.typeface = Typeface.DEFAULT
+        val guideBrand = if (isTravel) "Ultreia • Guía e Itinerario Oficial de Viaje" else "Ultreia • Guía Oficial & Memorias del Camino de Santiago"
+        canvas.drawText(guideBrand, MARGIN, PAGE_HEIGHT - 20f, paint)
+
+        // Píldora de número de página
+        val pageText = "Página $pageNumber"
+        val pageW = paint.measureText(pageText)
+        val pillRect = RectF(PAGE_WIDTH - MARGIN - pageW - 12f, PAGE_HEIGHT - 29f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 13f)
+        paint.color = COLOR_CARD_BG
+        canvas.drawRoundRect(pillRect, 4f, 4f, paint)
+        paint.color = COLOR_CARD_BORDER
+        paint.style = Paint.Style.STROKE
+        canvas.drawRoundRect(pillRect, 4f, 4f, paint)
+
+        paint.style = Paint.Style.FILL
+        paint.color = COLOR_SLATE
+        canvas.drawText(pageText, PAGE_WIDTH - MARGIN - pageW - 6f, PAGE_HEIGHT - 19.5f, paint)
+    }
+
+    // ----------------------------------------------------
+    // DETECCIÓN DE ARCHIVOS (IMÁGENES VS DOCUMENTOS)
+    // ----------------------------------------------------
     private fun checkIsImage(
         context: Context,
         mimeType: String?,
@@ -1046,9 +1496,15 @@ object PdfExporter {
 
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
             val frameRect = RectF(x, y, x + drawW + 6f, y + drawH + 6f)
-            paint.color = Color.rgb(240, 243, 248)
+            paint.color = COLOR_CARD_BG
             canvas.drawRoundRect(frameRect, 6f, 6f, paint)
 
+            paint.color = COLOR_CARD_BORDER
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 1f
+            canvas.drawRoundRect(frameRect, 6f, 6f, paint)
+
+            paint.style = Paint.Style.FILL
             val imageRect = RectF(x + 3f, y + 3f, x + 3f + drawW, y + 3f + drawH)
             canvas.drawBitmap(bitmap, null, imageRect, paint)
 
@@ -1070,7 +1526,7 @@ object PdfExporter {
         val latSpan = if (maxLat - minLat > 0.0001) maxLat - minLat else 0.01
         val lonSpan = if (maxLon - minLon > 0.0001) maxLon - minLon else 0.01
 
-        val padding = 18f
+        val padding = 16f
         val w = bounds.width() - 2 * padding
         val h = bounds.height() - 2 * padding
 
@@ -1082,31 +1538,65 @@ object PdfExporter {
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
 
-        paint.color = Color.rgb(14, 76, 153)
-        paint.strokeWidth = 3f
+        // Línea del recorrido (Azul Zafiro de Guía)
+        paint.color = COLOR_BLUE
+        paint.strokeWidth = 2.8f
         paint.style = Paint.Style.STROKE
         canvas.drawPath(path, paint)
         paint.style = Paint.Style.FILL
 
-        // Start point (Green)
+        // Punto de Salida / Origen (Verde Esmeralda)
         val pStart = points.first()
         val xStart = bounds.left + padding + ((pStart.lon - minLon) / lonSpan * w).toFloat()
         val yStart = bounds.bottom - padding - ((pStart.lat - minLat) / latSpan * h).toFloat()
-        paint.color = Color.rgb(46, 125, 50)
-        canvas.drawCircle(xStart, yStart, 5f, paint)
+        paint.color = COLOR_EMERALD
+        canvas.drawCircle(xStart, yStart, 4.5f, paint)
 
-        // End point (Gold Yellow)
+        // Punto de Llegada / Destino (Dorado)
         val pEnd = points.last()
         val xEnd = bounds.left + padding + ((pEnd.lon - minLon) / lonSpan * w).toFloat()
         val yEnd = bounds.bottom - padding - ((pEnd.lat - minLat) / latSpan * h).toFloat()
-        paint.color = Color.rgb(247, 190, 49)
-        canvas.drawCircle(xEnd, yEnd, 5f, paint)
+        paint.color = COLOR_GOLD
+        canvas.drawCircle(xEnd, yEnd, 4.5f, paint)
 
-        // Labels
-        paint.textSize = 9f
-        paint.color = Color.rgb(70, 70, 70)
-        canvas.drawText("Origen", xStart - 10f, yStart - 8f, paint)
-        canvas.drawText("Destino", xEnd - 10f, yEnd - 8f, paint)
+        // Etiquetas
+        paint.textSize = 8f
+        paint.color = COLOR_MUTED
+        canvas.drawText("Inicio", xStart - 8f, yStart - 7f, paint)
+        canvas.drawText("Fin", xEnd - 6f, yEnd - 7f, paint)
+    }
+
+    private fun measureMultilineTextHeight(
+        text: String,
+        maxWidth: Float,
+        paint: Paint,
+        lineSpacingExtra: Float = 4f
+    ): Float {
+        if (text.isBlank()) return 0f
+        var totalH = 0f
+        val paragraphs = text.split("\n")
+        for (paragraph in paragraphs) {
+            if (paragraph.isBlank()) {
+                totalH += paint.textSize * 0.7f
+                continue
+            }
+            val words = paragraph.split(" ")
+            var line = StringBuilder()
+            for (word in words) {
+                if (word.isEmpty()) continue
+                val testLine = if (line.isEmpty()) word else "$line $word"
+                if (paint.measureText(testLine) > maxWidth) {
+                    totalH += paint.textSize + lineSpacingExtra
+                    line = StringBuilder(word)
+                } else {
+                    line = StringBuilder(testLine)
+                }
+            }
+            if (line.isNotEmpty()) {
+                totalH += paint.textSize + lineSpacingExtra
+            }
+        }
+        return totalH
     }
 
     private fun drawMultilineText(
@@ -1122,7 +1612,7 @@ object PdfExporter {
 
         for (paragraph in paragraphs) {
             if (paragraph.isBlank()) {
-                currentY += paint.textSize * 0.8f
+                currentY += paint.textSize * 0.7f
                 continue
             }
             val words = paragraph.split(" ")
@@ -1147,21 +1637,25 @@ object PdfExporter {
         return currentY
     }
 
-    private fun sharePdfFile(context: Context, file: File, title: String) {
+    private fun sharePdfFile(context: Context, file: File, title: String, isTravel: Boolean) {
         val uri: Uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
             file
         )
 
+        val subject = if (isTravel) "Guía Oficial de Viaje: $title" else "Guía y Memorias del Camino: $title"
+        val bodyText = if (isTravel) "Comparto el itinerario y cuaderno de bitácora creado con Ultreia." else "Comparto mis memorias de viaje del Camino de Santiago creadas con Ultreia."
+
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Guía y Memorias del Camino: $title")
-            putExtra(Intent.EXTRA_TEXT, "Comparto mis memorias de viaje del Camino de Santiago creadas con Ultreia.")
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, bodyText)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        context.startActivity(Intent.createChooser(intent, "Compartir Memorias del Camino en PDF"))
+        val chooserTitle = if (isTravel) "Compartir Guía de Viaje en PDF" else "Compartir Memorias del Camino en PDF"
+        context.startActivity(Intent.createChooser(intent, chooserTitle))
     }
 }
