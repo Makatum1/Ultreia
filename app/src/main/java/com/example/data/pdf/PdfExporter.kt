@@ -186,6 +186,21 @@ object PdfExporter {
         }
     }
 
+    private fun loadBitmapFromUri(context: Context, uriStr: String): Bitmap? {
+        return try {
+            val uri = Uri.parse(uriStr)
+            val decodeOpts = BitmapFactory.Options().apply {
+                inScaled = false
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            openInputStreamForUri(context, uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, decodeOpts)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // ----------------------------------------------------
     // COVER PAGE (PORTADA EDITORIAL PROFESIONAL)
     // ----------------------------------------------------
@@ -199,8 +214,17 @@ object PdfExporter {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val isTravel = camino.isTravelGuide
 
-        // 1. Cargar la imagen del título con alta resolución y sin pixelación
-        val titleIcon = if (!isTravel && camino.coverPhotoUri.isNullOrBlank()) loadTitleIconBitmap(context) else null
+        // 1. Imagen del título:
+        // - En Caminos: siempre el icono de la aplicación (R.drawable.icono)
+        // - En Viajes: si no se cambia la imagen, no se pone icono; si se cambia, se pone esa imagen respetando el tamaño (sin círculo)
+        val titleIcon: Bitmap? = if (!isTravel) {
+            loadTitleIconBitmap(context)
+        } else if (!camino.coverPhotoUri.isNullOrBlank()) {
+            loadBitmapFromUri(context, camino.coverPhotoUri)
+        } else {
+            null
+        }
+
         var textLeftOffset = MARGIN
         var iconTargetW = 0f
         var iconTargetH = 0f
@@ -248,46 +272,6 @@ object PdfExporter {
         // Rectángulo de fondo de cabecera con el color exacto #1C4B64
         paint.color = COLOR_HEADER_BG
         canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
-
-        // Si se configuró foto de fondo/título (desde el botón del título), se utiliza para la cabecera del PDF
-        if (!camino.coverPhotoUri.isNullOrBlank()) {
-            try {
-                val coverUri = Uri.parse(camino.coverPhotoUri)
-                openInputStreamForUri(context, coverUri)?.use { stream ->
-                    val opts = BitmapFactory.Options().apply {
-                        inPreferredConfig = Bitmap.Config.ARGB_8888
-                    }
-                    val coverBmp = BitmapFactory.decodeStream(stream, null, opts)
-                    if (coverBmp != null) {
-                        val headerRect = RectF(0f, 0f, PAGE_WIDTH.toFloat(), bannerHeight)
-                        val bmpW = coverBmp.width.toFloat()
-                        val bmpH = coverBmp.height.toFloat()
-                        val scale = maxOf(PAGE_WIDTH.toFloat() / bmpW, bannerHeight / bmpH)
-                        val scaledW = bmpW * scale
-                        val scaledH = bmpH * scale
-                        val srcLeft = ((scaledW - PAGE_WIDTH.toFloat()) / (2f * scale)).coerceAtLeast(0f)
-                        val srcTop = ((scaledH - bannerHeight) / (2f * scale)).coerceAtLeast(0f)
-                        val srcRight = (srcLeft + PAGE_WIDTH.toFloat() / scale).coerceAtMost(bmpW)
-                        val srcBottom = (srcTop + bannerHeight / scale).coerceAtMost(bmpH)
-                        val srcRect = Rect(srcLeft.toInt(), srcTop.toInt(), srcRight.toInt(), srcBottom.toInt())
-
-                        val photoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            isFilterBitmap = true
-                            isDither = true
-                        }
-                        canvas.drawBitmap(coverBmp, srcRect, headerRect, photoPaint)
-
-                        // Sutil capa oscura superpuesta para garantizar contraste de los textos blancos
-                        val tintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            color = Color.argb(135, 15, 30, 50)
-                        }
-                        canvas.drawRect(headerRect, tintPaint)
-
-                        coverBmp.recycle()
-                    }
-                }
-            } catch (_: Exception) {}
-        }
 
         // Doble Franja Dorada Inferior
         paint.color = COLOR_GOLD
@@ -1032,13 +1016,23 @@ object PdfExporter {
         paint.color = COLOR_GOLD_DARK
         canvas.drawRect(0f, bannerH - 1.5f, PAGE_WIDTH.toFloat(), bannerH, paint)
 
-        // Logo o emblema de alta calidad sin pixelar
-        val statsIcon = loadTitleIconBitmap(context)
+        // Logo o imagen de cabecera:
+        // - En Caminos: icono de la aplicación (R.drawable.icono)
+        // - En Viajes: si no se cambia la imagen, no se pone icono; si se cambia, se pone esa imagen respetando el tamaño (sin círculo)
+        val statsIcon: Bitmap? = if (!isTravel) {
+            loadTitleIconBitmap(context)
+        } else if (!camino?.coverPhotoUri.isNullOrBlank()) {
+            loadBitmapFromUri(context, camino.coverPhotoUri!!)
+        } else {
+            null
+        }
         var textLeft = MARGIN
         if (statsIcon != null) {
-            val iconH = 56f
-            val scale = iconH / statsIcon.height.toFloat()
+            val maxH = 56f
+            val maxW = 90f
+            val scale = minOf(maxH / statsIcon.height.toFloat(), maxW / statsIcon.width.toFloat(), 1.0f)
             val iconW = statsIcon.width * scale
+            val iconH = statsIcon.height * scale
             val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 isFilterBitmap = true
                 isDither = true
