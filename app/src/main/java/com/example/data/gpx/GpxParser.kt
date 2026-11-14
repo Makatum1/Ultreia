@@ -1,5 +1,6 @@
 package com.example.data.gpx
 
+import android.location.Location
 import com.example.data.model.GpxPoint
 import org.json.JSONArray
 import org.json.JSONObject
@@ -63,12 +64,14 @@ object GpxParser {
 
     /**
      * Parses standard GPX 1.0 / 1.1 XML string and computes the 4 key track metrics:
-     * 1. Distance (Km): Haversine distance with filter ignoring jumps < 2 meters (anti-noise). Max 2 decimals.
-     * 2. Time: Difference between last point and first point timestamp, truncated to minutes ("X h Y min").
-     * 3. Elevation Gain & Loss (Double Filter): Moving average smoothing (5-point window) + Hysteresis threshold (3.5m).
+     * 1. Distance (Km): Native Android Location.distanceBetween per <trkseg> with unreal speed filter (> 30 km/h). Max 2 decimals.
+     * 2. Time: Recorded duration summing point-to-point intervals <= 10s ("X h Y min").
+     * 3. Elevation Gain & Loss (Double Filter): Moving average smoothing (11-point window) + Hysteresis threshold (0.80m).
      */
     fun parse(gpxContent: String): GpxParseResult {
         val rawPoints = mutableListOf<RawGpxPoint>()
+        val segments = mutableListOf<MutableList<RawGpxPoint>>()
+        var currentSegment = mutableListOf<RawGpxPoint>()
         var originName: String? = null
         var destName: String? = null
 
@@ -92,7 +95,12 @@ object GpxParser {
                     XmlPullParser.START_TAG -> {
                         val tagName = parser.name?.substringAfter(":")?.lowercase() ?: ""
                         currentTag = tagName
-                        if (tagName == "trkpt" || tagName == "wpt") {
+                        if (tagName == "trkseg") {
+                            if (currentSegment.isNotEmpty()) {
+                                segments.add(currentSegment)
+                                currentSegment = mutableListOf()
+                            }
+                        } else if (tagName == "trkpt" || tagName == "wpt") {
                             var latStr: String? = null
                             var lonStr: String? = null
                             for (i in 0 until parser.attributeCount) {
@@ -129,7 +137,9 @@ object GpxParser {
                         val endTag = parser.name?.substringAfter(":")?.lowercase() ?: ""
                         if (endTag == "trkpt" || endTag == "wpt") {
                             if (currentLat != null && currentLon != null) {
-                                rawPoints.add(RawGpxPoint(currentLat, currentLon, currentEle, hasEle, currentTimeMillis))
+                                val pt = RawGpxPoint(currentLat, currentLon, currentEle, hasEle, currentTimeMillis)
+                                rawPoints.add(pt)
+                                currentSegment.add(pt)
                             }
                             insideTrkpt = false
                             currentLat = null
@@ -137,11 +147,20 @@ object GpxParser {
                             currentEle = 0.0
                             hasEle = false
                             currentTimeMillis = null
+                        } else if (endTag == "trkseg") {
+                            if (currentSegment.isNotEmpty()) {
+                                segments.add(currentSegment)
+                                currentSegment = mutableListOf()
+                            }
                         }
                         currentTag = ""
                     }
                 }
                 eventType = parser.next()
+            }
+            if (currentSegment.isNotEmpty()) {
+                segments.add(currentSegment)
+                currentSegment = mutableListOf()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -159,7 +178,9 @@ object GpxParser {
                 val timeStr = """<time>(.*?)</time>""".toRegex().find(inner)?.groupValues?.get(1)?.trim()
                 val timeMillis = if (!timeStr.isNullOrBlank()) parseIsoTimestamp(timeStr) else null
                 if (lat != null && lon != null) {
-                    rawPoints.add(RawGpxPoint(lat, lon, ele, hasEle, timeMillis))
+                    val pt = RawGpxPoint(lat, lon, ele, hasEle, timeMillis)
+                    rawPoints.add(pt)
+                    currentSegment.add(pt)
                 }
             }
             if (rawPoints.isEmpty()) {
@@ -168,9 +189,15 @@ object GpxParser {
                     val lat = m.groupValues[1].toDoubleOrNull()
                     val lon = m.groupValues[2].toDoubleOrNull()
                     if (lat != null && lon != null) {
-                        rawPoints.add(RawGpxPoint(lat, lon, 0.0, false, null))
+                        val pt = RawGpxPoint(lat, lon, 0.0, false, null)
+                        rawPoints.add(pt)
+                        currentSegment.add(pt)
                     }
                 }
+            }
+            if (currentSegment.isNotEmpty()) {
+                segments.add(currentSegment)
+                currentSegment = mutableListOf()
             }
             val nameMatch = """<name>(.*?)</name>""".toRegex().find(gpxContent)
             if (nameMatch != null) {
@@ -179,14 +206,35 @@ object GpxParser {
             }
         }
 
-        // 1. DISTANCIA (KM) DESCARTANDO DESPLAZAMIENTOS < 1.5 METROS
+        if (segments.isEmpty() && rawPoints.isNotEmpty()) {
+            segments.add(rawPoints)
+        }
+
+        // 1. DISTANCIA (KM) CON FORMULA NATIVA, SEGMENTOS Y FILTRO DE VELOCIDAD (< 30 km/h)
         var totalDistanceMeters = 0.0
-        for (i in 0 until rawPoints.size - 1) {
-            val p1 = rawPoints[i]
-            val p2 = rawPoints[i + 1]
-            val stepMeters = haversineDistanceMeters(p1.lat, p1.lon, p2.lat, p2.lon)
-            if (stepMeters >= 1.5) {
-                totalDistanceMeters += stepMeters
+        val results = FloatArray(1)
+        for (segment in segments) {
+            for (i in 0 until segment.size - 1) {
+                val p1 = segment[i]
+                val p2 = segment[i + 1]
+                Location.distanceBetween(p1.lat, p1.lon, p2.lat, p2.lon, results)
+                val stepMeters = results[0].toDouble()
+
+                // Filtro de velocidad irreal: si la velocidad supera 30 km/h se ignora el tramo
+                var isUnrealSpeed = false
+                if (p1.timeMillis != null && p2.timeMillis != null) {
+                    val dtSec = (p2.timeMillis - p1.timeMillis) / 1000.0
+                    if (dtSec > 0.0) {
+                        val speedKmh = (stepMeters / dtSec) * 3.6
+                        if (speedKmh > 30.0) {
+                            isUnrealSpeed = true
+                        }
+                    }
+                }
+
+                if (!isUnrealSpeed) {
+                    totalDistanceMeters += stepMeters
+                }
             }
         }
         val distanceKm = round((totalDistanceMeters / 1000.0) * 100.0) / 100.0
