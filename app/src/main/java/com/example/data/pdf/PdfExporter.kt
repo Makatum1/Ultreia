@@ -159,7 +159,13 @@ object PdfExporter {
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
 
-        // 1. Intentar cargar recurso drawable con nombre "icono"
+        // 1. Cargar directamente recurso drawable R.drawable.icono
+        try {
+            val bmp = BitmapFactory.decodeResource(context.resources, R.drawable.icono, decodeOpts)
+            if (bmp != null) return bmp
+        } catch (_: Exception) {}
+
+        // 2. Intentar cargar recurso drawable con nombre "icono" por identificador
         val iconoResId = context.resources.getIdentifier("icono", "drawable", context.packageName)
         if (iconoResId != 0) {
             try {
@@ -168,7 +174,7 @@ object PdfExporter {
             } catch (_: Exception) {}
         }
 
-        // 2. Intentar cargar desde assets (icono.png, icono.jpg, etc.)
+        // 3. Intentar cargar desde assets (icono.png, icono.jpg, etc.)
         for (name in listOf("icono.png", "icono.jpg", "icono.jpeg", "icono.webp")) {
             try {
                 context.assets.open(name).use { stream ->
@@ -178,7 +184,7 @@ object PdfExporter {
             } catch (_: Exception) {}
         }
 
-        // 3. Fallback a ic_ultreia_logo de alta resolución
+        // 4. Fallback a ic_ultreia_logo de alta resolución
         return try {
             BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo, decodeOpts)
         } catch (_: Exception) {
