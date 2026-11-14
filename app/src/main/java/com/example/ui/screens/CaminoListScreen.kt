@@ -435,7 +435,7 @@ fun CaminoItemCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val cardBg = if (camino.isTravelGuide) CaminoBlueDark else CaminoBlue
+    val cardBg = if (camino.isTravelGuide) Color(0xFF1C4B64) else CaminoBlue
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -460,7 +460,7 @@ fun CaminoItemCard(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                } else {
+                } else if (!camino.isTravelGuide) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_ultreia_logo),
                         contentDescription = camino.title,
@@ -468,6 +468,13 @@ fun CaminoItemCard(
                             .fillMaxSize()
                             .background(cardBg),
                         contentScale = ContentScale.Fit
+                    )
+                } else {
+                    // Perfil Viajes: fondo limpio #1C4B64 sin nada más
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(cardBg)
                     )
                 }
 

@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -289,7 +290,13 @@ fun StagesListTab(
         // Hero Camino Header Banner
         item {
             Spacer(Modifier.height(8.dp))
-            CaminoHeaderBanner(camino = camino, stats = stats)
+            CaminoHeaderBanner(
+                camino = camino,
+                stats = stats,
+                onUpdateCoverPhoto = { newUri ->
+                    viewModel.updateCamino(camino.copy(coverPhotoUri = newUri))
+                }
+            )
         }
 
         // Export Actions: Exportar PDF & Exportar (JSON)
@@ -462,8 +469,18 @@ fun StagesListTab(
 }
 
 @Composable
-fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
-    val bannerBg = if (camino.isTravelGuide) CaminoBlueDark else CaminoBlue
+fun CaminoHeaderBanner(
+    camino: CaminoEntity,
+    stats: CaminoStats,
+    onUpdateCoverPhoto: ((String) -> Unit)? = null
+) {
+    val bannerBg = if (camino.isTravelGuide) Color(0xFF1C4B64) else CaminoBlue
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { onUpdateCoverPhoto?.invoke(it.toString()) }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -476,7 +493,7 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
                 .fillMaxWidth()
                 .background(bannerBg)
         ) {
-            // Background Image
+            // Background Image / Color
             if (!camino.coverPhotoUri.isNullOrBlank()) {
                 AsyncImage(
                     model = camino.coverPhotoUri,
@@ -486,7 +503,7 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
                         .height(160.dp),
                     contentScale = ContentScale.Crop
                 )
-            } else {
+            } else if (!camino.isTravelGuide) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_ultreia_logo),
                     contentDescription = camino.title,
@@ -496,6 +513,14 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
                         .background(bannerBg),
                     contentScale = ContentScale.Fit
                 )
+            } else {
+                // Perfil Viajes sin foto: solo el color #1C4B64 sin nada más
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .background(bannerBg)
+                )
             }
 
             // Dark gradient overlay
@@ -504,7 +529,7 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
                     .matchParentSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
                             startY = 25f
                         )
                     )
@@ -515,6 +540,7 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
+                    .padding(end = if (camino.isTravelGuide && onUpdateCoverPhoto != null) 120.dp else 0.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
@@ -577,6 +603,38 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White
                     )
+                }
+            }
+
+            // Botón abajo a la derecha con símbolo de imágenes para cambiar el fondo
+            if (camino.isTravelGuide && onUpdateCoverPhoto != null) {
+                Surface(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.Black.copy(alpha = 0.55f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = "Cambiar fondo",
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = "Cambiar fondo",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }
