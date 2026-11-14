@@ -86,10 +86,18 @@ afterEvaluate {
     val altApk = File(releaseDir, "Ultreia.apk")
     val src = if (releaseApk.exists()) releaseApk else if (altApk.exists()) altApk else null
     src?.let {
+      if (rootDest.exists()) {
+        rootDest.delete()
+      }
       it.copyTo(rootDest, overwrite = true)
       val destInRelease = File(releaseDir, "Ultreia.apk")
-      it.copyTo(destInRelease, overwrite = true)
-      println("APK copiado exitosamente a: ${rootDest.absolutePath}")
+      if (destInRelease.canonicalPath != it.canonicalPath) {
+        if (destInRelease.exists()) {
+          destInRelease.delete()
+        }
+        it.copyTo(destInRelease, overwrite = true)
+      }
+      println("APK copiado y sobreescrito exitosamente en: ${rootDest.absolutePath}")
     }
   }
 }

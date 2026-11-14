@@ -896,18 +896,22 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val stage = repository.getStageByIdOnce(stageId) ?: return@launch
             val list = parseAttachedFiles(stage.attachedFilesJson).toMutableList()
-            list.add(
-                AttachedFile(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = name,
-                    uri = uriStr,
-                    sizeBytes = sizeBytes,
-                    mimeType = mimeType
-                )
+            val existingIndex = list.indexOfFirst { it.name.equals(name, ignoreCase = true) }
+            val newFile = AttachedFile(
+                id = if (existingIndex != -1) list[existingIndex].id else java.util.UUID.randomUUID().toString(),
+                name = name,
+                uri = uriStr,
+                sizeBytes = sizeBytes,
+                mimeType = mimeType
             )
+            if (existingIndex != -1) {
+                list[existingIndex] = newFile
+            } else {
+                list.add(newFile)
+            }
             val updatedJson = serializeAttachedFiles(list)
             repository.updateStage(stage.copy(attachedFilesJson = updatedJson))
-            _userMessage.value = "Archivo \"$name\" adjuntado a la etapa"
+            _userMessage.value = if (existingIndex != -1) "Archivo \"$name\" sobreescrito y actualizado" else "Archivo \"$name\" adjuntado a la etapa"
         }
     }
 
