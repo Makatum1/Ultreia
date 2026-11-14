@@ -916,7 +916,16 @@ fun StageDetailScreen(
     if (previewPhotoUri != null) {
         FullscreenImageViewerDialog(
             photoUri = previewPhotoUri!!,
-            onDismiss = { previewPhotoUri = null }
+            onDismiss = { previewPhotoUri = null },
+            onDeletePhoto = if (selectedAgendaItemForDetail != null) {
+                {
+                    val currentItem = selectedAgendaItemForDetail!!
+                    val updatedFiles = currentItem.files.filter { it.uri != previewPhotoUri }
+                    val updatedItem = currentItem.copy(files = updatedFiles)
+                    viewModel.updateAgendaItem(stage.id, updatedItem)
+                    selectedAgendaItemForDetail = updatedItem
+                }
+            } else null
         )
     }
 }
@@ -1755,6 +1764,39 @@ fun StageAttachedFilesSection(
         }
     }
 
+    var fileToDeleteFromStage by remember { mutableStateOf<AttachedFile?>(null) }
+
+    if (fileToDeleteFromStage != null) {
+        val f = fileToDeleteFromStage!!
+        AlertDialog(
+            onDismissRequest = { fileToDeleteFromStage = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text("¿Eliminar archivo?")
+                }
+            },
+            text = { Text("¿Estás seguro de que quieres eliminar \"${f.name}\" de los archivos de la etapa?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.removeStageAttachedFile(stage.id, f.id)
+                        fileToDeleteFromStage = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { fileToDeleteFromStage = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1880,7 +1922,7 @@ fun StageAttachedFilesSection(
                                 }
 
                                 IconButton(
-                                    onClick = { viewModel.removeStageAttachedFile(stage.id, file.id) },
+                                    onClick = { fileToDeleteFromStage = file },
                                     modifier = Modifier.size(28.dp)
                                 ) {
                                     Icon(
@@ -2309,6 +2351,53 @@ fun AgendaItemDetailDialog(
         )
     }
 
+    var fileToDelete by remember { mutableStateOf<AttachedFile?>(null) }
+
+    if (fileToDelete != null) {
+        val target = fileToDelete!!
+        val isImg = isImageAttached(target)
+        AlertDialog(
+            onDismissRequest = { fileToDelete = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (isImg) "¿Eliminar foto?" else "¿Eliminar archivo?")
+                }
+            },
+            text = {
+                Text(
+                    if (isImg) "¿Estás seguro de que deseas eliminar esta foto de la actividad?"
+                    else "¿Estás seguro de que deseas eliminar \"${target.name}\" de la actividad?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val remaining = editFiles.filter { it.id != target.id }
+                        editFiles = remaining
+                        val updated = item.copy(
+                            time = editTime,
+                            title = editTitle,
+                            description = editDescription,
+                            files = remaining
+                        )
+                        viewModel.updateAgendaItem(stageId, updated)
+                        fileToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { fileToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -2468,6 +2557,24 @@ fun AgendaItemDetailDialog(
                                                     modifier = Modifier.padding(3.dp)
                                                 )
                                             }
+
+                                            // Botón de eliminar en la miniatura con confirmación
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                                                shape = CircleShape,
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(4.dp)
+                                                    .size(26.dp)
+                                                    .clickable { fileToDelete = imgFile }
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Eliminar foto",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.padding(5.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -2486,29 +2593,42 @@ fun AgendaItemDetailDialog(
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
                                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                try {
-                                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                        setDataAndType(Uri.parse(file.uri), file.mimeType.ifBlank { "*/*" })
-                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                    }
-                                                    context.startActivity(intent)
-                                                } catch (_: Exception) {
-                                                    Toast.makeText(context, "No se pudo abrir el archivo", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(20.dp))
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(file.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                            Row(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        try {
+                                                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                                setDataAndType(Uri.parse(file.uri), file.mimeType.ifBlank { "*/*" })
+                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                            }
+                                                            context.startActivity(intent)
+                                                        } catch (_: Exception) {
+                                                            Toast.makeText(context, "No se pudo abrir el archivo", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    },
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(20.dp))
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(file.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            IconButton(
+                                                onClick = { fileToDelete = file },
+                                                modifier = Modifier.size(26.dp)
+                                            ) {
+                                                Icon(Icons.Default.Delete, contentDescription = "Eliminar archivo", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                            }
                                         }
                                     }
                                 }
@@ -2614,7 +2734,7 @@ fun AgendaItemDetailDialog(
                                                 modifier = Modifier.weight(1f)
                                             )
                                             IconButton(
-                                                onClick = { editFiles = editFiles.filter { it.id != file.id } }
+                                                onClick = { fileToDelete = file }
                                             ) {
                                                 Icon(Icons.Default.Delete, contentDescription = "Eliminar archivo", tint = MaterialTheme.colorScheme.error)
                                             }
@@ -2667,10 +2787,43 @@ fun AgendaItemDetailDialog(
 @Composable
 fun FullscreenImageViewerDialog(
     photoUri: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onDeletePhoto: (() -> Unit)? = null
 ) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text("¿Eliminar foto?")
+                }
+            },
+            text = { Text("¿Estás seguro de que deseas eliminar esta foto de la actividad?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDeletePhoto?.invoke()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -2707,14 +2860,28 @@ fun FullscreenImageViewerDialog(
                 )
             }
 
-            IconButton(
-                onClick = onDismiss,
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                if (onDeletePhoto != null) {
+                    IconButton(
+                        onClick = { showDeleteConfirm = true },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar foto", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                }
             }
 
             Surface(
