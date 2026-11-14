@@ -125,26 +125,22 @@ class CaminoRepository(val context: Context) {
     }
 
     /**
-     * Import GPX content into a Stage: calculates distance, elevation gain/loss,
-     * updates origin/destination if available, and stores track points JSON.
+     * Import GPX content into a Stage:
+     * - NO modifica ni origen ni destino (se conservan intactos los de la etapa).
+     * - Actualiza únicamente: distancia acumulada, Desnivel + (acumulada), Desnivel - (acumulada) y Tiempo en movimiento.
+     * - Almacena las coordenadas del track en gpxTrackJson para visualización en mapa.
      */
     suspend fun importGpxIntoStage(stageId: Long, gpxXmlContent: String, markAsCompleted: Boolean = false): StageEntity? = withContext(Dispatchers.IO) {
         val stage = dao.getStageByIdOnce(stageId) ?: return@withContext null
         val parseResult = GpxParser.parse(gpxXmlContent)
 
-        val updatedOrigin = if (!parseResult.origin.isNullOrBlank()) parseResult.origin else stage.origin
-        val updatedDest = if (!parseResult.destination.isNullOrBlank()) parseResult.destination else stage.destination
-
-        val hours = parseResult.estimatedHours.toInt()
-        val minutes = ((parseResult.estimatedHours - hours) * 60).toInt()
-        val timeStr = if (hours > 0 || minutes > 0) "${hours}h ${minutes}m" else stage.estimatedTime
-
+        val timeStr = if (parseResult.movingTimeStr.isNotBlank()) parseResult.movingTimeStr else stage.estimatedTime
         val serializedPoints = GpxParser.serializePoints(parseResult.points)
 
         val updatedStage = stage.copy(
-            origin = updatedOrigin,
-            destination = updatedDest,
-            distanceKm = if (parseResult.distanceKm > 0) parseResult.distanceKm else stage.distanceKm,
+            origin = stage.origin,
+            destination = stage.destination,
+            distanceKm = if (parseResult.distanceKm > 0.0) parseResult.distanceKm else stage.distanceKm,
             elevationGainM = if (parseResult.elevationGainM > 0) parseResult.elevationGainM else stage.elevationGainM,
             elevationLossM = if (parseResult.elevationLossM > 0) parseResult.elevationLossM else stage.elevationLossM,
             estimatedTime = timeStr,

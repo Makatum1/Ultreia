@@ -231,7 +231,7 @@ object SampleData {
                 PredefinedStageInfo(3, "Etapa 3: Santa Croya de Tera a Rionegro del Puente", "Santa Croya de Tera", "Rionegro del Puente", 27.5, 240, 120, "6h 30m", "Moderada", "Santuario de la Virgen de la Carballeda."),
                 PredefinedStageInfo(4, "Etapa 4: Rionegro del Puente a Puebla de Sanabria", "Rionegro del Puente", "Puebla de Sanabria", 40.5, 410, 280, "9h 30m", "Muy exigente", "Villa medieval fortificada sobre el río Castro."),
                 PredefinedStageInfo(5, "Etapa 5: Puebla de Sanabria a Lubián", "Puebla de Sanabria", "Lubián", 28.5, 620, 480, "7h 00m", "Exigente", "Puerto del Padornelo y entrada en la Alta Sanabria."),
-                PredefinedStageInfo(6, "Etapa 6: Lubián a A Gudiña", "Lubián", "A Gudiña", 24.0, 580, 420, "6h 00m", "Moderada", "Paso por A Canda y entrada oficial en Galicia."),
+                PredefinedStageInfo(6, "Etapa 6: Lubián a A Gudiña", "Lubián", "A Gudiña", 24.0, 580, 420, "6h 00m", "Moderada", "Paso por A Canda y entrada en Galicia."),
                 PredefinedStageInfo(7, "Etapa 7: A Gudiña a Laza", "A Gudiña", "Laza", 34.5, 460, 890, "8h 15m", "Exigente", "Descenso pronunciado hacia el valle de Monterrei."),
                 PredefinedStageInfo(8, "Etapa 8: Laza a Xunqueira de Ambía", "Laza", "Xunqueira de Ambía", 32.2, 590, 480, "7h 45m", "Exigente", "Sierra de San Mamede y colegiata románica."),
                 PredefinedStageInfo(9, "Etapa 9: Xunqueira de Ambía a Ourense", "Xunqueira de Ambía", "Ourense", 22.0, 140, 490, "5h 15m", "Fácil", "Llegada al río Miño y las termas de As Burgas."),

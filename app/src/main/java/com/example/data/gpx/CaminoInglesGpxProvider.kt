@@ -138,7 +138,7 @@ object CaminoInglesGpxProvider {
         sb.appendLine("""<gpx version="1.1" creator="Ultreia - Wikiloc ID 128031925" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">""")
         sb.appendLine("  <metadata>")
         sb.appendLine("    <name>Ferrol a Santiago - Camino Inglés por Trazado Antiguo</name>")
-        sb.appendLine("    <desc>Ruta histórica del Camino Inglés por el trazado tradicional antiguo desde Ferrol a Santiago de Compostela evitando los tramos de asfalto modernos. Referencia oficial Wikiloc ID: 128031925</desc>")
+        sb.appendLine("    <desc>Ruta histórica del Camino Inglés por el trazado tradicional antiguo desde Ferrol a Santiago de Compostela evitando los tramos de asfalto modernos. Referencia Wikiloc ID: 128031925</desc>")
         sb.appendLine("    <author>")
         sb.appendLine("      <name>Ultreia Guía de Peregrinos</name>")
         sb.appendLine("    </author>")

@@ -815,7 +815,7 @@ fun MainRoutesDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Selecciona una de las rutas históricas oficiales para crear tu guía con sus etapas predefinidas:",
+                    text = "Selecciona una de las rutas históricas para crear tu guía con sus etapas predefinidas:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

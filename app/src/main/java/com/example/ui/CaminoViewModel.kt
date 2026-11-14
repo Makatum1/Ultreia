@@ -742,7 +742,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val updated = repository.importGpxIntoStage(stageId, gpxContent, markAsCompleted)
             if (updated != null) {
-                _userMessage.value = "¡GPX sincronizado! Datos actualizados: ${updated.distanceKm} km, +${updated.elevationGainM}m, tiempo ${updated.estimatedTime}."
+                _userMessage.value = "¡GPX sincronizado! Distancia: ${updated.distanceKm} km, Desnivel: +${updated.elevationGainM}m / -${updated.elevationLossM}m, Tiempo: ${updated.estimatedTime}."
             } else {
                 _userMessage.value = "Error al procesar el archivo GPX"
             }
