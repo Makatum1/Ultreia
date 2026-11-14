@@ -27,8 +27,9 @@ object PdfExporter {
     private const val MARGIN = 40f
 
     // Official Travel Guide Luxury Editorial Palette
-    private val COLOR_NAVY = Color.rgb(15, 34, 64)
-    private val COLOR_NAVY_LIGHT = Color.rgb(24, 55, 98)
+    private val COLOR_HEADER_BG = Color.parseColor("#1C4B64") // Azul oscuro exacto de marca
+    private val COLOR_NAVY = Color.parseColor("#1C4B64")
+    private val COLOR_NAVY_LIGHT = Color.rgb(38, 92, 122)
     private val COLOR_GOLD = Color.rgb(245, 178, 30)
     private val COLOR_GOLD_DARK = Color.rgb(194, 120, 3)
     private val COLOR_GOLD_LIGHT = Color.rgb(254, 243, 199)
@@ -152,6 +153,39 @@ object PdfExporter {
         }
     }
 
+    private fun loadTitleIconBitmap(context: Context): Bitmap? {
+        val decodeOpts = BitmapFactory.Options().apply {
+            inScaled = false // Preservar resolución nativa sin downsampling por densidad
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+
+        // 1. Intentar cargar recurso drawable con nombre "icono"
+        val iconoResId = context.resources.getIdentifier("icono", "drawable", context.packageName)
+        if (iconoResId != 0) {
+            try {
+                val bmp = BitmapFactory.decodeResource(context.resources, iconoResId, decodeOpts)
+                if (bmp != null) return bmp
+            } catch (_: Exception) {}
+        }
+
+        // 2. Intentar cargar desde assets (icono.png, icono.jpg, etc.)
+        for (name in listOf("icono.png", "icono.jpg", "icono.jpeg", "icono.webp")) {
+            try {
+                context.assets.open(name).use { stream ->
+                    val bmp = BitmapFactory.decodeStream(stream, null, decodeOpts)
+                    if (bmp != null) return bmp
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 3. Fallback a ic_ultreia_logo de alta resolución
+        return try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo, decodeOpts)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // ----------------------------------------------------
     // COVER PAGE (PORTADA EDITORIAL PROFESIONAL)
     // ----------------------------------------------------
@@ -165,16 +199,20 @@ object PdfExporter {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val isTravel = camino.isTravelGuide
 
-        // 1. Cabecera principal (Banner Azul Marino)
+        // 1. Cargar la imagen del título con alta resolución y sin pixelación
+        val titleIcon = loadTitleIconBitmap(context)
         var textLeftOffset = MARGIN
-        var logoBitmap: Bitmap? = null
-        try {
-            val bmp = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
-            if (bmp != null) {
-                logoBitmap = Bitmap.createScaledBitmap(bmp, 54, 54, true)
-                textLeftOffset = MARGIN + 68f
-            }
-        } catch (_: Exception) {}
+        var iconTargetW = 0f
+        var iconTargetH = 0f
+
+        if (titleIcon != null) {
+            val maxH = 54f
+            val maxW = 90f
+            val scale = minOf(maxH / titleIcon.height.toFloat(), maxW / titleIcon.width.toFloat(), 1.0f)
+            iconTargetW = titleIcon.width * scale
+            iconTargetH = titleIcon.height * scale
+            textLeftOffset = MARGIN + iconTargetW + 14f
+        }
 
         // Título del Camino / Viaje con ajuste multilínea si es largo
         paint.color = Color.WHITE
@@ -205,10 +243,10 @@ object PdfExporter {
         val subY = if (hasSub) lastTitleY + 16f else lastTitleY
         val dateY = if (hasSub) subY + 16f else lastTitleY + 16f
 
-        val bannerHeight = dateY + 18f
+        val bannerHeight = maxOf(dateY + 18f, iconTargetH + 42f)
 
-        // Fondo del banner
-        paint.color = COLOR_NAVY
+        // Rectángulo de fondo de cabecera con el color exacto #1C4B64
+        paint.color = COLOR_HEADER_BG
         canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
 
         // Doble Franja Dorada Inferior
@@ -217,18 +255,24 @@ object PdfExporter {
         paint.color = COLOR_GOLD_DARK
         canvas.drawRect(0f, bannerHeight - 1.5f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
 
-        // Dibujar Logo
-        if (logoBitmap != null) {
-            canvas.drawBitmap(logoBitmap, MARGIN, 26f, paint)
+        // Dibujar Imagen del Título dentro del rectángulo azul con filtrado de alta calidad
+        if (titleIcon != null) {
+            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                isFilterBitmap = true
+                isDither = true
+            }
+            val iconTop = 26f
+            val destRect = RectF(MARGIN, iconTop, MARGIN + iconTargetW, iconTop + iconTargetH)
+            canvas.drawBitmap(titleIcon, null, destRect, iconPaint)
         }
 
-        // Marca
-        paint.color = COLOR_GOLD
+        // Marca en blanco puro para máximo contraste
+        paint.color = Color.WHITE
         paint.textSize = 9.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         canvas.drawText(brandLabel, textLeftOffset, 32f, paint)
 
-        // Título del Camino
+        // Título del Camino en blanco puro
         paint.color = Color.WHITE
         paint.textSize = 23f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -237,17 +281,17 @@ object PdfExporter {
             canvas.drawText(line2.toString(), textLeftOffset, titleLine2Y, paint)
         }
 
-        // Subtítulo
+        // Subtítulo en blanco puro
         if (hasSub) {
             paint.textSize = 10.5f
             paint.typeface = Typeface.DEFAULT
-            paint.color = Color.rgb(220, 235, 255)
+            paint.color = Color.WHITE
             val truncatedSub = if (subText.length > 70) subText.take(67) + "..." else subText
             canvas.drawText(truncatedSub, textLeftOffset, subY, paint)
         }
 
-        // Solo la fecha (sin recuadro gris, justo debajo del título/subtítulo, sin texto de peregrino)
-        paint.color = COLOR_GOLD
+        // Fecha en blanco puro
+        paint.color = Color.WHITE
         paint.textSize = 10f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val dateValue = camino.startDate.ifBlank { "2026" }
@@ -440,16 +484,16 @@ object PdfExporter {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         fun drawStageHeader(c: Canvas, isContinuation: Boolean = false, subtitleText: String = "") {
-            // Fondo Azul Marino
-            paint.color = COLOR_NAVY
+            // Fondo Azul Marino exacto #1C4B64
+            paint.color = COLOR_HEADER_BG
             c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 56f, paint)
 
             // Franja Dorada Inferior
             paint.color = COLOR_GOLD
             c.drawRect(0f, 53f, PAGE_WIDTH.toFloat(), 56f, paint)
 
-            // Marca y Título del Viaje
-            paint.color = COLOR_GOLD
+            // Marca y Título del Viaje en blanco puro para máximo contraste
+            paint.color = Color.WHITE
             paint.textSize = 9.5f
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
@@ -937,9 +981,9 @@ object PdfExporter {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val isTravel = camino?.isTravelGuide == true
 
-        // Cabecera Azul Marino
+        // Cabecera Azul Marino exacto #1C4B64
         val bannerH = 175f
-        paint.color = COLOR_NAVY
+        paint.color = COLOR_HEADER_BG
         canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerH, paint)
 
         // Doble Franja Dorada
@@ -948,19 +992,24 @@ object PdfExporter {
         paint.color = COLOR_GOLD_DARK
         canvas.drawRect(0f, bannerH - 1.5f, PAGE_WIDTH.toFloat(), bannerH, paint)
 
-        // Logo o emblema
+        // Logo o emblema de alta calidad sin pixelar
+        val statsIcon = loadTitleIconBitmap(context)
         var textLeft = MARGIN
-        try {
-            val logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
-            if (logoBitmap != null) {
-                val scaled = Bitmap.createScaledBitmap(logoBitmap, 60, 60, true)
-                canvas.drawBitmap(scaled, MARGIN, 36f, paint)
-                textLeft = MARGIN + 72f
+        if (statsIcon != null) {
+            val iconH = 56f
+            val scale = iconH / statsIcon.height.toFloat()
+            val iconW = statsIcon.width * scale
+            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                isFilterBitmap = true
+                isDither = true
             }
-        } catch (_: Exception) {}
+            val destRect = RectF(MARGIN, 36f, MARGIN + iconW, 36f + iconH)
+            canvas.drawBitmap(statsIcon, null, destRect, iconPaint)
+            textLeft = MARGIN + iconW + 14f
+        }
 
-        // Títulos de Cabecera
-        paint.color = COLOR_GOLD
+        // Títulos de Cabecera en blanco puro para máximo contraste
+        paint.color = Color.WHITE
         paint.textSize = 10f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
@@ -978,7 +1027,7 @@ object PdfExporter {
 
         paint.textSize = 9.5f
         paint.typeface = Typeface.DEFAULT
-        paint.color = Color.rgb(215, 230, 250)
+        paint.color = Color.WHITE
         val dateGenerated = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
         canvas.drawText("Documento emitido y validado el: $dateGenerated", textLeft, 98f, paint)
 
