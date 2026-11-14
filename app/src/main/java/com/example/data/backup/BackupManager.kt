@@ -336,6 +336,7 @@ object BackupManager {
                     diaryPhotoUri = stageObj.optString("diaryPhotoUri").takeIf { it.isNotBlank() },
                     vivenciasJson = stageObj.optString("vivenciasJson", "[]"),
                     attachedFilesJson = stageObj.optString("attachedFilesJson", "[]"),
+                    agendaJson = stageObj.optString("agendaJson", "[]"),
                     gpxTrackJson = stageObj.optString("gpxTrackJson").takeIf { it.isNotBlank() }
                 )
                 stagesList.add(stage)
@@ -479,6 +480,7 @@ object BackupManager {
             stageObj.put("diaryPhotoUri", stage.diaryPhotoUri ?: "")
             stageObj.put("vivenciasJson", stage.vivenciasJson)
             stageObj.put("attachedFilesJson", stage.attachedFilesJson)
+            stageObj.put("agendaJson", stage.agendaJson)
             stageObj.put("gpxTrackJson", stage.gpxTrackJson ?: "")
 
             val accArray = JSONArray()

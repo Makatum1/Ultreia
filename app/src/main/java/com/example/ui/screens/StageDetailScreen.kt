@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -12,12 +13,16 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
@@ -32,7 +37,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -43,9 +51,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.data.gpx.GpxParser
 import com.example.data.model.AccommodationEntity
+import com.example.data.model.AgendaItem
 import com.example.data.model.AttachedFile
 import com.example.data.model.RoomPriceOption
 import com.example.data.model.StageEntity
@@ -67,11 +78,24 @@ fun StageDetailScreen(
     val context = LocalContext.current
 
     val activeCamino by viewModel.selectedCamino.collectAsStateWithLifecycle()
+    val isTravel = activeCamino?.isTravelGuide == true
     val isCaminoIngles = remember(activeCamino) {
         val title = activeCamino?.title ?: ""
         title.contains("Inglés", ignoreCase = true) || title.contains("Ingles", ignoreCase = true)
     }
-    val hasGpx = !stage.gpxTrackJson.isNullOrBlank()
+    val points = remember(stage.gpxTrackJson) {
+        GpxParser.deserializePoints(stage.gpxTrackJson)
+    }
+    val hasGpx = !stage.gpxTrackJson.isNullOrBlank() && points.isNotEmpty()
+    val showFichaTecnica = !isTravel || hasGpx
+
+    // Agenda State (Solo en Viajes)
+    var showAddAgendaDialog by remember { mutableStateOf(false) }
+    var selectedAgendaItemForDetail by remember { mutableStateOf<AgendaItem?>(null) }
+    var previewPhotoUri by remember { mutableStateOf<String?>(null) }
+    val agendaItems = remember(stage.agendaJson) {
+        viewModel.parseAgenda(stage.agendaJson)
+    }
 
     var showEditStageDialog by remember { mutableStateOf(false) }
     var showEditTipsDialog by remember { mutableStateOf(false) }
@@ -262,87 +286,86 @@ fun StageDetailScreen(
                 }
             }
 
-            // Route Metrics Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Ficha Técnica de la Etapa",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = CaminoBlue
-                            )
-
-                            IconButton(
-                                onClick = { showEditStageDialog = true },
-                                modifier = Modifier.size(28.dp)
+            // Route Metrics Card (Ficha Técnica: En Viajes solo visible si tiene GPX; en Caminos siempre)
+            if (showFichaTecnica) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(Icons.Default.Edit, contentDescription = "Modificar etapa", tint = CaminoBlue, modifier = Modifier.size(18.dp))
-                            }
-                        }
+                                Text(
+                                    text = if (isTravel) "Ficha Técnica del Día" else "Ficha Técnica de la Etapa",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CaminoBlue
+                                )
 
-                        Spacer(Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            StageMetricItem("Distancia", "${stage.distanceKm} km", Icons.Default.Straighten)
-                            StageMetricItem("Desnivel +", "+${stage.elevationGainM} m", Icons.AutoMirrored.Filled.TrendingUp)
-                            StageMetricItem("Desnivel -", "-${stage.elevationLossM} m", Icons.AutoMirrored.Filled.TrendingDown)
-                            StageMetricItem("Tiempo", stage.estimatedTime, Icons.Default.Schedule)
-                        }
-
-                        Spacer(Modifier.height(12.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                        Spacer(Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Terrain, contentDescription = null, tint = PilgrimYellowDark, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Dificultad: ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(stage.difficulty, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                            }
-
-                            // GPX sync indicator
-                            val points = remember(stage.gpxTrackJson) {
-                                GpxParser.deserializePoints(stage.gpxTrackJson)
-                            }
-                            Surface(
-                                color = if (points.isNotEmpty()) CaminoGreen.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                IconButton(
+                                    onClick = { showEditStageDialog = true },
+                                    modifier = Modifier.size(28.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.Route,
-                                        contentDescription = null,
-                                        tint = if (points.isNotEmpty()) CaminoGreen else Color.Gray,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        text = if (points.isNotEmpty()) "${points.size} pts GPX" else "Sin GPX",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (points.isNotEmpty()) CaminoGreen else Color.Gray
-                                    )
+                                    Icon(Icons.Default.Edit, contentDescription = "Modificar etapa", tint = CaminoBlue, modifier = Modifier.size(18.dp))
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                StageMetricItem("Distancia", "${stage.distanceKm} km", Icons.Default.Straighten)
+                                StageMetricItem("Desnivel +", "+${stage.elevationGainM} m", Icons.AutoMirrored.Filled.TrendingUp)
+                                StageMetricItem("Desnivel -", "-${stage.elevationLossM} m", Icons.AutoMirrored.Filled.TrendingDown)
+                                StageMetricItem("Tiempo", stage.estimatedTime, Icons.Default.Schedule)
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                            Spacer(Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Terrain, contentDescription = null, tint = PilgrimYellowDark, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Dificultad: ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(stage.difficulty, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                }
+
+                                // GPX sync indicator
+                                Surface(
+                                    color = if (points.isNotEmpty()) CaminoGreen.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Route,
+                                            contentDescription = null,
+                                            tint = if (points.isNotEmpty()) CaminoGreen else Color.Gray,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = if (points.isNotEmpty()) "${points.size} pts GPX" else "Sin GPX",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (points.isNotEmpty()) CaminoGreen else Color.Gray
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -417,10 +440,15 @@ fun StageDetailScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Lightbulb, contentDescription = null, tint = PilgrimYellowDark, modifier = Modifier.size(20.dp))
+                                Icon(
+                                    if (isTravel) Icons.Default.Article else Icons.Default.Lightbulb,
+                                    contentDescription = null,
+                                    tint = PilgrimYellowDark,
+                                    modifier = Modifier.size(20.dp)
+                                )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = "Consejos del Día",
+                                    text = if (isTravel) "Resumen del Día" else "Consejos del Día",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = CaminoBlue
@@ -440,7 +468,8 @@ fun StageDetailScreen(
                         Spacer(Modifier.height(6.dp))
 
                         val tipsText = stage.stageNotes.ifBlank {
-                            "No hay consejos específicos registrados para hoy. Toca en 'Editar' para añadir recomendaciones de calzado, fuentes de agua o tramos técnicos."
+                            if (isTravel) "No hay un resumen registrado para hoy. Toca en 'Editar' para escribir qué te espera en la jornada de hoy."
+                            else "No hay consejos específicos registrados para hoy. Toca en 'Editar' para añadir recomendaciones de calzado, fuentes de agua o tramos técnicos."
                         }
 
                         // 3-line text with ellipsis and tap to toggle full text
@@ -525,6 +554,17 @@ fun StageDetailScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // NUEVA SECCIÓN: AGENDA DEL DÍA (Solo en Viajes, debajo del resumen)
+            if (isTravel) {
+                item {
+                    AgendaSectionCard(
+                        agendaItems = agendaItems,
+                        onAddClick = { showAddAgendaDialog = true },
+                        onItemClick = { item -> selectedAgendaItemForDetail = item }
+                    )
                 }
             }
 
@@ -769,6 +809,7 @@ fun StageDetailScreen(
     if (showEditTipsDialog) {
         EditTipsDialog(
             currentTips = stage.stageNotes,
+            isTravel = isTravel,
             onDismiss = { showEditTipsDialog = false },
             onSave = { newTips ->
                 viewModel.updateStageTips(stage.id, newTips)
@@ -850,6 +891,32 @@ fun StageDetailScreen(
                     Text("Cancelar")
                 }
             }
+        )
+    }
+
+    // Agenda Dialogs (Solo en Viajes)
+    if (showAddAgendaDialog) {
+        AddAgendaDialog(
+            stageId = stage.id,
+            viewModel = viewModel,
+            onDismiss = { showAddAgendaDialog = false }
+        )
+    }
+
+    if (selectedAgendaItemForDetail != null) {
+        AgendaItemDetailDialog(
+            stageId = stage.id,
+            item = selectedAgendaItemForDetail!!,
+            viewModel = viewModel,
+            onDismiss = { selectedAgendaItemForDetail = null },
+            onPreviewPhoto = { uri -> previewPhotoUri = uri }
+        )
+    }
+
+    if (previewPhotoUri != null) {
+        FullscreenImageViewerDialog(
+            photoUri = previewPhotoUri!!,
+            onDismiss = { previewPhotoUri = null }
         )
     }
 }
@@ -1190,10 +1257,11 @@ fun EditStageDialog(
     )
 }
 
-// Dialog for editing Tips of the Day
+// Dialog for editing Tips of the Day / Resumen del Día
 @Composable
 fun EditTipsDialog(
     currentTips: String,
+    isTravel: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
@@ -1203,15 +1271,15 @@ fun EditTipsDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Lightbulb, contentDescription = null, tint = PilgrimYellowDark)
+                Icon(if (isTravel) Icons.Default.Article else Icons.Default.Lightbulb, contentDescription = null, tint = PilgrimYellowDark)
                 Spacer(Modifier.width(8.dp))
-                Text("Editar Consejos del Día")
+                Text(if (isTravel) "Editar Resumen del Día" else "Editar Consejos del Día")
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Añade advertencias sobre el terreno, fuentes de agua, sombras o tramos recomendados.",
+                    text = if (isTravel) "Escribe un resumen o introducción de lo que te espera en la jornada." else "Añade advertencias sobre el terreno, fuentes de agua, sombras o tramos recomendados.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1223,7 +1291,9 @@ fun EditTipsDialog(
                         .heightIn(min = 140.dp),
                     singleLine = false,
                     maxLines = Int.MAX_VALUE,
-                    placeholder = { Text("Escribe aquí los consejos y notas (texto ilimitado)...") }
+                    placeholder = {
+                        Text(if (isTravel) "Escribe aquí el resumen de la jornada (lugares que visitar, planes previstos, expectativas)..." else "Escribe aquí los consejos y notas (texto ilimitado)...")
+                    }
                 )
             }
         },
@@ -1827,4 +1897,849 @@ fun StageAttachedFilesSection(
             }
         }
     }
+}
+
+// -------------------------------------------------------------
+// COMPONENTES DE LA AGENDA DEL DÍA (Exclusivo Perfil Viajes)
+// -------------------------------------------------------------
+
+@Composable
+fun AgendaSectionCard(
+    agendaItems: List<AgendaItem>,
+    onAddClick: () -> Unit,
+    onItemClick: (AgendaItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("stage_agenda_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = CaminoBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Agenda del Día (${agendaItems.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = CaminoBlue
+                    )
+                }
+
+                FilledTonalButton(
+                    onClick = onAddClick,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Añadir a la Agenda", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            if (agendaItems.isEmpty()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "No hay actividades agendadas aún. Pulsa en 'Añadir a la Agenda' para planificar visitas y horarios de hoy.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            } else {
+                val sorted = remember(agendaItems) { agendaItems.sortedBy { it.time } }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    sorted.forEach { item ->
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onItemClick(item) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    // Hora Badge
+                                    Surface(
+                                        color = PilgrimYellow.copy(alpha = 0.25f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = item.time,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PilgrimYellowDark,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+
+                                    Spacer(Modifier.width(10.dp))
+
+                                    // Título
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    if (item.files.isNotEmpty()) {
+                                        Spacer(Modifier.width(6.dp))
+                                        Icon(
+                                            Icons.Default.AttachFile,
+                                            contentDescription = null,
+                                            tint = CaminoBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                Icon(
+                                    Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddAgendaDialog(
+    stageId: Long,
+    viewModel: CaminoViewModel,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var time by remember { mutableStateOf("09:00") }
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var attachedFiles by remember { mutableStateOf<List<AttachedFile>>(emptyList()) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                var displayName = "Documento"
+                var sizeBytes = 0L
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIdx != -1) displayName = cursor.getString(nameIdx) ?: displayName
+                        if (sizeIdx != -1) sizeBytes = cursor.getLong(sizeIdx)
+                    }
+                }
+                val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                val newFile = AttachedFile(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = displayName,
+                    uri = uri.toString(),
+                    mimeType = mimeType,
+                    sizeBytes = sizeBytes
+                )
+                attachedFiles = attachedFiles + newFile
+            } catch (_: Exception) {
+                Toast.makeText(context, "No se pudo adjuntar el archivo", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Event, contentDescription = null, tint = CaminoBlue)
+                Spacer(Modifier.width(8.dp))
+                Text("Añadir a la Agenda")
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Selector de Hora
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Hora del evento:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+
+                    OutlinedButton(
+                        onClick = {
+                            val parts = time.split(":")
+                            val initH = parts.getOrNull(0)?.toIntOrNull() ?: 9
+                            val initM = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                            TimePickerDialog(context, { _, hourOfDay, minute ->
+                                time = String.format("%02d:%02d", hourOfDay, minute)
+                            }, initH, initM, true).show()
+                        },
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(time, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Título
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Título de la actividad *") },
+                    placeholder = { Text("Ej. Visita al museo, Comida, Traslado...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // Descripción multilínea (ilimitada)
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Descripción") },
+                    placeholder = { Text("Detalles, direcciones, notas (texto ilimitado)...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp),
+                    singleLine = false,
+                    maxLines = Int.MAX_VALUE
+                )
+
+                // Botón Añadir Documento/Foto
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Archivos (${attachedFiles.size}):", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+
+                    FilledTonalButton(
+                        onClick = { filePickerLauncher.launch(arrayOf("*/*")) },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Añadir Documento/Foto", fontSize = 11.sp)
+                    }
+                }
+
+                // Lista de archivos seleccionados
+                if (attachedFiles.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        attachedFiles.forEach { file ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    val isImg = isImageAttached(file)
+                                    Icon(
+                                        if (isImg) Icons.Default.Image else Icons.Default.AttachFile,
+                                        contentDescription = null,
+                                        tint = CaminoBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = file.name,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { attachedFiles = attachedFiles.filter { it.id != file.id } },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isBlank()) {
+                        Toast.makeText(context, "Por favor escribe un título", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    val item = AgendaItem(
+                        time = time,
+                        title = title.trim(),
+                        description = description.trim(),
+                        files = attachedFiles
+                    )
+                    viewModel.addAgendaItem(stageId, item)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun AgendaItemDetailDialog(
+    stageId: Long,
+    item: AgendaItem,
+    viewModel: CaminoViewModel,
+    onDismiss: () -> Unit,
+    onPreviewPhoto: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var isEditing by remember { mutableStateOf(false) }
+    var editTime by remember(item) { mutableStateOf(item.time) }
+    var editTitle by remember(item) { mutableStateOf(item.title) }
+    var editDescription by remember(item) { mutableStateOf(item.description) }
+    var editFiles by remember(item) { mutableStateOf(item.files) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                var displayName = "Documento"
+                var sizeBytes = 0L
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIdx != -1) displayName = cursor.getString(nameIdx) ?: displayName
+                        if (sizeIdx != -1) sizeBytes = cursor.getLong(sizeIdx)
+                    }
+                }
+                val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                val newFile = AttachedFile(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = displayName,
+                    uri = uri.toString(),
+                    mimeType = mimeType,
+                    sizeBytes = sizeBytes
+                )
+                editFiles = editFiles + newFile
+            } catch (_: Exception) {
+                Toast.makeText(context, "No se pudo adjuntar el archivo", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Eliminar evento") },
+            text = { Text("¿Estás seguro de que quieres eliminar \"${item.title}\" de la agenda?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteAgendaItem(stageId, item.id)
+                        showDeleteConfirm = false
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.EventNote, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (isEditing) "Editar Evento" else "Detalle de Agenda",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = CaminoBlue
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!isEditing) {
+                            IconButton(onClick = { showDeleteConfirm = true }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                            }
+                            IconButton(onClick = { isEditing = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = CaminoBlue)
+                            }
+                        }
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = "Cerrar")
+                        }
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                // Scrollable content
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    if (!isEditing) {
+                        // MODO LECTURA
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                color = PilgrimYellow.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.AccessTime, contentDescription = null, tint = PilgrimYellowDark, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = item.time,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PilgrimYellowDark
+                                    )
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Column {
+                            Text(
+                                text = "Descripción:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            if (item.description.isNotBlank()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = item.description,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = "Sin descripción adicional.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Archivos y fotos
+                        val images = item.files.filter { isImageAttached(it) }
+                        val otherFiles = item.files.filter { it !in images }
+
+                        if (images.isNotEmpty()) {
+                            Text(
+                                text = "Fotos adjuntas (Toca una foto para ampliarla):",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(images) { imgFile ->
+                                    Card(
+                                        modifier = Modifier
+                                            .size(105.dp)
+                                            .clickable { onPreviewPhoto(imgFile.uri) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                    ) {
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            AsyncImage(
+                                                model = imgFile.uri,
+                                                contentDescription = imgFile.name,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                            Surface(
+                                                color = Color.Black.copy(alpha = 0.5f),
+                                                shape = CircleShape,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomEnd)
+                                                    .padding(4.dp)
+                                                    .size(22.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.ZoomIn,
+                                                    contentDescription = "Ampliar",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.padding(3.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (otherFiles.isNotEmpty()) {
+                            Text(
+                                text = "Documentos adjuntos:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                otherFiles.forEach { file ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                        setDataAndType(Uri.parse(file.uri), file.mimeType.ifBlank { "*/*" })
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {
+                                                    Toast.makeText(context, "No se pudo abrir el archivo", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(20.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(file.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // MODO EDICIÓN
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Hora:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                            OutlinedButton(
+                                onClick = {
+                                    val parts = editTime.split(":")
+                                    val initH = parts.getOrNull(0)?.toIntOrNull() ?: 9
+                                    val initM = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                    TimePickerDialog(context, { _, hourOfDay, minute ->
+                                        editTime = String.format("%02d:%02d", hourOfDay, minute)
+                                    }, initH, initM, true).show()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(editTime, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = editTitle,
+                            onValueChange = { editTitle = it },
+                            label = { Text("Título de la actividad *") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = editDescription,
+                            onValueChange = { editDescription = it },
+                            label = { Text("Descripción") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 120.dp),
+                            singleLine = false,
+                            maxLines = Int.MAX_VALUE
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Archivos y Fotos (${editFiles.size}):", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+
+                            FilledTonalButton(
+                                onClick = { filePickerLauncher.launch(arrayOf("*/*")) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Añadir Documento/Foto", fontSize = 11.sp)
+                            }
+                        }
+
+                        // Opción de eliminar cada archivo individualmente (papelera)
+                        if (editFiles.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                editFiles.forEach { file ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            val isImg = isImageAttached(file)
+                                            if (isImg) {
+                                                AsyncImage(
+                                                    model = file.uri,
+                                                    contentDescription = null,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                )
+                                            } else {
+                                                Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                text = file.name,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            IconButton(
+                                                onClick = { editFiles = editFiles.filter { it.id != file.id } }
+                                            ) {
+                                                Icon(Icons.Default.Delete, contentDescription = "Eliminar archivo", tint = MaterialTheme.colorScheme.error)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Botones al editar
+                if (isEditing) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { isEditing = false }) {
+                            Text("Cancelar")
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (editTitle.isBlank()) {
+                                    Toast.makeText(context, "Por favor escribe un título", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val updated = item.copy(
+                                    time = editTime,
+                                    title = editTitle.trim(),
+                                    description = editDescription.trim(),
+                                    files = editFiles
+                                )
+                                viewModel.updateAgendaItem(stageId, updated)
+                                isEditing = false
+                                onDismiss()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
+                        ) {
+                            Text("Guardar Cambios")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FullscreenImageViewerDialog(
+    photoUri: String,
+    onDismiss: () -> Unit
+) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.96f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            offset = if (scale > 1f) offset + pan else Offset.Zero
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = photoUri,
+                    contentDescription = "Foto ampliada",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y
+                        ),
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+            }
+
+            Surface(
+                color = Color.Black.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 24.dp)
+            ) {
+                Text(
+                    text = "Pellizca con dos dedos para hacer zoom",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun isImageAttached(file: AttachedFile): Boolean {
+    val mime = file.mimeType.lowercase()
+    val name = file.name.lowercase()
+    val uri = file.uri.lowercase()
+    return mime.startsWith("image/") ||
+            name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp") ||
+            uri.contains(".jpg") || uri.contains(".jpeg") || uri.contains(".png")
 }

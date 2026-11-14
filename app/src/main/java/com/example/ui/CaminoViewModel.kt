@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.gpx.GpxParser
 import com.example.data.model.AccommodationEntity
+import com.example.data.model.AgendaItem
 import com.example.data.model.AttachedFile
 import com.example.data.model.CaminoEntity
 import com.example.data.model.RoomPriceOption
@@ -925,6 +926,44 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Agenda del Día (Solo en Viajes)
+    fun addAgendaItem(stageId: Long, item: AgendaItem) {
+        viewModelScope.launch {
+            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
+            val list = parseAgenda(stage.agendaJson).toMutableList()
+            list.add(item)
+            val updatedJson = serializeAgenda(list)
+            repository.updateStage(stage.copy(agendaJson = updatedJson))
+            _userMessage.value = "Evento \"${item.title}\" añadido a la agenda"
+        }
+    }
+
+    fun updateAgendaItem(stageId: Long, item: AgendaItem) {
+        viewModelScope.launch {
+            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
+            val list = parseAgenda(stage.agendaJson).toMutableList()
+            val index = list.indexOfFirst { it.id == item.id }
+            if (index != -1) {
+                list[index] = item
+            } else {
+                list.add(item)
+            }
+            val updatedJson = serializeAgenda(list)
+            repository.updateStage(stage.copy(agendaJson = updatedJson))
+            _userMessage.value = "Evento de agenda actualizado"
+        }
+    }
+
+    fun deleteAgendaItem(stageId: Long, itemId: String) {
+        viewModelScope.launch {
+            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
+            val list = parseAgenda(stage.agendaJson).filter { it.id != itemId }
+            val updatedJson = serializeAgenda(list)
+            repository.updateStage(stage.copy(agendaJson = updatedJson))
+            _userMessage.value = "Evento de agenda eliminado"
+        }
+    }
+
     fun updateVivencias(stageId: Long, diaryNotes: String, photoUri: String?) {
         viewModelScope.launch {
             val currentStage = repository.getStageByIdOnce(stageId)
@@ -1053,6 +1092,72 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             obj.put("mimeType", f.mimeType)
             obj.put("sizeBytes", f.sizeBytes)
             obj.put("addedAt", f.addedAt)
+            array.put(obj)
+        }
+        return array.toString()
+    }
+
+    fun parseAgenda(json: String?): List<AgendaItem> {
+        if (json.isNullOrBlank()) return emptyList()
+        return try {
+            val array = org.json.JSONArray(json)
+            val res = mutableListOf<AgendaItem>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val filesArray = obj.optJSONArray("files") ?: org.json.JSONArray()
+                val filesList = mutableListOf<AttachedFile>()
+                for (j in 0 until filesArray.length()) {
+                    val fObj = filesArray.getJSONObject(j)
+                    filesList.add(
+                        AttachedFile(
+                            id = fObj.optString("id", java.util.UUID.randomUUID().toString()),
+                            name = fObj.optString("name", "Archivo"),
+                            uri = fObj.optString("uri", ""),
+                            mimeType = fObj.optString("mimeType", ""),
+                            sizeBytes = fObj.optLong("sizeBytes", 0),
+                            addedAt = fObj.optLong("addedAt", System.currentTimeMillis())
+                        )
+                    )
+                }
+                res.add(
+                    AgendaItem(
+                        id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                        time = obj.optString("time", "08:00"),
+                        title = obj.optString("title", "Actividad"),
+                        description = obj.optString("description", ""),
+                        files = filesList,
+                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                    )
+                )
+            }
+            res.sortedBy { it.time }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun serializeAgenda(items: List<AgendaItem>): String {
+        val array = org.json.JSONArray()
+        for (item in items) {
+            val obj = org.json.JSONObject()
+            obj.put("id", item.id)
+            obj.put("time", item.time)
+            obj.put("title", item.title)
+            obj.put("description", item.description)
+            obj.put("timestamp", item.timestamp)
+
+            val filesArray = org.json.JSONArray()
+            for (f in item.files) {
+                val fObj = org.json.JSONObject()
+                fObj.put("id", f.id)
+                fObj.put("name", f.name)
+                fObj.put("uri", f.uri)
+                fObj.put("mimeType", f.mimeType)
+                fObj.put("sizeBytes", f.sizeBytes)
+                fObj.put("addedAt", f.addedAt)
+                filesArray.put(fObj)
+            }
+            obj.put("files", filesArray)
             array.put(obj)
         }
         return array.toString()

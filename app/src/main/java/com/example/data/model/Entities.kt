@@ -71,7 +71,17 @@ data class StageEntity(
     val diaryPhotoUri: String? = null,
     val vivenciasJson: String = "[]",
     val attachedFilesJson: String = "[]",
+    val agendaJson: String = "[]",
     val gpxTrackJson: String? = null // JSON array of GpxPoint
+)
+
+data class AgendaItem(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val time: String,
+    val title: String,
+    val description: String = "",
+    val files: List<AttachedFile> = emptyList(),
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 data class RoomPriceOption(
