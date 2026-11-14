@@ -82,7 +82,7 @@ object PdfExporter {
             if (!outputDir.exists()) outputDir.mkdirs()
 
             val sanitizedTitle = camino.title.replace("[^a-zA-Z0-9]".toRegex(), "_")
-            val pdfFile = File(outputDir, "Ultreia_Memorias_${sanitizedTitle}.pdf")
+            val pdfFile = File(outputDir, "${sanitizedTitle}.pdf")
             val fos = FileOutputStream(pdfFile)
             pdfDocument.writeTo(fos)
             fos.close()
@@ -165,43 +165,25 @@ object PdfExporter {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val isTravel = camino.isTravelGuide
 
-        // 1. Cabecera principal (Banner Azul Marino de Lujo)
-        val bannerHeight = 245f
-        paint.color = COLOR_NAVY
-        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
-
-        // Doble Franja Dorada Inferior (Estilo Guía de Alta Gama)
-        paint.color = COLOR_GOLD
-        canvas.drawRect(0f, bannerHeight - 6f, PAGE_WIDTH.toFloat(), bannerHeight - 2f, paint)
-        paint.color = COLOR_GOLD_DARK
-        canvas.drawRect(0f, bannerHeight - 1.5f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
-
-        // Logo o emblema
+        // 1. Cabecera principal (Banner Azul Marino)
         var textLeftOffset = MARGIN
+        var logoBitmap: Bitmap? = null
         try {
-            val logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
-            if (logoBitmap != null) {
-                val scaledLogo = Bitmap.createScaledBitmap(logoBitmap, 64, 64, true)
-                canvas.drawBitmap(scaledLogo, MARGIN, 36f, paint)
-                textLeftOffset = MARGIN + 76f
+            val bmp = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
+            if (bmp != null) {
+                logoBitmap = Bitmap.createScaledBitmap(bmp, 54, 54, true)
+                textLeftOffset = MARGIN + 68f
             }
         } catch (_: Exception) {}
 
-        // Etiqueta de Marca / Sello de Edición
-        paint.color = COLOR_GOLD
-        paint.textSize = 10.5f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        val brandLabel = if (isTravel) "ULTREIA VIAJES  •  GUÍA DE VIAJE" else "ULTREIA  •  GUÍA DEL CAMINO DE SANTIAGO"
-        canvas.drawText(brandLabel, textLeftOffset, 48f, paint)
-
         // Título del Camino / Viaje con ajuste multilínea si es largo
         paint.color = Color.WHITE
-        paint.textSize = 24f
+        paint.textSize = 23f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val titleMaxWidth = PAGE_WIDTH - textLeftOffset - MARGIN
         val titleWords = camino.title.split(" ")
-        var line1 = StringBuilder()
-        var line2 = StringBuilder()
+        val line1 = StringBuilder()
+        val line2 = StringBuilder()
         for (word in titleWords) {
             val test = if (line1.isEmpty()) word else "$line1 $word"
             if (paint.measureText(test) <= titleMaxWidth && line2.isEmpty()) {
@@ -210,46 +192,70 @@ object PdfExporter {
                 line2.append(if (line2.isEmpty()) word else " $word")
             }
         }
-        var titleY = 78f
-        canvas.drawText(line1.toString(), textLeftOffset, titleY, paint)
-        if (line2.isNotEmpty()) {
-            titleY += 26f
-            canvas.drawText(line2.toString(), textLeftOffset, titleY, paint)
+
+        val brandLabel = if (isTravel) "ULTREIA VIAJES  •  GUÍA DE VIAJE" else "ULTREIA  •  GUÍA DEL CAMINO DE SANTIAGO"
+
+        val hasLine2 = line2.isNotEmpty()
+        val titleLine1Y = 54f
+        val titleLine2Y = if (hasLine2) titleLine1Y + 24f else titleLine1Y
+        val lastTitleY = if (hasLine2) titleLine2Y else titleLine1Y
+
+        val subText = camino.subtitle.trim()
+        val hasSub = subText.isNotBlank()
+        val subY = if (hasSub) lastTitleY + 16f else lastTitleY
+        val dateY = if (hasSub) subY + 16f else lastTitleY + 16f
+
+        val bannerHeight = dateY + 18f
+
+        // Fondo del banner
+        paint.color = COLOR_NAVY
+        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
+
+        // Doble Franja Dorada Inferior
+        paint.color = COLOR_GOLD
+        canvas.drawRect(0f, bannerHeight - 5f, PAGE_WIDTH.toFloat(), bannerHeight - 2f, paint)
+        paint.color = COLOR_GOLD_DARK
+        canvas.drawRect(0f, bannerHeight - 1.5f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
+
+        // Dibujar Logo
+        if (logoBitmap != null) {
+            canvas.drawBitmap(logoBitmap, MARGIN, 26f, paint)
+        }
+
+        // Marca
+        paint.color = COLOR_GOLD
+        paint.textSize = 9.5f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText(brandLabel, textLeftOffset, 32f, paint)
+
+        // Título del Camino
+        paint.color = Color.WHITE
+        paint.textSize = 23f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText(line1.toString(), textLeftOffset, titleLine1Y, paint)
+        if (hasLine2) {
+            canvas.drawText(line2.toString(), textLeftOffset, titleLine2Y, paint)
         }
 
         // Subtítulo
-        paint.textSize = 11.5f
-        paint.typeface = Typeface.DEFAULT
-        paint.color = Color.rgb(220, 235, 255)
-        val sub = if (camino.subtitle.length > 70) camino.subtitle.take(67) + "..." else camino.subtitle
-        canvas.drawText(sub, textLeftOffset, titleY + 20f, paint)
+        if (hasSub) {
+            paint.textSize = 10.5f
+            paint.typeface = Typeface.DEFAULT
+            paint.color = Color.rgb(220, 235, 255)
+            val truncatedSub = if (subText.length > 70) subText.take(67) + "..." else subText
+            canvas.drawText(truncatedSub, textLeftOffset, subY, paint)
+        }
 
-        // Tarjeta de Credencial del Peregrino / Viajero en la cabecera
-        val credBoxTop = 185f
-        val credBoxHeight = 38f
-        val credRect = RectF(MARGIN, credBoxTop, PAGE_WIDTH - MARGIN, credBoxTop + credBoxHeight)
-        paint.color = Color.argb(45, 255, 255, 255)
-        canvas.drawRoundRect(credRect, 6f, 6f, paint)
-        paint.color = Color.argb(90, 255, 255, 255)
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1f
-        canvas.drawRoundRect(credRect, 6f, 6f, paint)
-        paint.style = Paint.Style.FILL
-
-        paint.color = Color.WHITE
+        // Solo la fecha (sin recuadro gris, justo debajo del título/subtítulo, sin texto de peregrino)
+        paint.color = COLOR_GOLD
         paint.textSize = 10f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        val userRole = if (isTravel) "👤 VIAJERO / EXPLORADOR" else "🥾 PEREGRINO DEL CAMINO"
-        val userName = camino.pilgrimName.ifBlank { if (isTravel) "Viajero" else "Peregrino" }
-        canvas.drawText("$userRole: $userName", MARGIN + 14f, credBoxTop + 24f, paint)
-
-        val dateText = "📅 FECHA: ${camino.startDate.ifBlank { "2026" }}"
-        val dateWidth = paint.measureText(dateText)
-        canvas.drawText(dateText, PAGE_WIDTH - MARGIN - dateWidth - 14f, credBoxTop + 24f, paint)
+        val dateValue = camino.startDate.ifBlank { "2026" }
+        canvas.drawText("📅 Fecha: $dateValue", textLeftOffset, dateY, paint)
 
         // 2. RESUMEN ESTADÍSTICO EN 4 TARJETAS MODULARES DE COLOR
         val stats = repository.calculateStats(stages)
-        val kpiTop = 265f
+        val kpiTop = bannerHeight + 14f
         val kpiHeight = 56f
         val kpiSpacing = 8f
         val kpiWidth = (PAGE_WIDTH - (MARGIN * 2) - (kpiSpacing * 3)) / 4f
@@ -411,7 +417,7 @@ object PdfExporter {
         }
 
         // Pie de página de la portada
-        drawEditorialFooter(canvas, 1, isTravel)
+        drawEditorialFooter(canvas, 1, isTravel, camino.title)
     }
 
     // ----------------------------------------------------
@@ -476,7 +482,7 @@ object PdfExporter {
         }
 
         fun nextSubPage(continuationSubtitle: String) {
-            drawEditorialFooter(canvas, currentPageNumber, isTravel)
+            drawEditorialFooter(canvas, currentPageNumber, isTravel, camino.title)
             pdfDocument.finishPage(page)
             currentPageNumber++
             pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, currentPageNumber).create()
@@ -912,7 +918,7 @@ object PdfExporter {
             currentY += 6f
         }
 
-        drawEditorialFooter(canvas, currentPageNumber, isTravel)
+        drawEditorialFooter(canvas, currentPageNumber, isTravel, camino.title)
         pdfDocument.finishPage(page)
         return currentPageNumber + 1
     }
@@ -1107,7 +1113,7 @@ object PdfExporter {
         canvas.drawText("ULTREIA ET SUSEIA", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 74f, paint)
 
         // Footer
-        drawEditorialFooter(canvas, 1, isTravel)
+        drawEditorialFooter(canvas, 1, isTravel, camino?.title ?: "")
     }
 
     // ----------------------------------------------------
@@ -1248,7 +1254,7 @@ object PdfExporter {
         return y + chipH + 6f
     }
 
-    private fun drawEditorialFooter(canvas: Canvas, pageNumber: Int, isTravel: Boolean) {
+    private fun drawEditorialFooter(canvas: Canvas, pageNumber: Int, isTravel: Boolean, caminoTitle: String = "") {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         // Línea divisoria inferior
@@ -1256,11 +1262,11 @@ object PdfExporter {
         paint.strokeWidth = 0.8f
         canvas.drawLine(MARGIN, PAGE_HEIGHT - 34f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 34f, paint)
 
-        // Marca de la guía
+        // Marca de la guía (solo el nombre del Camino sin Ultreia Memorias)
         paint.color = COLOR_MUTED
         paint.textSize = 8.5f
         paint.typeface = Typeface.DEFAULT
-        val guideBrand = if (isTravel) "Ultreia • Guía e Itinerario de Viaje" else "Ultreia • Guía & Memorias del Camino de Santiago"
+        val guideBrand = if (caminoTitle.isNotBlank()) caminoTitle else if (isTravel) "Guía e Itinerario de Viaje" else "Guía del Camino de Santiago"
         canvas.drawText(guideBrand, MARGIN, PAGE_HEIGHT - 20f, paint)
 
         // Píldora de número de página
@@ -1644,8 +1650,8 @@ object PdfExporter {
             file
         )
 
-        val subject = if (isTravel) "Guía de Viaje: $title" else "Guía y Memorias del Camino: $title"
-        val bodyText = if (isTravel) "Comparto el itinerario y cuaderno de bitácora creado con Ultreia." else "Comparto mis memorias de viaje del Camino de Santiago creadas con Ultreia."
+        val subject = title
+        val bodyText = title
 
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
@@ -1655,7 +1661,7 @@ object PdfExporter {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        val chooserTitle = if (isTravel) "Compartir Guía de Viaje en PDF" else "Compartir Memorias del Camino en PDF"
+        val chooserTitle = "Compartir: $title"
         context.startActivity(Intent.createChooser(intent, chooserTitle))
     }
 }
