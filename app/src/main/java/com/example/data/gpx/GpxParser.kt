@@ -15,6 +15,7 @@ private data class InternalGpxPoint(
     val lat: Double,
     val lon: Double,
     val ele: Double,
+    val hasEle: Boolean,
     val timeMillis: Long?
 )
 
@@ -65,6 +66,7 @@ object GpxParser {
         if (clean.isBlank()) return null
         clean.toLongOrNull()?.let { return it }
         clean.toDoubleOrNull()?.let { return it.toLong() }
+
         if (clean.contains(":")) {
             val parts = clean.split(":")
             if (parts.size == 3) {
@@ -78,12 +80,73 @@ object GpxParser {
                 return m * 60L + s
             }
         }
+
+        val hMatch = Regex("""(\d+)\s*h""", RegexOption.IGNORE_CASE).find(clean)
+        val mMatch = Regex("""(\d+)\s*m(?:in)?""", RegexOption.IGNORE_CASE).find(clean)
+        val sMatch = Regex("""(\d+)\s*s(?:eg)?""", RegexOption.IGNORE_CASE).find(clean)
+        if (hMatch != null || mMatch != null || sMatch != null) {
+            val h = hMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            val m = mMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            val s = sMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            val total = h * 3600L + m * 60L + s
+            if (total > 0L) return total
+        }
+
         if (clean.startsWith("PT", ignoreCase = true)) {
             try {
                 return java.time.Duration.parse(clean).seconds
             } catch (_: Exception) {}
         }
         return null
+    }
+
+    private fun extractMetricsFromText(
+        text: String,
+        onDistanceKm: (Double) -> Unit,
+        onGainM: (Int) -> Unit,
+        onLossM: (Int) -> Unit,
+        onMovingTimeSec: (Long) -> Unit
+    ) {
+        if (text.isBlank()) return
+
+        // 1. Distancia
+        val distRegex = Regex("""(?:distancia|distance|longitud|length)\s*[:=]?\s*([0-9]+[.,]?[0-9]*)\s*(km|m)?\b""", RegexOption.IGNORE_CASE)
+        distRegex.find(text)?.let { m ->
+            val rawNum = m.groupValues[1].replace(',', '.')
+            val unit = m.groupValues.getOrNull(2)?.lowercase() ?: "km"
+            val num = rawNum.toDoubleOrNull()
+            if (num != null && num > 0.0) {
+                val km = if (unit == "m" && num > 500.0) num / 1000.0 else num
+                onDistanceKm(km)
+            }
+        }
+
+        // 2. Desnivel positivo
+        val gainRegex = Regex("""(?:desnivel\s*(?:\+|positivo|acumulado\s*(?:subiendo|positivo)?)|elevation\s*gain|ascent|subida|ganancia\s*(?:de\s*elevaci[oó]n)?)\s*[:=]?\s*\+?\s*([0-9]+[.,]?[0-9]*)\s*(?:m|metros)?\b""", RegexOption.IGNORE_CASE)
+        gainRegex.find(text)?.let { m ->
+            val rawNum = m.groupValues[1].replace(',', '.')
+            rawNum.toDoubleOrNull()?.let {
+                if (it > 0.0) onGainM(it.roundToInt())
+            }
+        }
+
+        // 3. Desnivel negativo
+        val lossRegex = Regex("""(?:desnivel\s*(?:\-|negativo|acumulado\s*(?:bajando|negativo)?)|elevation\s*loss|descent|bajada|p[eé]rdida\s*(?:de\s*elevaci[oó]n)?)\s*[:=]?\s*\-?\s*([0-9]+[.,]?[0-9]*)\s*(?:m|metros)?\b""", RegexOption.IGNORE_CASE)
+        lossRegex.find(text)?.let { m ->
+            val rawNum = m.groupValues[1].replace(',', '.')
+            rawNum.toDoubleOrNull()?.let {
+                if (it > 0.0) onLossM(it.roundToInt())
+            }
+        }
+
+        // 4. Tiempo en movimiento
+        val timeRegex = Regex("""(?:tiempo\s*(?:en\s*movimiento|movimiento|activo)?|moving\s*time|time\s*moving)\s*[:=]?\s*([0-9]+(?::[0-9]+(?::[0-9]+)?|\s*h(?:\s*[0-9]+\s*m)?(?:\s*[0-9]+\s*s)?|[0-9]+\s*min))""", RegexOption.IGNORE_CASE)
+        timeRegex.find(text)?.let { m ->
+            val timeStr = m.groupValues[1].trim()
+            parseDurationToSeconds(timeStr)?.let {
+                if (it > 0L) onMovingTimeSec(it)
+            }
+        }
     }
 
     /**
@@ -111,6 +174,7 @@ object GpxParser {
             var currentLat: Double? = null
             var currentLon: Double? = null
             var currentEle = 0.0
+            var hasEle = false
             var currentTimeMillis: Long? = null
             var insideTrkpt = false
             var currentTag = ""
@@ -131,6 +195,7 @@ object GpxParser {
                             currentLat = latStr?.toDoubleOrNull()
                             currentLon = lonStr?.toDoubleOrNull()
                             currentEle = 0.0
+                            hasEle = false
                             currentTimeMillis = null
                             insideTrkpt = true
                         }
@@ -140,7 +205,10 @@ object GpxParser {
                         if (text.isNotEmpty()) {
                             if (insideTrkpt) {
                                 when (currentTag) {
-                                    "ele" -> currentEle = text.toDoubleOrNull() ?: 0.0
+                                    "ele" -> {
+                                        currentEle = text.toDoubleOrNull() ?: 0.0
+                                        hasEle = true
+                                    }
                                     "time" -> currentTimeMillis = parseIsoTimestamp(text)
                                 }
                             } else {
@@ -149,10 +217,19 @@ object GpxParser {
                                         if (originName == null) originName = text
                                         else destName = text
                                     }
-                                    "distance", "length", "totaldistance", "total_distance", "dist" -> {
+                                    "desc", "cmt" -> {
+                                        extractMetricsFromText(
+                                            text = text,
+                                            onDistanceKm = { if (explicitDistanceMeters == null) explicitDistanceMeters = it },
+                                            onGainM = { if (explicitAscentMeters == null) explicitAscentMeters = it.toDouble() },
+                                            onLossM = { if (explicitDescentMeters == null) explicitDescentMeters = it.toDouble() },
+                                            onMovingTimeSec = { if (explicitMovingTimeSec == null) explicitMovingTimeSec = it }
+                                        )
+                                    }
+                                    "distance", "length", "totaldistance", "total_distance", "dist", "totaldist", "total_dist" -> {
                                         text.toDoubleOrNull()?.let { if (it > 0) explicitDistanceMeters = it }
                                     }
-                                    "ascent", "totalascent", "total_ascent", "elevationgain", "elevation_gain", "gain", "elegain", "ele_gain", "climb" -> {
+                                    "ascent", "totalascent", "total_ascent", "elevationgain", "elevation_gain", "gain", "elegain", "ele_gain", "climb", "totalclimb" -> {
                                         text.toDoubleOrNull()?.let { if (it > 0) explicitAscentMeters = it }
                                     }
                                     "descent", "totaldescent", "total_descent", "elevationloss", "elevation_loss", "loss", "eleloss", "ele_loss" -> {
@@ -174,11 +251,12 @@ object GpxParser {
                             if (currentLat != null && currentLon != null) {
                                 val pt = GpxPoint(currentLat, currentLon, currentEle)
                                 points.add(pt)
-                                internalPoints.add(InternalGpxPoint(currentLat, currentLon, currentEle, currentTimeMillis))
+                                internalPoints.add(InternalGpxPoint(currentLat, currentLon, currentEle, hasEle, currentTimeMillis))
                             }
                             insideTrkpt = false
                             currentLat = null
                             currentLon = null
+                            hasEle = false
                             currentTimeMillis = null
                         }
                         currentTag = ""
@@ -196,12 +274,14 @@ object GpxParser {
                 val lat = match.groupValues[1].toDoubleOrNull()
                 val lon = match.groupValues[2].toDoubleOrNull()
                 val inner = match.groupValues[3]
-                val ele = """<ele>([-0-9.]+)</ele>""".toRegex().find(inner)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                val eleMatch = """<ele>([-0-9.]+)</ele>""".toRegex().find(inner)
+                val ele = eleMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                val hasEle = eleMatch != null
                 val timeStr = """<time>(.*?)</time>""".toRegex().find(inner)?.groupValues?.get(1)?.trim()
                 val timeMillis = if (!timeStr.isNullOrBlank()) parseIsoTimestamp(timeStr) else null
                 if (lat != null && lon != null) {
                     points.add(GpxPoint(lat, lon, ele))
-                    internalPoints.add(InternalGpxPoint(lat, lon, ele, timeMillis))
+                    internalPoints.add(InternalGpxPoint(lat, lon, ele, hasEle, timeMillis))
                 }
             }
             if (points.isEmpty()) {
@@ -211,7 +291,7 @@ object GpxParser {
                     val lon = m.groupValues[2].toDoubleOrNull()
                     if (lat != null && lon != null) {
                         points.add(GpxPoint(lat, lon, 0.0))
-                        internalPoints.add(InternalGpxPoint(lat, lon, 0.0, null))
+                        internalPoints.add(InternalGpxPoint(lat, lon, 0.0, false, null))
                     }
                 }
             }
@@ -220,6 +300,17 @@ object GpxParser {
                 val nameText = nameMatch.groupValues[1].trim()
                 if (originName == null) originName = nameText
             }
+        }
+
+        // Escaneo global de descripciones si los campos explícitos aún no se han encontrado
+        if (explicitDistanceMeters == null || explicitAscentMeters == null || explicitDescentMeters == null || explicitMovingTimeSec == null) {
+            extractMetricsFromText(
+                text = gpxContent,
+                onDistanceKm = { if (explicitDistanceMeters == null) explicitDistanceMeters = it },
+                onGainM = { if (explicitAscentMeters == null) explicitAscentMeters = it.toDouble() },
+                onLossM = { if (explicitDescentMeters == null) explicitDescentMeters = it.toDouble() },
+                onMovingTimeSec = { if (explicitMovingTimeSec == null) explicitMovingTimeSec = it }
+            )
         }
 
         // Downsample points if too dense (limit to max ~250 points for smooth canvas rendering)
@@ -232,17 +323,10 @@ object GpxParser {
 
         // 1. Distancia acumulada exacta de todos los puntos consecutivos (o metadato explícito del GPX)
         var totalDistanceKm = 0.0
-        var gainM = 0.0
-        var lossM = 0.0
-
         for (i in 0 until internalPoints.size - 1) {
             val p1 = internalPoints[i]
             val p2 = internalPoints[i + 1]
             totalDistanceKm += haversineDistanceKm(p1.lat, p1.lon, p2.lat, p2.lon)
-
-            val dEle = p2.ele - p1.ele
-            if (dEle > 0.0) gainM += dEle
-            else if (dEle < 0.0) lossM += abs(dEle)
         }
 
         val finalDistanceKm = if (explicitDistanceMeters != null && explicitDistanceMeters > 0.0) {
@@ -252,7 +336,21 @@ object GpxParser {
         }
         val distanceExact = (round(finalDistanceKm * 100.0) / 100.0)
 
-        // 2. Desnivel + y Desnivel - (acumulada exacta)
+        // 2. Desnivel positivo y negativo acumulado en TODO el GPX (calculado sobre los puntos con altimetría)
+        var gainM = 0.0
+        var lossM = 0.0
+        val elevationPoints = internalPoints.filter { it.hasEle }
+        for (i in 0 until elevationPoints.size - 1) {
+            val e1 = elevationPoints[i].ele
+            val e2 = elevationPoints[i + 1].ele
+            val dEle = e2 - e1
+            if (dEle > 0.0) {
+                gainM += dEle
+            } else if (dEle < 0.0) {
+                lossM += abs(dEle)
+            }
+        }
+
         val finalElevationGainM = if (explicitAscentMeters != null && explicitAscentMeters > 0.0) {
             explicitAscentMeters.roundToInt()
         } else {
@@ -270,25 +368,25 @@ object GpxParser {
         if (explicitMovingTimeSec != null && explicitMovingTimeSec > 0) {
             movingSeconds = explicitMovingTimeSec.toDouble()
         } else {
-            for (i in 0 until internalPoints.size - 1) {
-                val p1 = internalPoints[i]
-                val p2 = internalPoints[i + 1]
-                if (p1.timeMillis != null && p2.timeMillis != null) {
-                    val dtSec = (p2.timeMillis - p1.timeMillis) / 1000.0
-                    if (dtSec in 0.5..900.0) {
-                        val distKm = haversineDistanceKm(p1.lat, p1.lon, p2.lat, p2.lon)
-                        val speedKmh = (distKm / dtSec) * 3600.0
-                        if (speedKmh >= 0.5) {
-                            movingSeconds += dtSec
-                        }
+            val timedPoints = internalPoints.filter { it.timeMillis != null }
+            for (i in 0 until timedPoints.size - 1) {
+                val p1 = timedPoints[i]
+                val p2 = timedPoints[i + 1]
+                val dtSec = (p2.timeMillis!! - p1.timeMillis!!) / 1000.0
+                if (dtSec in 0.5..900.0) {
+                    val distKm = haversineDistanceKm(p1.lat, p1.lon, p2.lat, p2.lon)
+                    val speedKmh = (distKm / dtSec) * 3600.0
+                    // Umbral senderista de movimiento efectivo (descartando paradas)
+                    if (speedKmh >= 0.5) {
+                        movingSeconds += dtSec
                     }
                 }
             }
 
-            if (movingSeconds <= 0.0) {
-                val firstTime = internalPoints.firstOrNull { it.timeMillis != null }?.timeMillis
-                val lastTime = internalPoints.lastOrNull { it.timeMillis != null }?.timeMillis
-                if (firstTime != null && lastTime != null && lastTime > firstTime) {
+            if (movingSeconds <= 0.0 && timedPoints.size >= 2) {
+                val firstTime = timedPoints.first().timeMillis!!
+                val lastTime = timedPoints.last().timeMillis!!
+                if (lastTime > firstTime) {
                     movingSeconds = (lastTime - firstTime) / 1000.0
                 }
             }
