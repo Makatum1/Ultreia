@@ -13,6 +13,7 @@ import com.example.data.model.AgendaItem
 import com.example.data.model.AttachedFile
 import com.example.data.model.CaminoEntity
 import com.example.data.model.StageEntity
+import com.example.data.model.VivenciaItem
 import com.example.data.repository.CaminoRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -599,17 +600,34 @@ object PdfExporter {
                         paint.textSize = 10f
                         paint.isFakeBoldText = false
                         currentY = drawMultilineText(canvas, event.description, MARGIN + 12f, currentY, PAGE_WIDTH - 2 * MARGIN - 24f, paint)
-                        currentY += 8f
+                        currentY += 6f
                     }
 
-                    // Fotos adjuntas
-                    val photos = event.files.filter { isImageAttachedFile(it) }
-                    for (photo in photos) {
-                        if (currentY + 160f > PAGE_HEIGHT - MARGIN - 40f) {
+                    // Separación estricta de archivos: Documentos vs Imágenes
+                    val (imageFiles, docFiles) = event.files.partition { isImageAttachedFile(context, it) }
+
+                    // A. Documentos no-imagen: listar como texto
+                    for (doc in docFiles) {
+                        if (currentY + 20f > PAGE_HEIGHT - MARGIN - 40f) {
+                            nextSubPage("Agenda - Documentos")
+                            currentY = 75f
+                        }
+                        paint.color = Color.rgb(75, 85, 99)
+                        paint.textSize = 9.5f
+                        paint.isFakeBoldText = false
+                        val docName = doc.name.ifBlank { extractFileName(doc.uri) }
+                        canvas.drawText("Archivo adjunto: $docName", MARGIN + 12f, currentY, paint)
+                        currentY += 14f
+                    }
+
+                    // B. Imágenes: incrustar justo debajo del texto manteniendo proporción y márgenes
+                    for (photo in imageFiles) {
+                        val neededH = estimateImageHeight(context, photo.uri, PAGE_WIDTH - 2 * MARGIN - 24f, 220f)
+                        if (currentY + neededH + 10f > PAGE_HEIGHT - MARGIN - 40f) {
                             nextSubPage("Agenda - Fotos")
                             currentY = 75f
                         }
-                        val drawnH = drawImageFromUri(context, canvas, photo.uri, MARGIN + 12f, currentY, PAGE_WIDTH - 2 * MARGIN - 24f, 180f)
+                        val drawnH = drawImageFromUri(context, canvas, photo.uri, MARGIN + 12f, currentY, PAGE_WIDTH - 2 * MARGIN - 24f, 220f)
                         if (drawnH > 0f) {
                             currentY += drawnH + 8f
                         }
@@ -674,34 +692,138 @@ object PdfExporter {
             currentY += 10f
         }
 
-        // 5. VIVENCIAS (DIARIO)
-        if (stage.diaryNotes.isNotBlank() || !isTravel) {
-            if (currentY + 80f > PAGE_HEIGHT - MARGIN - 40f) {
-                nextSubPage("Vivencias")
+        // 5. VIVENCIAS / NOTAS PERSONALES DE LA JORNADA
+        val vivenciasList = parseVivencias(stage.vivenciasJson, stage.diaryNotes, stage.diaryPhotoUri)
+        if (vivenciasList.isNotEmpty() || !isTravel) {
+            if (currentY + 60f > PAGE_HEIGHT - MARGIN - 40f) {
+                nextSubPage(if (isTravel) "Notas" else "Vivencias")
                 currentY = 75f
             }
 
             paint.color = Color.rgb(14, 76, 153)
             paint.textSize = 13f
             paint.isFakeBoldText = true
-            canvas.drawText(if (isTravel) "Notas Personales de la Jornada" else "Vivencias Personales de la Jornada", MARGIN, currentY, paint)
+            val vivenciasTitle = if (isTravel) "Notas Personales de la Jornada" else "Vivencias Personales de la Jornada"
+            canvas.drawText(vivenciasTitle, MARGIN, currentY, paint)
             currentY += 16f
 
-            val boxHeight = 90f
-            val diaryBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + boxHeight)
-            paint.color = Color.rgb(255, 252, 245)
-            canvas.drawRoundRect(diaryBox, 8f, 8f, paint)
-            paint.color = Color.rgb(240, 225, 185)
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 1f
-            canvas.drawRoundRect(diaryBox, 8f, 8f, paint)
-            paint.style = Paint.Style.FILL
+            if (vivenciasList.isEmpty()) {
+                val boxHeight = 45f
+                val diaryBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + boxHeight)
+                paint.color = Color.rgb(255, 252, 245)
+                canvas.drawRoundRect(diaryBox, 8f, 8f, paint)
+                paint.color = Color.rgb(240, 225, 185)
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 1f
+                canvas.drawRoundRect(diaryBox, 8f, 8f, paint)
+                paint.style = Paint.Style.FILL
 
-            val diaryText = if (stage.diaryNotes.isNotBlank()) stage.diaryNotes else "Sin notas de vivencias registradas aún para este día."
-            paint.color = Color.rgb(60, 50, 30)
-            paint.textSize = 10.5f
-            paint.isFakeBoldText = false
-            drawMultilineText(canvas, diaryText, MARGIN + 12f, currentY + 18f, PAGE_WIDTH - 2 * MARGIN - 24f, paint)
+                paint.color = Color.rgb(120, 110, 95)
+                paint.textSize = 10f
+                paint.isFakeBoldText = false
+                canvas.drawText("Sin notas de vivencias registradas aún para este día.", MARGIN + 12f, currentY + 26f, paint)
+                currentY += boxHeight + 14f
+            } else {
+                for (vivencia in vivenciasList) {
+                    if (currentY + 45f > PAGE_HEIGHT - MARGIN - 40f) {
+                        nextSubPage(if (isTravel) "Notas" else "Vivencias")
+                        currentY = 75f
+                    }
+
+                    // Fecha si está disponible
+                    if (vivencia.dateStr.isNotBlank()) {
+                        paint.color = Color.rgb(107, 114, 128)
+                        paint.textSize = 9.5f
+                        paint.isFakeBoldText = true
+                        canvas.drawText("📅 ${vivencia.dateStr}", MARGIN + 4f, currentY, paint)
+                        currentY += 13f
+                    }
+
+                    // Texto de la vivencia
+                    if (vivencia.note.isNotBlank()) {
+                        paint.color = Color.rgb(55, 65, 81)
+                        paint.textSize = 10f
+                        paint.isFakeBoldText = false
+                        currentY = drawMultilineText(canvas, vivencia.note, MARGIN + 8f, currentY, PAGE_WIDTH - 2 * MARGIN - 16f, paint)
+                        currentY += 6f
+                    }
+
+                    // Archivo / Foto adjunta a la vivencia
+                    if (!vivencia.photoUri.isNullOrBlank()) {
+                        val isImg = checkIsImage(context, null, extractFileName(vivencia.photoUri), vivencia.photoUri)
+                        if (isImg) {
+                            val neededH = estimateImageHeight(context, vivencia.photoUri, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
+                            if (currentY + neededH + 10f > PAGE_HEIGHT - MARGIN - 40f) {
+                                nextSubPage(if (isTravel) "Notas - Fotos" else "Vivencias - Fotos")
+                                currentY = 75f
+                            }
+                            val drawnH = drawImageFromUri(context, canvas, vivencia.photoUri, MARGIN + 8f, currentY, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
+                            if (drawnH > 0f) {
+                                currentY += drawnH + 8f
+                            }
+                        } else {
+                            // Documento no-imagen: nunca renderizar como imagen
+                            if (currentY + 20f > PAGE_HEIGHT - MARGIN - 40f) {
+                                nextSubPage(if (isTravel) "Notas" else "Vivencias")
+                                currentY = 75f
+                            }
+                            val fileName = extractFileName(vivencia.photoUri)
+                            paint.color = Color.rgb(75, 85, 99)
+                            paint.textSize = 9.5f
+                            paint.isFakeBoldText = false
+                            canvas.drawText("Archivo adjunto: $fileName", MARGIN + 8f, currentY, paint)
+                            currentY += 14f
+                        }
+                    }
+                    currentY += 6f
+                }
+                currentY += 8f
+            }
+        }
+
+        // 6. ARCHIVOS Y DOCUMENTOS ADJUNTOS DE LA ETAPA
+        val stageAttachedFiles = parseAttachedFiles(stage.attachedFilesJson)
+        if (stageAttachedFiles.isNotEmpty()) {
+            if (currentY + 50f > PAGE_HEIGHT - MARGIN - 40f) {
+                nextSubPage("Archivos Adjuntos")
+                currentY = 75f
+            }
+
+            paint.color = Color.rgb(14, 76, 153)
+            paint.textSize = 13f
+            paint.isFakeBoldText = true
+            canvas.drawText("Archivos y Documentos Adjuntos", MARGIN, currentY, paint)
+            currentY += 16f
+
+            val (stageImages, stageDocs) = stageAttachedFiles.partition { isImageAttachedFile(context, it) }
+
+            // Documentos no-imagen
+            for (doc in stageDocs) {
+                if (currentY + 20f > PAGE_HEIGHT - MARGIN - 40f) {
+                    nextSubPage("Archivos Adjuntos")
+                    currentY = 75f
+                }
+                paint.color = Color.rgb(75, 85, 99)
+                paint.textSize = 9.5f
+                paint.isFakeBoldText = false
+                val docName = doc.name.ifBlank { extractFileName(doc.uri) }
+                canvas.drawText("Archivo adjunto: $docName", MARGIN + 8f, currentY, paint)
+                currentY += 14f
+            }
+
+            // Imágenes adjuntas
+            for (img in stageImages) {
+                val neededH = estimateImageHeight(context, img.uri, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
+                if (currentY + neededH + 10f > PAGE_HEIGHT - MARGIN - 40f) {
+                    nextSubPage("Archivos Adjuntos")
+                    currentY = 75f
+                }
+                val drawnH = drawImageFromUri(context, canvas, img.uri, MARGIN + 8f, currentY, PAGE_WIDTH - 2 * MARGIN - 16f, 220f)
+                if (drawnH > 0f) {
+                    currentY += drawnH + 8f
+                }
+            }
+            currentY += 8f
         }
 
         drawFooter(canvas)
@@ -709,13 +831,50 @@ object PdfExporter {
         return currentPageNumber + 1
     }
 
-    private fun isImageAttachedFile(file: AttachedFile): Boolean {
-        val mime = file.mimeType.lowercase()
-        val name = file.name.lowercase()
-        val uri = file.uri.lowercase()
-        return mime.startsWith("image/") ||
-                name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp") ||
-                uri.contains(".jpg") || uri.contains(".jpeg") || uri.contains(".png")
+    private fun checkIsImage(
+        context: Context,
+        mimeType: String?,
+        fileName: String?,
+        uriStr: String?
+    ): Boolean {
+        val mime = (mimeType ?: "").lowercase().trim()
+        val name = (fileName ?: "").lowercase().trim()
+        val uri = (uriStr ?: "").lowercase().trim()
+
+        if (mime.startsWith("image/")) return true
+
+        val imageExtensions = listOf(".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif")
+        if (imageExtensions.any { name.endsWith(it) || uri.endsWith(it) || uri.contains("$it?") || uri.contains(it) }) {
+            return true
+        }
+
+        if (!uriStr.isNullOrBlank()) {
+            try {
+                val parsedUri = Uri.parse(uriStr)
+                val resolvedMime = context.contentResolver.getType(parsedUri)
+                if (!resolvedMime.isNullOrBlank() && resolvedMime.startsWith("image/")) {
+                    return true
+                }
+            } catch (_: Exception) {}
+        }
+
+        return false
+    }
+
+    private fun isImageAttachedFile(context: Context, file: AttachedFile): Boolean {
+        return checkIsImage(context, file.mimeType, file.name, file.uri)
+    }
+
+    private fun extractFileName(uriOrPath: String?): String {
+        if (uriOrPath.isNullOrBlank()) return "archivo"
+        return try {
+            val uri = Uri.parse(uriOrPath)
+            val path = uri.path ?: uriOrPath
+            val name = path.substringAfterLast('/')
+            if (name.isNotBlank()) name else "archivo"
+        } catch (_: Exception) {
+            "archivo"
+        }
     }
 
     private fun parseAgendaItems(json: String?): List<AgendaItem> {
@@ -755,6 +914,101 @@ object PdfExporter {
         }
     }
 
+    private fun parseVivencias(json: String?, fallbackNotes: String = "", fallbackPhotoUri: String? = null): List<VivenciaItem> {
+        val list = mutableListOf<VivenciaItem>()
+        if (!json.isNullOrBlank()) {
+            try {
+                val array = org.json.JSONArray(json)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    list.add(
+                        VivenciaItem(
+                            id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                            note = obj.optString("note", ""),
+                            photoUri = obj.optString("photoUri").takeIf { it.isNotBlank() },
+                            dateStr = obj.optString("dateStr", ""),
+                            timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                        )
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+        if (list.isEmpty() && (fallbackNotes.isNotBlank() || !fallbackPhotoUri.isNullOrBlank())) {
+            list.add(
+                VivenciaItem(
+                    id = "legacy_vivencia",
+                    note = fallbackNotes,
+                    photoUri = fallbackPhotoUri,
+                    dateStr = "",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+        return list
+    }
+
+    private fun parseAttachedFiles(json: String?): List<AttachedFile> {
+        if (json.isNullOrBlank()) return emptyList()
+        return try {
+            val array = org.json.JSONArray(json)
+            val res = mutableListOf<AttachedFile>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                res.add(
+                    AttachedFile(
+                        id = obj.optString("id", i.toString()),
+                        name = obj.optString("name", "Documento"),
+                        uri = obj.optString("uri", ""),
+                        mimeType = obj.optString("mimeType", ""),
+                        sizeBytes = obj.optLong("sizeBytes", 0),
+                        addedAt = obj.optLong("addedAt", System.currentTimeMillis())
+                    )
+                )
+            }
+            res
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun openInputStreamForUri(context: Context, uri: Uri): java.io.InputStream? {
+        return try {
+            if (uri.scheme == "file" || uri.scheme == null) {
+                val file = File(uri.path ?: uri.toString())
+                if (file.exists()) file.inputStream() else context.contentResolver.openInputStream(uri)
+            } else {
+                context.contentResolver.openInputStream(uri)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun estimateImageHeight(
+        context: Context,
+        uriStr: String,
+        maxWidth: Float,
+        maxHeight: Float
+    ): Float {
+        if (uriStr.isBlank()) return 0f
+        return try {
+            val uri = Uri.parse(uriStr)
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            openInputStreamForUri(context, uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, boundsOpts)
+            } ?: return 0f
+
+            val origW = boundsOpts.outWidth
+            val origH = boundsOpts.outHeight
+            if (origW <= 0 || origH <= 0) return 0f
+
+            val scale = minOf(maxWidth / origW.toFloat(), maxHeight / origH.toFloat(), 1.0f)
+            (origH * scale) + 12f
+        } catch (_: Exception) {
+            0f
+        }
+    }
+
     private fun drawImageFromUri(
         context: Context,
         canvas: Canvas,
@@ -768,7 +1022,7 @@ object PdfExporter {
         return try {
             val uri = Uri.parse(uriStr)
             val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(uri)?.use { stream ->
+            openInputStreamForUri(context, uri)?.use { stream ->
                 BitmapFactory.decodeStream(stream, null, boundsOpts)
             } ?: return 0f
 
@@ -782,7 +1036,7 @@ object PdfExporter {
             }
 
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+            val bitmap = openInputStreamForUri(context, uri)?.use { stream ->
                 BitmapFactory.decodeStream(stream, null, decodeOpts)
             } ?: return 0f
 
@@ -864,22 +1118,31 @@ object PdfExporter {
         paint: Paint
     ): Float {
         var currentY = startY
-        val words = text.split(" ")
-        var line = StringBuilder()
+        val paragraphs = text.split("\n")
 
-        for (word in words) {
-            val testLine = if (line.isEmpty()) word else "$line $word"
-            if (paint.measureText(testLine) > maxWidth) {
+        for (paragraph in paragraphs) {
+            if (paragraph.isBlank()) {
+                currentY += paint.textSize * 0.8f
+                continue
+            }
+            val words = paragraph.split(" ")
+            var line = StringBuilder()
+
+            for (word in words) {
+                if (word.isEmpty()) continue
+                val testLine = if (line.isEmpty()) word else "$line $word"
+                if (paint.measureText(testLine) > maxWidth) {
+                    canvas.drawText(line.toString(), x, currentY, paint)
+                    currentY += paint.textSize + 4f
+                    line = StringBuilder(word)
+                } else {
+                    line = StringBuilder(testLine)
+                }
+            }
+            if (line.isNotEmpty()) {
                 canvas.drawText(line.toString(), x, currentY, paint)
                 currentY += paint.textSize + 4f
-                line = StringBuilder(word)
-            } else {
-                line = StringBuilder(testLine)
             }
-        }
-        if (line.isNotEmpty()) {
-            canvas.drawText(line.toString(), x, currentY, paint)
-            currentY += paint.textSize + 4f
         }
         return currentY
     }
