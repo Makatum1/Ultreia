@@ -41,7 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "ultreia_camino_database.db"
                 )
                 .addMigrations(MIGRATION_5_6)
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
                 INSTANCE = instance
                 instance

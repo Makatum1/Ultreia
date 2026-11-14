@@ -25,7 +25,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -441,7 +443,7 @@ fun StageDetailScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    if (isTravel) Icons.Default.Article else Icons.Default.Lightbulb,
+                                    if (isTravel) Icons.AutoMirrored.Filled.Article else Icons.Default.Lightbulb,
                                     contentDescription = null,
                                     tint = PilgrimYellowDark,
                                     modifier = Modifier.size(20.dp)
@@ -1280,7 +1282,7 @@ fun EditTipsDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (isTravel) Icons.Default.Article else Icons.Default.Lightbulb, contentDescription = null, tint = PilgrimYellowDark)
+                Icon(if (isTravel) Icons.AutoMirrored.Filled.Article else Icons.Default.Lightbulb, contentDescription = null, tint = PilgrimYellowDark)
                 Spacer(Modifier.width(8.dp))
                 Text(if (isTravel) "Editar Resumen del Día" else "Editar Consejos del Día")
             }
@@ -2422,7 +2424,7 @@ fun AgendaItemDetailDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.EventNote, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
+                        Icon(Icons.AutoMirrored.Filled.EventNote, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = if (isEditing) "Editar Evento" else "Detalle de Agenda",
@@ -2618,7 +2620,7 @@ fun AgendaItemDetailDialog(
                                                     },
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(20.dp))
+                                                Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(20.dp))
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(file.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                                             }
@@ -2723,7 +2725,7 @@ fun AgendaItemDetailDialog(
                                                         .clip(RoundedCornerShape(4.dp))
                                                 )
                                             } else {
-                                                Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
+                                                Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
                                             }
                                             Spacer(Modifier.width(8.dp))
                                             Text(
