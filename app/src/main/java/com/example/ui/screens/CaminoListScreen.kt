@@ -435,13 +435,14 @@ fun CaminoItemCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val cardBg = if (camino.isTravelGuide) CaminoBlueDark else CaminoBlue
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
             .testTag("camino_card_${camino.id}"),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -450,6 +451,7 @@ fun CaminoItemCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
+                    .background(cardBg)
             ) {
                 if (!camino.coverPhotoUri.isNullOrBlank()) {
                     AsyncImage(
@@ -464,7 +466,7 @@ fun CaminoItemCard(
                         contentDescription = camino.title,
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(if (camino.isTravelGuide) CaminoBlueDark else CaminoBlue),
+                            .background(cardBg),
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -483,7 +485,7 @@ fun CaminoItemCard(
 
                 // Badge top-left for travel guide vs camino
                 Surface(
-                    color = if (camino.isTravelGuide) PilgrimYellow else CaminoBlue,
+                    color = if (camino.isTravelGuide) PilgrimYellow else Color.White.copy(alpha = 0.25f),
                     shape = RoundedCornerShape(bottomEnd = 8.dp),
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
@@ -545,10 +547,11 @@ fun CaminoItemCard(
                 }
             }
 
-            // Card Footer
+            // Card Footer - Harmonized with primary theme color, removing white stripe
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.15f))
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -560,13 +563,14 @@ fun CaminoItemCard(
                     Icon(
                         imageVector = Icons.Default.CalendarToday,
                         contentDescription = null,
-                        tint = CaminoBlue,
+                        tint = PilgrimYellow,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = if (camino.startDate.isNotBlank()) "Inicio: ${camino.startDate}" else "Sin fecha",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.9f)
                     )
                 }
 
@@ -578,12 +582,12 @@ fun CaminoItemCard(
                         text = "Ver Etapas",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = CaminoBlue
+                        color = PilgrimYellow
                     )
                     Icon(
                         Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = CaminoBlue,
+                        tint = PilgrimYellow,
                         modifier = Modifier.size(18.dp)
                     )
                 }

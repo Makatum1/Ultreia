@@ -4,16 +4,14 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
-import androidx.compose.material.icons.automirrored.filled.TrendingDown
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,13 +20,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
 import com.example.data.model.AccommodationEntity
 import com.example.data.model.CaminoEntity
 import com.example.data.model.StageEntity
@@ -52,49 +52,18 @@ fun StatsScreen(
     val stageTermPlural = if (isTravel) "Días" else "Etapas"
     val routeTerm = if (isTravel) "Viaje" else "Camino"
 
-    // Sub-pestaña seleccionada: 0 = "Datos de la Etapa" (por defecto), 1 = "Datos Totales"
+    // Sub-pestaña seleccionada: 0 = "Datos del Camino" (por defecto), 1 = "Datos Totales"
     var selectedSubTab by remember { mutableIntStateOf(0) }
 
     // Alojamientos asociados al camino activo para cálculo de gastos
     val caminoAccommodations by viewModel.caminoAccommodations.collectAsStateWithLifecycle()
 
-    // Etapas ordenadas por número de día
-    val sortedStages = remember(stages) {
-        stages.sortedBy { it.dayNumber }
-    }
+    // Datos globales de todos los caminos
+    val allCaminos by viewModel.caminos.collectAsStateWithLifecycle()
+    val allStages by viewModel.allStages.collectAsStateWithLifecycle()
+    val allAccommodations by viewModel.allAccommodations.collectAsStateWithLifecycle()
 
-    // --- SEPARACIÓN DE ESTADOS: DATOS DE LA ETAPA ---
-    // Etapa seleccionada actualmente para la pestaña "Datos de la Etapa"
-    var selectedStageId by remember(stages) {
-        // Por defecto: la primera pendiente o la última etapa disponible
-        val defaultId = stages.firstOrNull { !it.isCompleted }?.id
-            ?: stages.lastOrNull()?.id
-        mutableStateOf(defaultId)
-    }
-
-    val currentStage = remember(sortedStages, selectedStageId) {
-        sortedStages.firstOrNull { it.id == selectedStageId } ?: sortedStages.lastOrNull()
-    }
-
-    var showStageDropdown by remember { mutableStateOf(false) }
-
-    // Alojamientos y gastos de la etapa seleccionada exclusivamente
-    val currentStageAccommodations = remember(caminoAccommodations, currentStage) {
-        if (currentStage != null) {
-            caminoAccommodations.filter { it.stageId == currentStage.id }
-        } else {
-            emptyList()
-        }
-    }
-
-    val currentStageExpenseEur = remember(currentStageAccommodations) {
-        currentStageAccommodations.sumOf { acc ->
-            val options = viewModel.parseRoomOptions(acc.roomOptionsJson)
-            if (options.isNotEmpty()) options.sumOf { it.priceEur } else 0.0
-        }
-    }
-
-    // --- SEPARACIÓN DE ESTADOS: DATOS TOTALES DEL CAMINO/VIAJE ---
+    // --- SEPARACIÓN DE ESTADOS: DATOS DEL CAMINO ACTIVO ---
     val totalCaminoKm = remember(stages) {
         stages.sumOf { it.distanceKm }
     }
@@ -116,11 +85,46 @@ fun StatsScreen(
     val pendingCaminoStagesCount = remember(totalCaminoStagesCount, completedCaminoStagesCount) {
         (totalCaminoStagesCount - completedCaminoStagesCount).coerceAtLeast(0)
     }
-    val totalCaminoProgressPercent = remember(totalCaminoKm, completedCaminoKm) {
-        if (totalCaminoKm > 0) ((completedCaminoKm / totalCaminoKm) * 100).toInt() else 0
+    val caminoProgressPercent = remember(totalCaminoKm, completedCaminoKm) {
+        if (totalCaminoKm > 0) ((completedCaminoKm / totalCaminoKm) * 100).toInt().coerceIn(0, 100) else 0
     }
-    val totalCaminoExpenseEur = remember(caminoAccommodations) {
+    val caminoExpenseEur = remember(caminoAccommodations) {
         caminoAccommodations.sumOf { acc ->
+            val options = viewModel.parseRoomOptions(acc.roomOptionsJson)
+            if (options.isNotEmpty()) options.sumOf { it.priceEur } else 0.0
+        }
+    }
+
+    // --- SEPARACIÓN DE ESTADOS: DATOS TOTALES GLOBALES (TODOS LOS CAMINOS) ---
+    val totalGlobalCaminosRealizados = remember(allCaminos, allStages) {
+        allCaminos.count { c ->
+            val cStages = allStages.filter { it.caminoId == c.id }
+            cStages.isNotEmpty() && cStages.all { it.isCompleted }
+        }
+    }
+    val totalGlobalKm = remember(allStages) {
+        allStages.sumOf { it.distanceKm }
+    }
+    val completedGlobalKm = remember(allStages) {
+        allStages.filter { it.isCompleted }.sumOf { it.distanceKm }
+    }
+    val totalGlobalElevationGain = remember(allStages) {
+        allStages.sumOf { it.elevationGainM }
+    }
+    val completedGlobalElevationGain = remember(allStages) {
+        allStages.filter { it.isCompleted }.sumOf { it.elevationGainM }
+    }
+    val totalGlobalStagesCount = remember(allStages) {
+        allStages.size
+    }
+    val completedGlobalStagesCount = remember(allStages) {
+        allStages.count { it.isCompleted }
+    }
+    val pendingGlobalStagesCount = remember(totalGlobalStagesCount, completedGlobalStagesCount) {
+        (totalGlobalStagesCount - completedGlobalStagesCount).coerceAtLeast(0)
+    }
+    val totalGlobalExpenseEur = remember(allAccommodations) {
+        allAccommodations.sumOf { acc ->
             val options = viewModel.parseRoomOptions(acc.roomOptionsJson)
             if (options.isNotEmpty()) options.sumOf { it.priceEur } else 0.0
         }
@@ -156,9 +160,9 @@ fun StatsScreen(
                         )
                         Text(
                             text = if (selectedSubTab == 0) {
-                                "Métricas individuales por $stageTerm"
+                                "Métricas acumuladas del $routeTerm activo"
                             } else {
-                                "Métricas acumuladas del $routeTerm"
+                                "Métricas acumuladas de todos los caminos"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -179,7 +183,7 @@ fun StatsScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                // SELECTOR DE PESTAÑAS (TabRow): "Datos de la Etapa" vs "Datos Totales"
+                // SELECTOR DE PESTAÑAS (TabRow): "Datos del Camino" vs "Datos Totales"
                 TabRow(
                     selectedTabIndex = selectedSubTab,
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -191,19 +195,19 @@ fun StatsScreen(
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = Icons.Default.ViewDay,
+                                    imageVector = if (isTravel) Icons.Default.Luggage else Icons.Default.Hiking,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = "Datos de la $stageTerm",
+                                    text = "Datos del $routeTerm",
                                     fontWeight = if (selectedSubTab == 0) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp
                                 )
                             }
                         },
-                        modifier = Modifier.testTag("tab_datos_etapa")
+                        modifier = Modifier.testTag("tab_datos_camino")
                     )
 
                     Tab(
@@ -238,23 +242,8 @@ fun StatsScreen(
             modifier = Modifier.fillMaxSize()
         ) { tabIndex ->
             if (tabIndex == 0) {
-                // VISTA: DATOS DE LA ETAPA INDIVIDUAL
-                StageDataContent(
-                    stage = currentStage,
-                    stages = sortedStages,
-                    stageTerm = stageTerm,
-                    stageAccommodations = currentStageAccommodations,
-                    stageExpenseEur = currentStageExpenseEur,
-                    showStageDropdown = showStageDropdown,
-                    onToggleDropdown = { showStageDropdown = it },
-                    onSelectStage = {
-                        selectedStageId = it.id
-                        showStageDropdown = false
-                    }
-                )
-            } else {
-                // VISTA: DATOS TOTALES ACUMULADOS DEL VIAJE/CAMINO
-                TotalCaminoDataContent(
+                // VISTA: DATOS DEL CAMINO ACTIVO
+                ActiveCaminoDataContent(
                     camino = camino,
                     routeTerm = routeTerm,
                     stageTerm = stageTerm,
@@ -266,9 +255,26 @@ fun StatsScreen(
                     totalStages = totalCaminoStagesCount,
                     completedStages = completedCaminoStagesCount,
                     pendingStages = pendingCaminoStagesCount,
-                    progressPercent = totalCaminoProgressPercent,
-                    totalExpenseEur = totalCaminoExpenseEur,
-                    totalAccommodationsCount = caminoAccommodations.size,
+                    progressPercent = caminoProgressPercent,
+                    totalExpenseEur = caminoExpenseEur,
+                    caminoAccommodations = caminoAccommodations,
+                    viewModel = viewModel,
+                    onExportPdf = { viewModel.exportStatsPdf(context, isTotal = false) }
+                )
+            } else {
+                // VISTA: DATOS TOTALES GLOBALES (TODOS LOS CAMINOS)
+                GlobalTotalDataContent(
+                    totalCaminosRealizados = totalGlobalCaminosRealizados,
+                    totalCaminosCount = allCaminos.size,
+                    totalKm = totalGlobalKm,
+                    completedKm = completedGlobalKm,
+                    totalElevationGain = totalGlobalElevationGain,
+                    completedElevationGain = completedGlobalElevationGain,
+                    totalStages = totalGlobalStagesCount,
+                    completedStages = completedGlobalStagesCount,
+                    pendingStages = pendingGlobalStagesCount,
+                    totalExpenseEur = totalGlobalExpenseEur,
+                    totalAccommodationsCount = allAccommodations.size,
                     onExportPdf = { viewModel.exportStatsPdf(context, isTotal = true) }
                 )
             }
@@ -277,20 +283,28 @@ fun StatsScreen(
 }
 
 /**
- * Contenido exclusivo de la pestaña "Datos de la Etapa"
+ * Contenido de la sub-pestaña "Datos del Camino" (Lógica acumulada de todas las etapas del camino activo)
  */
 @Composable
-private fun StageDataContent(
-    stage: StageEntity?,
-    stages: List<StageEntity>,
+private fun ActiveCaminoDataContent(
+    camino: CaminoEntity?,
+    routeTerm: String,
     stageTerm: String,
-    stageAccommodations: List<AccommodationEntity>,
-    stageExpenseEur: Double,
-    showStageDropdown: Boolean,
-    onToggleDropdown: (Boolean) -> Unit,
-    onSelectStage: (StageEntity) -> Unit
+    stageTermPlural: String,
+    totalKm: Double,
+    completedKm: Double,
+    totalElevationGain: Int,
+    completedElevationGain: Int,
+    totalStages: Int,
+    completedStages: Int,
+    pendingStages: Int,
+    progressPercent: Int,
+    totalExpenseEur: Double,
+    caminoAccommodations: List<AccommodationEntity>,
+    viewModel: CaminoViewModel,
+    onExportPdf: () -> Unit
 ) {
-    if (stage == null || stages.isEmpty()) {
+    if (camino == null || totalStages == 0) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -314,14 +328,14 @@ private fun StageDataContent(
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "Sin $stageTerm registradas",
+                        text = "Sin $routeTerm activo",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = CaminoBlue
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "Añade una o más $stageTerm en la pestaña principal para ver el desglose de datos individuales.",
+                        text = "Crea o selecciona un $routeTerm para ver sus métricas acumuladas.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -331,381 +345,6 @@ private fun StageDataContent(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // SELECTOR DE ETAPA ACTUAL
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleDropdown(!showStageDropdown) },
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(CaminoBlue, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "${stage.dayNumber}",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "$stageTerm ${stage.dayNumber}: ${stage.origin} → ${stage.destination}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = if (stage.date.isNotBlank()) "Fecha: ${stage.date} • Toca para cambiar" else "Toca para cambiar de $stageTerm",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Cambiar de etapa",
-                        tint = CaminoBlue
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = showStageDropdown,
-                    onDismissRequest = { onToggleDropdown(false) },
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .heightIn(max = 350.dp)
-                ) {
-                    stages.forEach { stg ->
-                        val isSelected = stg.id == stage.id
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .background(
-                                                if (isSelected) CaminoBlue else MaterialTheme.colorScheme.surfaceVariant,
-                                                CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${stg.dayNumber}",
-                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    Column {
-                                        Text(
-                                            text = "$stageTerm ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = "${stg.distanceKm} km • +${stg.elevationGainM}m",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            },
-                            onClick = { onSelectStage(stg) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // TARJETA DE ESTADO Y RESUMEN PRINCIPAL DE LA ETAPA
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CaminoBlue),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = if (stage.isCompleted) CaminoGreen else PilgrimYellow,
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = if (stage.isCompleted) "✓ COMPLETADA" else "PENDIENTE",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (stage.isCompleted) Color.White else CaminoBlueDark,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-
-                        if (stage.difficulty.isNotBlank()) {
-                            Surface(
-                                color = Color.White.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    text = "Dificultad: ${stage.difficulty}",
-                                    fontSize = 11.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Text(
-                        text = "${stage.origin} → ${stage.destination}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-
-                    if (stage.title.isNotBlank() && stage.title != "${stage.origin} - ${stage.destination}") {
-                        Text(
-                            text = stage.title,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f)
-                        )
-                    }
-
-                    Spacer(Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("Distancia", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f))
-                            Text("${stage.distanceKm} km", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = PilgrimYellow)
-                        }
-                        Column {
-                            Text("Desnivel", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f))
-                            Text("+${stage.elevationGainM} m", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Column {
-                            Text("Tiempo", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f))
-                            Text(stage.estimatedTime.ifBlank { "--" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
-                }
-            }
-        }
-
-        // MÉTRICAS INDIVIDUALES DE LA ETAPA
-        item {
-            Text(
-                text = "Detalle de la $stageTerm",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = CaminoBlue
-            )
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetricCard(
-                    title = "Desnivel Positivo",
-                    value = "+${stage.elevationGainM} m",
-                    sub = "Subida de la etapa",
-                    icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    color = CaminoBlue,
-                    modifier = Modifier.weight(1f)
-                )
-
-                StatMetricCard(
-                    title = "Desnivel Negativo",
-                    value = "-${stage.elevationLossM} m",
-                    sub = "Bajada de la etapa",
-                    icon = Icons.AutoMirrored.Filled.TrendingDown,
-                    color = PilgrimYellowDark,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetricCard(
-                    title = "Gasto en Alojamiento",
-                    value = "${String.format(Locale.US, "%.2f", stageExpenseEur)} €",
-                    sub = "${stageAccommodations.size} alojamientos registrados",
-                    icon = Icons.Default.Euro,
-                    color = CaminoGreen,
-                    modifier = Modifier.weight(1f)
-                )
-
-                StatMetricCard(
-                    title = "Trazado GPX",
-                    value = if (!stage.gpxTrackJson.isNullOrBlank()) "Grabado" else "Estimado",
-                    sub = if (!stage.gpxTrackJson.isNullOrBlank()) "Track real oficial" else "Trazado estándar",
-                    icon = Icons.Default.Route,
-                    color = if (!stage.gpxTrackJson.isNullOrBlank()) CaminoGreen else CaminoBlue,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // DESGLOSE DE ALOJAMIENTOS DE ESTA ETAPA
-        if (stageAccommodations.isNotEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "Alojamientos de este $stageTerm (${stageAccommodations.size})",
-                                fontWeight = FontWeight.Bold,
-                                color = CaminoBlue
-                            )
-                            Text(
-                                text = "${String.format(Locale.US, "%.2f", stageExpenseEur)} €",
-                                fontWeight = FontWeight.Bold,
-                                color = CaminoGreen
-                            )
-                        }
-
-                        HorizontalDivider()
-
-                        stageAccommodations.forEach { acc ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = acc.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    if (acc.phone.isNotBlank()) {
-                                        Text(
-                                            text = "Tel: ${acc.phone}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                val options = remember(acc.roomOptionsJson) {
-                                    val list = mutableListOf<String>()
-                                    try {
-                                        val array = org.json.JSONArray(acc.roomOptionsJson)
-                                        for (i in 0 until array.length()) {
-                                            val o = array.getJSONObject(i)
-                                            list.add("${o.optString("roomType")}: ${o.optDouble("priceEur")}€")
-                                        }
-                                    } catch (_: Exception) {}
-                                    list
-                                }
-
-                                if (options.isNotEmpty()) {
-                                    Text(
-                                        text = options.joinToString(", "),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = CaminoBlueDark
-                                    )
-                                } else {
-                                    Text(
-                                        text = "--",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(80.dp)) }
-    }
-}
-
-/**
- * Contenido exclusivo de la pestaña "Datos Totales" (suma y agregación del camino/viaje completo)
- */
-@Composable
-private fun TotalCaminoDataContent(
-    camino: CaminoEntity?,
-    routeTerm: String,
-    stageTerm: String,
-    stageTermPlural: String,
-    totalKm: Double,
-    completedKm: Double,
-    totalElevationGain: Int,
-    completedElevationGain: Int,
-    totalStages: Int,
-    completedStages: Int,
-    pendingStages: Int,
-    progressPercent: Int,
-    totalExpenseEur: Double,
-    totalAccommodationsCount: Int,
-    onExportPdf: () -> Unit
-) {
     val totalKmStr = remember(totalKm) { String.format(Locale.US, "%.1f", totalKm) }
     val completedKmStr = remember(completedKm) { String.format(Locale.US, "%.1f", completedKm) }
     val remainingKm = remember(totalKm, completedKm) { kotlin.math.max(0.0, totalKm - completedKm) }
@@ -724,12 +363,12 @@ private fun TotalCaminoDataContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // HERO CARD: RESUMEN GLOBAL DEL CAMINO/VIAJE ACTIVO
+        // HERO CARD: BARRA DE PROGRESO Y MEDALLA O COMPOSTELA AL 100%
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("stats_hero_card"),
+                    .testTag("stats_camino_hero_card"),
                 colors = CardDefaults.cardColors(containerColor = CaminoBlue),
                 shape = RoundedCornerShape(20.dp)
             ) {
@@ -739,27 +378,52 @@ private fun TotalCaminoDataContent(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(66.dp)
-                            .background(PilgrimYellow, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WorkspacePremium,
-                            contentDescription = null,
-                            tint = CaminoBlueDark,
-                            modifier = Modifier.size(38.dp)
-                        )
+                    // Icono: Compostela si llega al 100%, Medalla en caso contrario
+                    if (progressPercent >= 100) {
+                        Box(
+                            modifier = Modifier
+                                .size(74.dp)
+                                .clip(CircleShape)
+                                .background(PilgrimYellow),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.compostela),
+                                contentDescription = "Compostela",
+                                modifier = Modifier
+                                    .size(70.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(66.dp)
+                                .background(PilgrimYellow, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.WorkspacePremium,
+                                contentDescription = null,
+                                tint = CaminoBlueDark,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
                     }
 
                     Spacer(Modifier.height(12.dp))
 
                     Text(
-                        text = "$progressPercent% COMPLETADO DEL ${routeTerm.uppercase()}",
+                        text = if (progressPercent >= 100) {
+                            "¡100% COMPLETADO! COMPOSTELA OBTENIDA"
+                        } else {
+                            "$progressPercent% COMPLETADO DEL ${routeTerm.uppercase()}"
+                        },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = PilgrimYellow
+                        color = PilgrimYellow,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
 
                     Text(
@@ -768,7 +432,7 @@ private fun TotalCaminoDataContent(
                         color = Color.White.copy(alpha = 0.9f)
                     )
 
-                    if (camino != null && camino.title.isNotBlank()) {
+                    if (camino.title.isNotBlank()) {
                         Text(
                             text = camino.title,
                             style = MaterialTheme.typography.labelSmall,
@@ -827,7 +491,7 @@ private fun TotalCaminoDataContent(
             }
         }
 
-        // FILA 2: TOTAL DE ETAPAS Y GASTO TOTAL DEL VIAJE
+        // FILA 2: TOTAL DE ETAPAS Y GASTO TOTAL DEL CAMINO
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -843,9 +507,9 @@ private fun TotalCaminoDataContent(
                 )
 
                 StatMetricCard(
-                    title = "Gasto Total Estimado",
+                    title = "Gasto en Alojamiento",
                     value = "${String.format(Locale.US, "%.2f", totalExpenseEur)} €",
-                    sub = "en $totalAccommodationsCount alojamientos",
+                    sub = "en ${caminoAccommodations.size} alojamientos",
                     icon = Icons.Default.Euro,
                     color = CaminoGreen,
                     modifier = Modifier.weight(1f)
@@ -862,7 +526,7 @@ private fun TotalCaminoDataContent(
                 StatMetricCard(
                     title = "Media km / $stageTerm",
                     value = "${String.format(Locale.US, "%.1f", avgKmPerStage)} km",
-                    sub = "Promedio diario",
+                    sub = "Promedio por etapa",
                     icon = Icons.Default.Speed,
                     color = CaminoBlue,
                     modifier = Modifier.weight(1f)
@@ -879,7 +543,7 @@ private fun TotalCaminoDataContent(
             }
         }
 
-        // TARJETA DE DETALLE GENERAL DEL CAMINO/VIAJE
+        // BALANCE GENERAL DEL CAMINO/VIAJE
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -906,7 +570,7 @@ private fun TotalCaminoDataContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Nombre de la ruta:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(camino?.title ?: "--", fontWeight = FontWeight.Bold)
+                        Text(camino.title, fontWeight = FontWeight.Bold)
                     }
 
                     Row(
@@ -938,22 +602,110 @@ private fun TotalCaminoDataContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Alojamientos registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("$totalAccommodationsCount", fontWeight = FontWeight.Bold)
+                        Text("${caminoAccommodations.size}", fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        // BOTÓN DE EXPORTAR INFORME COMPLETO A PDF
+        // DESGLOSE DE ALOJAMIENTOS DE ESTE CAMINO
+        if (caminoAccommodations.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Alojamientos registrados (${caminoAccommodations.size})",
+                                fontWeight = FontWeight.Bold,
+                                color = CaminoBlue
+                            )
+                            Text(
+                                text = "${String.format(Locale.US, "%.2f", totalExpenseEur)} €",
+                                fontWeight = FontWeight.Bold,
+                                color = CaminoGreen
+                            )
+                        }
+
+                        HorizontalDivider()
+
+                        caminoAccommodations.forEach { acc ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = acc.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    if (acc.phone.isNotBlank()) {
+                                        Text(
+                                            text = "Tel: ${acc.phone}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                val options = remember(acc.roomOptionsJson) {
+                                    val list = mutableListOf<String>()
+                                    try {
+                                        val array = org.json.JSONArray(acc.roomOptionsJson)
+                                        for (i in 0 until array.length()) {
+                                            val o = array.getJSONObject(i)
+                                            list.add("${o.optString("roomType")}: ${o.optDouble("priceEur")}€")
+                                        }
+                                    } catch (_: Exception) {}
+                                    list
+                                }
+
+                                if (options.isNotEmpty()) {
+                                    Text(
+                                        text = options.joinToString(", "),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CaminoBlueDark
+                                    )
+                                } else {
+                                    Text(
+                                        text = "--",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // BOTÓN DE EXPORTAR INFORME DEL CAMINO A PDF
         item {
             OutlinedButton(
                 onClick = onExportPdf,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue)
+                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Exportar Informe Completo a PDF", fontWeight = FontWeight.Bold)
+                Text("Exportar Informe del $routeTerm a PDF", color = CaminoBlue, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -961,8 +713,280 @@ private fun TotalCaminoDataContent(
     }
 }
 
+/**
+ * Contenido de la sub-pestaña "Datos Totales" (Suma real y global de absolutamente todos los caminos)
+ */
 @Composable
-fun StatMetricCard(
+private fun GlobalTotalDataContent(
+    totalCaminosRealizados: Int,
+    totalCaminosCount: Int,
+    totalKm: Double,
+    completedKm: Double,
+    totalElevationGain: Int,
+    completedElevationGain: Int,
+    totalStages: Int,
+    completedStages: Int,
+    pendingStages: Int,
+    totalExpenseEur: Double,
+    totalAccommodationsCount: Int,
+    onExportPdf: () -> Unit
+) {
+    val totalKmStr = remember(totalKm) { String.format(Locale.US, "%.1f", totalKm) }
+    val completedKmStr = remember(completedKm) { String.format(Locale.US, "%.1f", completedKm) }
+    val remainingKm = remember(totalKm, completedKm) { kotlin.math.max(0.0, totalKm - completedKm) }
+    val remainingKmStr = remember(remainingKm) { String.format(Locale.US, "%.1f", remainingKm) }
+
+    val avgKmPerStage = remember(totalKm, totalStages) {
+        if (totalStages > 0) totalKm / totalStages else 0.0
+    }
+    val avgElevationPerStage = remember(totalElevationGain, totalStages) {
+        if (totalStages > 0) totalElevationGain / totalStages else 0
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // TARJETA SIMPLE SUPERIOR: TOTAL CAMINOS REALIZADOS (Sin barra de progreso ni % de completado)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("stats_global_hero_card"),
+                colors = CardDefaults.cardColors(containerColor = CaminoBlue),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "TOTAL CAMINOS Y VIAJES",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = PilgrimYellow
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Total Caminos Realizados: $totalCaminosRealizados",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "$totalCaminosCount rutas registradas en la aplicación",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .background(PilgrimYellow, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = CaminoBlueDark,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // TÍTULO DE SECCIÓN: TOTALES ACUMULADOS (Sin 'del Camino')
+        item {
+            Text(
+                text = "Totales Acumulados",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = CaminoBlue
+            )
+        }
+
+        // FILA 1: DISTANCIA TOTAL GLOBAL Y DESNIVEL TOTAL GLOBAL
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatMetricCard(
+                    title = "Distancia Total",
+                    value = "$completedKmStr km",
+                    sub = "de $totalKmStr km totales",
+                    icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                    color = CaminoGreen,
+                    modifier = Modifier.weight(1f)
+                )
+
+                StatMetricCard(
+                    title = "Desnivel Total",
+                    value = "+$totalElevationGain m",
+                    sub = "+$completedElevationGain m completados",
+                    icon = Icons.Default.Landscape,
+                    color = CaminoBlue,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // FILA 2: TOTAL GLOBAL DE ETAPAS Y GASTO TOTAL GLOBAL
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatMetricCard(
+                    title = "Total de Etapas",
+                    value = "$totalStages",
+                    sub = "$completedStages completadas • $pendingStages pendientes",
+                    icon = Icons.Default.ViewDay,
+                    color = PilgrimYellow,
+                    modifier = Modifier.weight(1f)
+                )
+
+                StatMetricCard(
+                    title = "Gasto Total Estimado",
+                    value = "${String.format(Locale.US, "%.2f", totalExpenseEur)} €",
+                    sub = "en $totalAccommodationsCount alojamientos",
+                    icon = Icons.Default.Euro,
+                    color = CaminoGreen,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // FILA 3: PROMEDIOS GLOBALES
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatMetricCard(
+                    title = "Media km / Etapa",
+                    value = "${String.format(Locale.US, "%.1f", avgKmPerStage)} km",
+                    sub = "Promedio global diario",
+                    icon = Icons.Default.Speed,
+                    color = CaminoBlue,
+                    modifier = Modifier.weight(1f)
+                )
+
+                StatMetricCard(
+                    title = "Media Desnivel",
+                    value = "+$avgElevationPerStage m",
+                    sub = "Promedio global por etapa",
+                    icon = Icons.Default.Terrain,
+                    color = PilgrimYellowDark,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // BALANCE GENERAL GLOBAL (Sin 'del Camino')
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Balance General",
+                        fontWeight = FontWeight.Bold,
+                        color = CaminoBlue
+                    )
+
+                    HorizontalDivider()
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Rutas y caminos registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$totalCaminosCount", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Distancia global por recorrer:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$remainingKmStr km", fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Desnivel positivo restante:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("+${(totalElevationGain - completedElevationGain).coerceAtLeast(0)} m", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Etapas pendientes totales:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$pendingStages", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Alojamientos totales registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$totalAccommodationsCount", fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Gasto global acumulado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${String.format(Locale.US, "%.2f", totalExpenseEur)} €", fontWeight = FontWeight.Bold, color = CaminoGreen)
+                    }
+                }
+            }
+        }
+
+        // BOTÓN DE EXPORTAR INFORME GLOBAL A PDF
+        item {
+            OutlinedButton(
+                onClick = onExportPdf,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Exportar Informe Global a PDF", color = CaminoBlue, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        item { Spacer(Modifier.height(80.dp)) }
+    }
+}
+
+/**
+ * Tarjeta de métrica estadística individual con icono y color
+ */
+@Composable
+private fun StatMetricCard(
     title: String,
     value: String,
     sub: String,
@@ -972,7 +996,7 @@ fun StatMetricCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -983,7 +1007,7 @@ fun StatMetricCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .background(color.copy(alpha = 0.15f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -998,25 +1022,26 @@ fun StatMetricCard(
             Spacer(Modifier.height(10.dp))
 
             Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
-            )
-
-            Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = CaminoBlueDark
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             if (sub.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = sub,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 10.sp,
+                    color = color
                 )
             }
         }

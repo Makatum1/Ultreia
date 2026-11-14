@@ -99,6 +99,9 @@ interface CaminoDao {
     suspend fun getAllStagesOnce(): List<StageEntity>
 
     @Query("SELECT * FROM accommodations")
+    fun getAllAccommodations(): Flow<List<AccommodationEntity>>
+
+    @Query("SELECT * FROM accommodations")
     suspend fun getAllAccommodationsOnce(): List<AccommodationEntity>
 
     @Query("DELETE FROM caminos")

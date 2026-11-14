@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.File
 
 plugins {
   alias(libs.plugins.android.application)
@@ -28,7 +29,7 @@ android {
     create("release") {
       val keystorePath = project.findProperty("RELEASE_KEYSTORE_PATH") as String?
         ?: System.getenv("KEYSTORE_PATH")
-        ?: "C:/Users/perez/Desktop/basura/Aplicacion/keystore/travelcash"
+        ?: "C:/Users/perez/Desktop/basura/Aplicaciones/keystore/travelcash"
       storeFile = file(keystorePath)
       storePassword = project.findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
         ?: System.getenv("STORE_PASSWORD")
@@ -74,16 +75,6 @@ android {
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
-  }
-
-  applicationVariants.all {
-    val variant = this
-    outputs.all {
-      val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
-      if (variant.buildType.name == "release") {
-        output?.outputFileName = "Ultreia.apk"
-      }
-    }
   }
 }
 
@@ -159,20 +150,5 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
-}
-
-tasks.matching { it.name == "assembleRelease" }.configureEach {
-  doLast {
-    val releaseApk = layout.buildDirectory.file("outputs/apk/release/Ultreia.apk").get().asFile
-    val fallbackApk = layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile
-    val sourceApk = if (releaseApk.exists()) releaseApk else fallbackApk
-    if (sourceApk.exists()) {
-      sourceApk.copyTo(file("${rootDir}/Ultreia.apk"), overwrite = true)
-      val destFolder = file("C:/Users/perez/Desktop/basura/13nov")
-      if (destFolder.exists()) {
-        sourceApk.copyTo(file("${destFolder}/Ultreia.apk"), overwrite = true)
-      }
-    }
-  }
 }
 

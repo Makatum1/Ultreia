@@ -276,6 +276,7 @@ fun StagesListTab(
     onEditStage: (StageEntity) -> Unit
 ) {
     val context = LocalContext.current
+    var stageToDelete by remember { mutableStateOf<StageEntity?>(null) }
 
     LazyColumn(
         modifier = Modifier
@@ -412,7 +413,8 @@ fun StagesListTab(
                     isToday = isToday,
                     onClick = { onStageClick(stage.id) },
                     onToggle = { onToggleStage(stage) },
-                    onEdit = { onEditStage(stage) }
+                    onEdit = { onEditStage(stage) },
+                    onDelete = { stageToDelete = stage }
                 )
             }
         }
@@ -421,18 +423,58 @@ fun StagesListTab(
             Spacer(Modifier.height(80.dp))
         }
     }
+
+    if (stageToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { stageToDelete = null },
+            title = {
+                Text(
+                    text = "Eliminar etapa",
+                    fontWeight = FontWeight.Bold,
+                    color = CaminoBlue
+                )
+            },
+            text = {
+                Text("¿Estás seguro de que quieres eliminar esta etapa?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val stage = stageToDelete!!
+                        viewModel.deleteStage(stage)
+                        stageToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    Text("Eliminar", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { stageToDelete = null }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
+    val bannerBg = if (camino.isTravelGuide) CaminoBlueDark else CaminoBlue
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(6.dp, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = bannerBg)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(bannerBg)
+        ) {
             // Background Image
             if (!camino.coverPhotoUri.isNullOrBlank()) {
                 AsyncImage(
@@ -450,7 +492,7 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(160.dp)
-                        .background(CaminoBlue),
+                        .background(bannerBg),
                     contentScale = ContentScale.Fit
                 )
             }
@@ -458,12 +500,11 @@ fun CaminoHeaderBanner(camino: CaminoEntity, stats: CaminoStats) {
             // Dark gradient overlay
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
+                    .matchParentSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f)),
-                            startY = 35f
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                            startY = 25f
                         )
                     )
             )
@@ -548,7 +589,8 @@ fun StageCardItem(
     isToday: Boolean,
     onClick: () -> Unit,
     onToggle: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -562,7 +604,7 @@ fun StageCardItem(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Header line: Date pill, Today badge, Edit button
+            // Header line: Date pill, Today badge, Edit button, Delete button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -607,17 +649,34 @@ fun StageCardItem(
                     }
                 }
 
-                // Quick Edit Action Button
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Editar etapa",
-                        tint = CaminoBlue,
-                        modifier = Modifier.size(16.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Quick Edit Action Button
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Editar etapa",
+                            tint = CaminoBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.width(2.dp))
+
+                    // Quick Delete Action Button
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Eliminar etapa",
+                            tint = Color(0xFFD32F2F),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 

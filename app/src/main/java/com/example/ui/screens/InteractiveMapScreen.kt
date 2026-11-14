@@ -800,6 +800,7 @@ fun InteractiveMapScreen(
         )
 
         // TARJETA DE TÍTULO SUPERIOR: Idéntica a la pantalla de Etapas (CaminoHeaderBanner)
+        val mapBannerBg = if (camino.isTravelGuide) CaminoBlueDark else CaminoBlue
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -807,9 +808,13 @@ fun InteractiveMapScreen(
                 .align(Alignment.TopCenter)
                 .shadow(6.dp, RoundedCornerShape(18.dp)),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = mapBannerBg)
         ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(mapBannerBg)
+            ) {
                 if (!camino.coverPhotoUri.isNullOrBlank()) {
                     AsyncImage(
                         model = camino.coverPhotoUri,
@@ -826,15 +831,14 @@ fun InteractiveMapScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(145.dp)
-                            .background(CaminoBlue),
+                            .background(mapBannerBg),
                         contentScale = ContentScale.Fit
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(145.dp)
+                        .matchParentSize()
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),

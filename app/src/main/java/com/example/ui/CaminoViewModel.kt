@@ -183,6 +183,12 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    val allStages: StateFlow<List<StageEntity>> = repository.allStages
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allAccommodations: StateFlow<List<AccommodationEntity>> = repository.allAccommodations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Conflict state for import overwriting
     data class ConflictDialogState(
         val conflict: com.example.data.backup.ImportConflict,
@@ -721,11 +727,13 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun deleteStage(stage: StageEntity) {
+    fun deleteStage(stage: StageEntity, shouldNavigateBack: Boolean = false) {
         viewModelScope.launch {
             repository.deleteStage(stage)
             _userMessage.value = "Etapa eliminada"
-            navigateBack()
+            if (shouldNavigateBack) {
+                navigateBack()
+            }
         }
     }
 

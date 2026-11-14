@@ -41,6 +41,7 @@ class CaminoRepository(val context: Context) {
 
     val allCaminos: Flow<List<CaminoEntity>> = dao.getAllCaminos()
     val allStages: Flow<List<StageEntity>> = dao.getAllStages()
+    val allAccommodations: Flow<List<AccommodationEntity>> = dao.getAllAccommodations()
 
     suspend fun getAllCaminosOnce(): List<CaminoEntity> = withContext(Dispatchers.IO) {
         dao.getAllCaminosOnce()
