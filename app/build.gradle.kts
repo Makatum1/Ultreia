@@ -78,6 +78,22 @@ android {
   }
 }
 
+afterEvaluate {
+  val releaseDir = File(layout.buildDirectory.asFile.get(), "outputs/apk/release")
+  val rootDest = File(rootDir, "Ultreia.apk")
+  tasks.findByName("assembleRelease")?.doLast {
+    val releaseApk = File(releaseDir, "app-release.apk")
+    val altApk = File(releaseDir, "Ultreia.apk")
+    val src = if (releaseApk.exists()) releaseApk else if (altApk.exists()) altApk else null
+    src?.let {
+      it.copyTo(rootDest, overwrite = true)
+      val destInRelease = File(releaseDir, "Ultreia.apk")
+      it.copyTo(destInRelease, overwrite = true)
+      println("APK copiado exitosamente a: ${rootDest.absolutePath}")
+    }
+  }
+}
+
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {
