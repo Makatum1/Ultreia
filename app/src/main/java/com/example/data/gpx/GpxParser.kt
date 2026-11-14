@@ -332,9 +332,10 @@ object GpxParser {
         val finalDistanceKm = if (explicitDistanceMeters != null && explicitDistanceMeters > 0.0) {
             if (explicitDistanceMeters > 500.0) explicitDistanceMeters / 1000.0 else explicitDistanceMeters
         } else {
-            totalDistanceKm
+            // Eliminar ruido de coma flotante IEEE manteniendo los decimales reales sin redondeo forzado
+            round(totalDistanceKm * 10000.0) / 10000.0
         }
-        val distanceExact = (round(finalDistanceKm * 100.0) / 100.0)
+        val distanceExact = finalDistanceKm
 
         // 2. Desnivel positivo y negativo acumulado en TODO el GPX (calculado sobre los puntos con altimetría)
         var gainM = 0.0
@@ -363,7 +364,7 @@ object GpxParser {
             lossM.roundToInt()
         }
 
-        // 3. Tiempo en movimiento (moving time)
+        // 3. Tiempo en movimiento (moving time) sin segundos
         var movingSeconds = 0.0
         if (explicitMovingTimeSec != null && explicitMovingTimeSec > 0) {
             movingSeconds = explicitMovingTimeSec.toDouble()
@@ -407,22 +408,12 @@ object GpxParser {
         val totalSec = movingSeconds.roundToLong()
         val hours = totalSec / 3600
         val minutes = (totalSec % 3600) / 60
-        val seconds = totalSec % 60
 
+        // Tiempo en movimiento en formato "Xh Ym" sin incluir segundos
         val movingTimeStr = if (hours > 0) {
-            if (seconds > 0) {
-                "${hours}h ${String.format(Locale.US, "%02d", minutes)}m ${String.format(Locale.US, "%02d", seconds)}s"
-            } else {
-                "${hours}h ${String.format(Locale.US, "%02d", minutes)}m"
-            }
+            "${hours}h ${String.format(Locale.US, "%02d", minutes)}m"
         } else if (minutes > 0) {
-            if (seconds > 0) {
-                "${minutes}m ${String.format(Locale.US, "%02d", seconds)}s"
-            } else {
-                "${minutes}m"
-            }
-        } else if (seconds > 0) {
-            "${seconds}s"
+            "${minutes}m"
         } else {
             "0h 00m"
         }
