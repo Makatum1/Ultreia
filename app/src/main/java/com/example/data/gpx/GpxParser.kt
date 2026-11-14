@@ -179,27 +179,27 @@ object GpxParser {
             }
         }
 
-        // 1. DISTANCIA (KM) CON FILTRO ANTI-RUIDO (< 2 metros)
+        // 1. DISTANCIA (KM) DESCARTANDO DESPLAZAMIENTOS < 1.5 METROS
         var totalDistanceMeters = 0.0
         for (i in 0 until rawPoints.size - 1) {
             val p1 = rawPoints[i]
             val p2 = rawPoints[i + 1]
             val stepMeters = haversineDistanceMeters(p1.lat, p1.lon, p2.lat, p2.lon)
-            if (stepMeters >= 2.0) {
+            if (stepMeters >= 1.5) {
                 totalDistanceMeters += stepMeters
             }
         }
         val distanceKm = round((totalDistanceMeters / 1000.0) * 100.0) / 100.0
 
-        // 2. DESNIVEL POSITIVO Y NEGATIVO ACUMULADO CON FILTRO DOBLE (Media Móvil + Histéresis 3.5m)
+        // 2. DESNIVEL POSITIVO Y NEGATIVO ACUMULADO (Suavizado 11 puntos + Histéresis 0.80m)
         var gainM = 0.0
         var lossM = 0.0
         val elevationPoints = rawPoints.filter { it.hasEle }
         if (elevationPoints.size >= 2) {
-            // Paso 1 (Suavizado): Media móvil con ventana de 5 puntos para eliminar picos de altitud irreales
+            // Paso 1 (Suavizado): Media móvil con ventana de 11 puntos (radio = 5 puntos a cada lado)
             val rawEle = elevationPoints.map { it.ele }
             val smoothed = DoubleArray(rawEle.size)
-            val radius = 2
+            val radius = 5
             for (i in rawEle.indices) {
                 val start = maxOf(0, i - radius)
                 val end = minOf(rawEle.lastIndex, i + radius)
@@ -212,8 +212,8 @@ object GpxParser {
                 smoothed[i] = sum / count
             }
 
-            // Paso 2 (Histéresis): Umbral de 3.5 metros. Solo suma cuando supera el umbral respecto al último punto validado
-            val threshold = 3.5
+            // Paso 2 (Histéresis): Umbral de 0.80 metros. Solo suma cuando el cambio respecto al último punto validado supera 0.80m
+            val threshold = 0.80
             var lastValidatedEle = smoothed[0]
             for (i in 1 until smoothed.size) {
                 val current = smoothed[i]
@@ -230,13 +230,27 @@ object GpxParser {
         val finalElevationGainM = gainM.roundToInt()
         val finalElevationLossM = lossM.roundToInt()
 
-        // 3. TIEMPO: Diferencia entre último punto y primer punto, truncado a minutos ("X h Y min")
-        val firstTime = rawPoints.firstOrNull { it.timeMillis != null }?.timeMillis
-        val lastTime = rawPoints.lastOrNull { it.timeMillis != null }?.timeMillis
-        val durationMinutes = if (firstTime != null && lastTime != null && lastTime >= firstTime) {
-            (lastTime - firstTime) / 60000L
+        // 3. TIEMPO GRABADO: Suma de los intervalos entre puntos hasta 10 segundos (sin huecos)
+        var recordedDurationSec = 0.0
+        val timedPoints = rawPoints.filter { it.timeMillis != null }
+        for (i in 0 until timedPoints.size - 1) {
+            val p1 = timedPoints[i]
+            val p2 = timedPoints[i + 1]
+            val dtSec = (p2.timeMillis!! - p1.timeMillis!!) / 1000.0
+            if (dtSec > 0.0 && dtSec <= 10.0) {
+                recordedDurationSec += dtSec
+            }
+        }
+
+        val durationMinutes = if (recordedDurationSec > 0.0) {
+            (recordedDurationSec / 60.0).roundToLong()
         } else {
-            if (distanceKm > 0) {
+            // Fallback si el GPX no contiene marcas de tiempo consecutivas de muestreo
+            val firstTime = timedPoints.firstOrNull()?.timeMillis
+            val lastTime = timedPoints.lastOrNull()?.timeMillis
+            if (firstTime != null && lastTime != null && lastTime >= firstTime) {
+                (lastTime - firstTime) / 60000L
+            } else if (distanceKm > 0) {
                 (((distanceKm / 4.2) + (finalElevationGainM / 400.0)) * 60).toLong()
             } else 0L
         }

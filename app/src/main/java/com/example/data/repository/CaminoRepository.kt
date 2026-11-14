@@ -139,9 +139,10 @@ class CaminoRepository(val context: Context) {
 
         val serializedPoints = GpxParser.serializePoints(parseResult.points)
 
+        // No se modifica origen ni destino; se actualizan únicamente distancia, desniveles acumulados y tiempo
         val updatedStage = stage.copy(
-            origin = updatedOrigin,
-            destination = updatedDest,
+            origin = stage.origin,
+            destination = stage.destination,
             distanceKm = if (parseResult.distanceKm > 0) parseResult.distanceKm else stage.distanceKm,
             elevationGainM = if (parseResult.elevationGainM > 0) parseResult.elevationGainM else stage.elevationGainM,
             elevationLossM = if (parseResult.elevationLossM > 0) parseResult.elevationLossM else stage.elevationLossM,
