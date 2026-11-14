@@ -135,9 +135,7 @@ class CaminoRepository(val context: Context) {
         val updatedOrigin = if (!parseResult.origin.isNullOrBlank()) parseResult.origin else stage.origin
         val updatedDest = if (!parseResult.destination.isNullOrBlank()) parseResult.destination else stage.destination
 
-        val hours = parseResult.estimatedHours.toInt()
-        val minutes = ((parseResult.estimatedHours - hours) * 60).toInt()
-        val timeStr = if (hours > 0 || minutes > 0) "${hours}h ${minutes}m" else stage.estimatedTime
+        val timeStr = if (parseResult.formattedTime.isNotBlank()) parseResult.formattedTime else stage.estimatedTime
 
         val serializedPoints = GpxParser.serializePoints(parseResult.points)
 

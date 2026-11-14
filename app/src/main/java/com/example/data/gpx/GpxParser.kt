@@ -5,9 +5,19 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
-import java.io.InputStream
 import java.io.StringReader
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.*
+
+private data class RawGpxPoint(
+    val lat: Double,
+    val lon: Double,
+    val ele: Double,
+    val hasEle: Boolean,
+    val timeMillis: Long?
+)
 
 data class GpxParseResult(
     val points: List<GpxPoint>,
@@ -16,16 +26,49 @@ data class GpxParseResult(
     val elevationLossM: Int,
     val origin: String?,
     val destination: String?,
-    val estimatedHours: Double
+    val estimatedHours: Double,
+    val formattedTime: String = ""
 )
 
 object GpxParser {
 
+    private fun parseIsoTimestamp(timeStr: String): Long? {
+        val clean = timeStr.trim()
+        if (clean.isBlank()) return null
+        try {
+            return java.time.Instant.parse(clean).toEpochMilli()
+        } catch (_: Exception) {}
+        try {
+            return java.time.OffsetDateTime.parse(clean).toInstant().toEpochMilli()
+        } catch (_: Exception) {}
+
+        val formats = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd HH:mm:ss"
+        )
+        for (pattern in formats) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.US).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }
+                val date = sdf.parse(clean)
+                if (date != null) return date.time
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
     /**
-     * Parses standard GPX 1.0 / 1.1 XML string and computes track metrics
+     * Parses standard GPX 1.0 / 1.1 XML string and computes the 4 key track metrics:
+     * 1. Distance (Km): Haversine distance with filter ignoring jumps < 2 meters (anti-noise). Max 2 decimals.
+     * 2. Time: Difference between last point and first point timestamp, truncated to minutes ("X h Y min").
+     * 3. Elevation Gain & Loss (Double Filter): Moving average smoothing (5-point window) + Hysteresis threshold (3.5m).
      */
     fun parse(gpxContent: String): GpxParseResult {
-        val points = mutableListOf<GpxPoint>()
+        val rawPoints = mutableListOf<RawGpxPoint>()
         var originName: String? = null
         var destName: String? = null
 
@@ -39,6 +82,8 @@ object GpxParser {
             var currentLat: Double? = null
             var currentLon: Double? = null
             var currentEle = 0.0
+            var hasEle = false
+            var currentTimeMillis: Long? = null
             var insideTrkpt = false
             var currentTag = ""
 
@@ -58,13 +103,23 @@ object GpxParser {
                             currentLat = latStr?.toDoubleOrNull()
                             currentLon = lonStr?.toDoubleOrNull()
                             currentEle = 0.0
+                            hasEle = false
+                            currentTimeMillis = null
                             insideTrkpt = true
                         }
                     }
                     XmlPullParser.TEXT -> {
                         val text = parser.text?.trim() ?: ""
-                        if (insideTrkpt && currentTag == "ele" && text.isNotEmpty()) {
-                            currentEle = text.toDoubleOrNull() ?: 0.0
+                        if (insideTrkpt && text.isNotEmpty()) {
+                            when (currentTag) {
+                                "ele" -> {
+                                    currentEle = text.toDoubleOrNull() ?: 0.0
+                                    hasEle = true
+                                }
+                                "time" -> {
+                                    currentTimeMillis = parseIsoTimestamp(text)
+                                }
+                            }
                         } else if (currentTag == "name" && text.isNotEmpty()) {
                             if (originName == null) originName = text
                             else destName = text
@@ -74,11 +129,14 @@ object GpxParser {
                         val endTag = parser.name?.substringAfter(":")?.lowercase() ?: ""
                         if (endTag == "trkpt" || endTag == "wpt") {
                             if (currentLat != null && currentLon != null) {
-                                points.add(GpxPoint(currentLat, currentLon, currentEle))
+                                rawPoints.add(RawGpxPoint(currentLat, currentLon, currentEle, hasEle, currentTimeMillis))
                             }
                             insideTrkpt = false
                             currentLat = null
                             currentLon = null
+                            currentEle = 0.0
+                            hasEle = false
+                            currentTimeMillis = null
                         }
                         currentTag = ""
                     }
@@ -89,24 +147,28 @@ object GpxParser {
             e.printStackTrace()
         }
 
-        if (points.isEmpty()) {
+        if (rawPoints.isEmpty()) {
             val trkptFullRegex = """<trkpt[^>]*lat=["']([-0-9.]+)["'][^>]*lon=["']([-0-9.]+)["'][^>]*>(.*?)</trkpt>""".toRegex(RegexOption.DOT_MATCHES_ALL)
             for (match in trkptFullRegex.findAll(gpxContent)) {
                 val lat = match.groupValues[1].toDoubleOrNull()
                 val lon = match.groupValues[2].toDoubleOrNull()
                 val inner = match.groupValues[3]
-                val ele = """<ele>([-0-9.]+)</ele>""".toRegex().find(inner)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                val eleMatch = """<ele>([-0-9.]+)</ele>""".toRegex().find(inner)
+                val ele = eleMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                val hasEle = eleMatch != null
+                val timeStr = """<time>(.*?)</time>""".toRegex().find(inner)?.groupValues?.get(1)?.trim()
+                val timeMillis = if (!timeStr.isNullOrBlank()) parseIsoTimestamp(timeStr) else null
                 if (lat != null && lon != null) {
-                    points.add(GpxPoint(lat, lon, ele))
+                    rawPoints.add(RawGpxPoint(lat, lon, ele, hasEle, timeMillis))
                 }
             }
-            if (points.isEmpty()) {
+            if (rawPoints.isEmpty()) {
                 val simpleTrkpt = """<trkpt[^>]*lat=["']([-0-9.]+)["'][^>]*lon=["']([-0-9.]+)["']""".toRegex()
                 for (m in simpleTrkpt.findAll(gpxContent)) {
                     val lat = m.groupValues[1].toDoubleOrNull()
                     val lon = m.groupValues[2].toDoubleOrNull()
                     if (lat != null && lon != null) {
-                        points.add(GpxPoint(lat, lon, 0.0))
+                        rawPoints.add(RawGpxPoint(lat, lon, 0.0, false, null))
                     }
                 }
             }
@@ -117,49 +179,100 @@ object GpxParser {
             }
         }
 
-        // Downsample points if too dense (limit to max ~250 points for smooth canvas rendering)
-        val sampledPoints = if (points.size > 250) {
-            val step = points.size / 250
-            points.filterIndexed { index, _ -> index % step == 0 || index == points.lastIndex }
-        } else {
-            points
+        // 1. DISTANCIA (KM) CON FILTRO ANTI-RUIDO (< 2 metros)
+        var totalDistanceMeters = 0.0
+        for (i in 0 until rawPoints.size - 1) {
+            val p1 = rawPoints[i]
+            val p2 = rawPoints[i + 1]
+            val stepMeters = haversineDistanceMeters(p1.lat, p1.lon, p2.lat, p2.lon)
+            if (stepMeters >= 2.0) {
+                totalDistanceMeters += stepMeters
+            }
         }
+        val distanceKm = round((totalDistanceMeters / 1000.0) * 100.0) / 100.0
 
-        // Calculate total distance & elevation gain/loss
-        var totalDistanceKm = 0.0
+        // 2. DESNIVEL POSITIVO Y NEGATIVO ACUMULADO CON FILTRO DOBLE (Media Móvil + Histéresis 3.5m)
         var gainM = 0.0
         var lossM = 0.0
+        val elevationPoints = rawPoints.filter { it.hasEle }
+        if (elevationPoints.size >= 2) {
+            // Paso 1 (Suavizado): Media móvil con ventana de 5 puntos para eliminar picos de altitud irreales
+            val rawEle = elevationPoints.map { it.ele }
+            val smoothed = DoubleArray(rawEle.size)
+            val radius = 2
+            for (i in rawEle.indices) {
+                val start = maxOf(0, i - radius)
+                val end = minOf(rawEle.lastIndex, i + radius)
+                var sum = 0.0
+                var count = 0
+                for (j in start..end) {
+                    sum += rawEle[j]
+                    count++
+                }
+                smoothed[i] = sum / count
+            }
 
-        for (i in 0 until points.size - 1) {
-            val p1 = points[i]
-            val p2 = points[i + 1]
-            totalDistanceKm += haversineDistanceKm(p1.lat, p1.lon, p2.lat, p2.lon)
+            // Paso 2 (Histéresis): Umbral de 3.5 metros. Solo suma cuando supera el umbral respecto al último punto validado
+            val threshold = 3.5
+            var lastValidatedEle = smoothed[0]
+            for (i in 1 until smoothed.size) {
+                val current = smoothed[i]
+                val dEle = current - lastValidatedEle
+                if (dEle >= threshold) {
+                    gainM += dEle
+                    lastValidatedEle = current
+                } else if (dEle <= -threshold) {
+                    lossM += abs(dEle)
+                    lastValidatedEle = current
+                }
+            }
+        }
+        val finalElevationGainM = gainM.roundToInt()
+        val finalElevationLossM = lossM.roundToInt()
 
-            val dEle = p2.ele - p1.ele
-            if (dEle > 1.0) gainM += dEle
-            else if (dEle < -1.0) lossM += abs(dEle)
+        // 3. TIEMPO: Diferencia entre último punto y primer punto, truncado a minutos ("X h Y min")
+        val firstTime = rawPoints.firstOrNull { it.timeMillis != null }?.timeMillis
+        val lastTime = rawPoints.lastOrNull { it.timeMillis != null }?.timeMillis
+        val durationMinutes = if (firstTime != null && lastTime != null && lastTime >= firstTime) {
+            (lastTime - firstTime) / 60000L
+        } else {
+            if (distanceKm > 0) {
+                (((distanceKm / 4.2) + (finalElevationGainM / 400.0)) * 60).toLong()
+            } else 0L
         }
 
-        // Estimated hiking time: ~4.2 km/h + 1h per 400m elevation gain
-        val estimatedHours = if (totalDistanceKm > 0) {
-            (totalDistanceKm / 4.2) + (gainM / 400.0)
+        val hours = durationMinutes / 60L
+        val mins = durationMinutes % 60L
+        val formattedTime = if (hours > 0) {
+            "${hours} h ${mins} min"
         } else {
-            0.0
+            "${mins} min"
+        }
+        val estimatedHours = durationMinutes / 60.0
+
+        // Puntos simplificados para renderizado en mapa / elevación (máximo 250)
+        val sampledPoints = if (rawPoints.size > 250) {
+            val step = rawPoints.size / 250
+            rawPoints.filterIndexed { index, _ -> index % step == 0 || index == rawPoints.lastIndex }
+                .map { GpxPoint(it.lat, it.lon, it.ele) }
+        } else {
+            rawPoints.map { GpxPoint(it.lat, it.lon, it.ele) }
         }
 
         return GpxParseResult(
             points = sampledPoints,
-            distanceKm = (round(totalDistanceKm * 10.0) / 10.0),
-            elevationGainM = gainM.roundToInt(),
-            elevationLossM = lossM.roundToInt(),
+            distanceKm = distanceKm,
+            elevationGainM = finalElevationGainM,
+            elevationLossM = finalElevationLossM,
             origin = originName,
             destination = destName,
-            estimatedHours = estimatedHours
+            estimatedHours = estimatedHours,
+            formattedTime = formattedTime
         )
     }
 
-    private fun haversineDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371.0 // Earth radius in km
+    private fun haversineDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371000.0 // Earth radius in meters
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val a = sin(dLat / 2).pow(2) +
@@ -167,6 +280,10 @@ object GpxParser {
                 sin(dLon / 2).pow(2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return r * c
+    }
+
+    fun haversineDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        return haversineDistanceMeters(lat1, lon1, lat2, lon2) / 1000.0
     }
 
     fun serializePoints(points: List<GpxPoint>): String {

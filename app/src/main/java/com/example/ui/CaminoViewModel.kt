@@ -18,6 +18,7 @@ import com.example.data.repository.CaminoStats
 import com.example.ui.settings.AppStrings
 import com.example.ui.settings.LanguageMode
 import com.example.ui.settings.ThemeMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -739,10 +740,10 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun importGpxToStage(stageId: Long, gpxContent: String, markAsCompleted: Boolean = false) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val updated = repository.importGpxIntoStage(stageId, gpxContent, markAsCompleted)
             if (updated != null) {
-                _userMessage.value = "¡GPX sincronizado! Datos actualizados: ${updated.distanceKm} km, +${updated.elevationGainM}m, tiempo ${updated.estimatedTime}."
+                _userMessage.value = "¡GPX sincronizado! Datos: ${updated.distanceKm} km, +${updated.elevationGainM} m / -${updated.elevationLossM} m, Tiempo ${updated.estimatedTime}."
             } else {
                 _userMessage.value = "Error al procesar el archivo GPX"
             }
