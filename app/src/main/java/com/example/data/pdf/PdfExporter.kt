@@ -176,7 +176,7 @@ object PdfExporter {
         paint.color = COLOR_GOLD_DARK
         canvas.drawRect(0f, bannerHeight - 1.5f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
 
-        // Logo oficial o emblema
+        // Logo o emblema
         var textLeftOffset = MARGIN
         try {
             val logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
@@ -191,7 +191,7 @@ object PdfExporter {
         paint.color = COLOR_GOLD
         paint.textSize = 10.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        val brandLabel = if (isTravel) "ULTREIA VIAJES  •  GUÍA OFICIAL & CUADERNO DE BITÁCORA" else "ULTREIA  •  GUÍA OFICIAL & MEMORIAS DEL CAMINO DE SANTIAGO"
+        val brandLabel = if (isTravel) "ULTREIA VIAJES  •  GUÍA DE VIAJE" else "ULTREIA  •  GUÍA DEL CAMINO DE SANTIAGO"
         canvas.drawText(brandLabel, textLeftOffset, 48f, paint)
 
         // Título del Camino / Viaje con ajuste multilínea si es largo
@@ -942,7 +942,7 @@ object PdfExporter {
         paint.color = COLOR_GOLD_DARK
         canvas.drawRect(0f, bannerH - 1.5f, PAGE_WIDTH.toFloat(), bannerH, paint)
 
-        // Logo oficial
+        // Logo o emblema
         var textLeft = MARGIN
         try {
             val logoBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_ultreia_logo)
@@ -958,7 +958,7 @@ object PdfExporter {
         paint.textSize = 10f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
-        canvas.drawText("$brandPrefix  •  INFORME OFICIAL DE RENDIMIENTO", textLeft, 48f, paint)
+        canvas.drawText("$brandPrefix  •  INFORME GENERAL DE RENDIMIENTO", textLeft, 48f, paint)
 
         paint.color = Color.WHITE
         paint.textSize = 19f
@@ -1085,7 +1085,7 @@ object PdfExporter {
             canvas.drawText("• Cumplimiento del plan de viaje: ${stats.completedStages} jornadas efectivas registradas en Ultreia", MARGIN + 8f, startY, paint)
         }
 
-        // Cajetín de Certificación y Sello Oficial
+        // Cajetín de Certificación y Sello
         val stampBox = RectF(PAGE_WIDTH - MARGIN - 160f, PAGE_HEIGHT - 125f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 45f)
         paint.color = COLOR_WARM_BG
         canvas.drawRoundRect(stampBox, 8f, 8f, paint)
@@ -1098,13 +1098,13 @@ object PdfExporter {
         paint.color = COLOR_GOLD_DARK
         paint.textSize = 8.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("SELLO Y CERTIFICACIÓN", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 100f, paint)
+        canvas.drawText("SELLO Y VALIDACIÓN", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 100f, paint)
         paint.color = COLOR_MUTED
         paint.textSize = 7.5f
         paint.typeface = Typeface.DEFAULT
-        val certSub = if (isTravel) "OFICINA DE EXPEDICIÓN" else "OFICINA DEL PEREGRINO"
+        val certSub = if (isTravel) "CUADERNO DE VIAJE" else "CREDENCIAL DEL PEREGRINO"
         canvas.drawText(certSub, PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 86f, paint)
-        canvas.drawText("SANTIAGO DE COMPOSTELA", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 74f, paint)
+        canvas.drawText("ULTREIA ET SUSEIA", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 74f, paint)
 
         // Footer
         drawEditorialFooter(canvas, 1, isTravel)
@@ -1260,7 +1260,7 @@ object PdfExporter {
         paint.color = COLOR_MUTED
         paint.textSize = 8.5f
         paint.typeface = Typeface.DEFAULT
-        val guideBrand = if (isTravel) "Ultreia • Guía e Itinerario Oficial de Viaje" else "Ultreia • Guía Oficial & Memorias del Camino de Santiago"
+        val guideBrand = if (isTravel) "Ultreia • Guía e Itinerario de Viaje" else "Ultreia • Guía & Memorias del Camino de Santiago"
         canvas.drawText(guideBrand, MARGIN, PAGE_HEIGHT - 20f, paint)
 
         // Píldora de número de página
@@ -1644,7 +1644,7 @@ object PdfExporter {
             file
         )
 
-        val subject = if (isTravel) "Guía Oficial de Viaje: $title" else "Guía y Memorias del Camino: $title"
+        val subject = if (isTravel) "Guía de Viaje: $title" else "Guía y Memorias del Camino: $title"
         val bodyText = if (isTravel) "Comparto el itinerario y cuaderno de bitácora creado con Ultreia." else "Comparto mis memorias de viaje del Camino de Santiago creadas con Ultreia."
 
         val intent = Intent(Intent.ACTION_SEND).apply {
