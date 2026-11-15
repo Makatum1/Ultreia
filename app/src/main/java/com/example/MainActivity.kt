@@ -296,6 +296,19 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     ),
                     modifier = Modifier.testTag("btn_bottom_settings")
                 )
+
+                // Button 6: Ayuda (interrogante a la derecha de Ajustes)
+                NavigationBarItem(
+                    selected = currentTab == MainTab.HELP && destination !is NavigationDestination.StageDetail,
+                    onClick = { viewModel.selectTab(MainTab.HELP) },
+                    icon = { Icon(Icons.Default.HelpOutline, contentDescription = null) },
+                    label = { Text(viewModel.string("tab_help")) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = CaminoBlue,
+                        indicatorColor = PilgrimYellowLight
+                    ),
+                    modifier = Modifier.testTag("btn_bottom_help")
+                )
             }
         },
         floatingActionButton = {
@@ -394,6 +407,12 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                         SettingsScreen(
                             viewModel = viewModel,
                             selectedCamino = selectedCamino
+                        )
+                    }
+
+                    MainTab.HELP -> {
+                        com.example.ui.screens.HelpScreen(
+                            viewModel = viewModel
                         )
                     }
                 }

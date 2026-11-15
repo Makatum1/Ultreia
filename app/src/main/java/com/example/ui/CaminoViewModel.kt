@@ -33,7 +33,8 @@ enum class MainTab {
     STAGES,
     MAP,
     STATS,
-    SETTINGS
+    SETTINGS,
+    HELP
 }
 
 sealed interface NavigationDestination {
