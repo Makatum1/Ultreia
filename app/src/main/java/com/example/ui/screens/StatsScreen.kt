@@ -49,7 +49,8 @@ fun StatsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val isTravel = camino?.isTravelGuide == true
+    val isTravelProfile by viewModel.isTravelProfile.collectAsStateWithLifecycle()
+    val isTravel = camino?.isTravelGuide == true || isTravelProfile
     val stageTerm = if (isTravel) "Día" else "Etapa"
     val stageTermPlural = if (isTravel) "Días" else "Etapas"
     val routeTerm = if (isTravel) "Viaje" else "Camino"
@@ -289,6 +290,7 @@ fun StatsScreen(
             } else {
                 // VISTA: DATOS TOTALES GLOBALES (TODOS LOS CAMINOS)
                 GlobalTotalDataContent(
+                    isTravel = isTravel,
                     totalCaminosRealizados = totalGlobalCaminosRealizados,
                     totalCaminosCount = allCaminos.size,
                     totalKm = totalGlobalKm,
@@ -764,6 +766,7 @@ private fun ActiveCaminoDataContent(
  */
 @Composable
 private fun GlobalTotalDataContent(
+    isTravel: Boolean = false,
     totalCaminosRealizados: Int,
     totalCaminosCount: Int,
     totalKm: Double,
@@ -826,19 +829,20 @@ private fun GlobalTotalDataContent(
                         )
                     }
 
-                    Box(
+                    Spacer(Modifier.width(12.dp))
+
+                    Image(
+                        painter = if (isTravel) {
+                            painterResource(id = R.drawable.pasaporte)
+                        } else {
+                            painterResource(id = R.drawable.compostela)
+                        },
+                        contentDescription = if (isTravel) "Pasaporte" else "Compostela",
                         modifier = Modifier
-                            .size(54.dp)
-                            .background(PilgrimYellow, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = CaminoBlueDark,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
+                            .height(64.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Fit
+                    )
                 }
             }
         }
