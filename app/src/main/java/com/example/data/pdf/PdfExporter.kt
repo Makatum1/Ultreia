@@ -2095,8 +2095,22 @@ object PdfExporter {
         val lonMargin = maxOf((maxLon - minLon) * 0.12, 0.006)
         val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
         val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
-        val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
-        val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
+        var bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
+        var bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
+
+        // Si el vertical es más largo que el horizontal, expandir horizontalmente para que quede cuadrado (1:1).
+        // Si el horizontal ya es más largo o igual, se deja tal cual.
+        val mercYMin = latToMercatorY(bbMaxLat, 0)
+        val mercYMax = latToMercatorY(bbMinLat, 0)
+        val deltaY = mercYMax - mercYMin
+        val deltaX = (bbMaxLon - bbMinLon) / 360.0
+
+        if (deltaY > deltaX) {
+            val centerLon = (bbMinLon + bbMaxLon) / 2.0
+            val lonSpanNeeded = deltaY * 360.0
+            bbMinLon = (centerLon - lonSpanNeeded / 2.0).coerceIn(-180.0, 180.0)
+            bbMaxLon = (centerLon + lonSpanNeeded / 2.0).coerceIn(-180.0, 180.0)
+        }
 
         // Zoom de alto detalle cartográfico para callejero de Google
         val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 10, 14, 12)
@@ -2272,8 +2286,22 @@ object PdfExporter {
         val lonMargin = maxOf((maxLon - minLon) * 0.10, 0.01)
         val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
         val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
-        val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
-        val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
+        var bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
+        var bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
+
+        // Si el vertical es más largo que el horizontal, expandir horizontalmente para que quede cuadrado (1:1).
+        // Si el horizontal ya es más largo o igual, se deja tal cual.
+        val mercYMin = latToMercatorY(bbMaxLat, 0)
+        val mercYMax = latToMercatorY(bbMinLat, 0)
+        val deltaY = mercYMax - mercYMin
+        val deltaX = (bbMaxLon - bbMinLon) / 360.0
+
+        if (deltaY > deltaX) {
+            val centerLon = (bbMinLon + bbMaxLon) / 2.0
+            val lonSpanNeeded = deltaY * 360.0
+            bbMinLon = (centerLon - lonSpanNeeded / 2.0).coerceIn(-180.0, 180.0)
+            bbMaxLon = (centerLon + lonSpanNeeded / 2.0).coerceIn(-180.0, 180.0)
+        }
 
         val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 7, 13, 14)
         val mapBitmap = getSatelliteOrReliefBitmap(
