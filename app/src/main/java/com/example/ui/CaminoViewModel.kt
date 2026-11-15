@@ -22,6 +22,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Calendar
+import java.util.Locale
 
 enum class MainTab {
     CAMINOS,
@@ -36,6 +41,12 @@ sealed interface NavigationDestination {
     data class CaminoDetail(val caminoId: Long, val initialTab: Int = 0) : NavigationDestination
     data class StageDetail(val stageId: Long) : NavigationDestination
 }
+
+data class PendingStageDateUpdate(
+    val stageId: Long,
+    val newDate: String,
+    val updatedStage: StageEntity
+)
 
 class CaminoViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -712,9 +723,114 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Cascade Date Update State
+    private val _pendingStageDateUpdate = MutableStateFlow<PendingStageDateUpdate?>(null)
+    val pendingStageDateUpdate: StateFlow<PendingStageDateUpdate?> = _pendingStageDateUpdate.asStateFlow()
+
+    fun dismissStageDateDialog() {
+        _pendingStageDateUpdate.value = null
+    }
+
+    fun confirmStageDateUpdate(cascadeDates: Boolean) {
+        val pending = _pendingStageDateUpdate.value ?: return
+        _pendingStageDateUpdate.value = null
+        viewModelScope.launch {
+            applyStageUpdate(pending.updatedStage, cascadeDates)
+        }
+    }
+
+    fun parseLocalDate(dateStr: String): LocalDate? {
+        val clean = dateStr.trim()
+        if (clean.isBlank()) return null
+        val formatters = listOf(
+            DateTimeFormatter.ofPattern("d/M/yyyy"),
+            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+            DateTimeFormatter.ofPattern("d-M-yyyy"),
+            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        )
+        for (formatter in formatters) {
+            try {
+                return LocalDate.parse(clean, formatter)
+            } catch (_: Exception) {}
+        }
+        try {
+            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val cal = Calendar.getInstance()
+            val parsed = sdf.parse(clean)
+            if (parsed != null) {
+                cal.time = parsed
+                return LocalDate.of(
+                    cal.get(Calendar.YEAR),
+                    cal.get(Calendar.MONTH) + 1,
+                    cal.get(Calendar.DAY_OF_MONTH)
+                )
+            }
+        } catch (_: Exception) {}
+        return null
+    }
+
     fun updateStage(stage: StageEntity) {
         viewModelScope.launch {
-            repository.updateStage(stage)
+            val existing = repository.getStageByIdOnce(stage.id)
+            val allStages = repository.getStagesForCaminoOnce(stage.caminoId).sortedBy { it.dayNumber }
+            val subsequentStages = allStages.filter { it.dayNumber > stage.dayNumber }
+
+            val oldDate = existing?.date?.trim() ?: ""
+            val newDate = stage.date.trim()
+            val currentCamino = repository.getCaminoByIdOnce(stage.caminoId)
+            val oldResolvedDate = if (oldDate.isNotBlank()) {
+                oldDate
+            } else if (currentCamino != null && currentCamino.startDate.isNotBlank()) {
+                AppStrings.calculateStageDate(currentCamino.startDate, stage.dayNumber - 1).trim()
+            } else {
+                ""
+            }
+
+            val parsedOld = parseLocalDate(oldDate) ?: parseLocalDate(oldResolvedDate)
+            val parsedNew = parseLocalDate(newDate)
+            val dateChanged = parsedNew != null && parsedNew != parsedOld
+
+            if (subsequentStages.isNotEmpty() && dateChanged) {
+                _pendingStageDateUpdate.value = PendingStageDateUpdate(
+                    stageId = stage.id,
+                    newDate = newDate,
+                    updatedStage = stage
+                )
+            } else {
+                applyStageUpdate(stage, cascadeDates = false)
+            }
+        }
+    }
+
+    private suspend fun applyStageUpdate(stage: StageEntity, cascadeDates: Boolean) {
+        repository.updateStage(stage)
+
+        val currentCamino = repository.getCaminoByIdOnce(stage.caminoId)
+        val allStages = repository.getStagesForCaminoOnce(stage.caminoId).sortedBy { it.dayNumber }
+
+        // Si es la primera etapa, actualizar también la fecha de inicio del Camino/Viaje
+        val isFirstStage = stage.dayNumber == 1 || allStages.firstOrNull()?.id == stage.id
+        if (isFirstStage && stage.date.isNotBlank() && currentCamino != null) {
+            if (currentCamino.startDate != stage.date) {
+                repository.updateCamino(currentCamino.copy(startDate = stage.date))
+            }
+        }
+
+        if (cascadeDates && stage.date.isNotBlank()) {
+            val subsequentStages = allStages.filter { it.dayNumber > stage.dayNumber }.sortedBy { it.dayNumber }
+            val initialDate = parseLocalDate(stage.date)
+            if (initialDate != null) {
+                var dateCursor: LocalDate = initialDate
+                val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                for (subsequent in subsequentStages) {
+                    dateCursor = dateCursor.plusDays(1)
+                    val newFormattedDate = dateCursor.format(formatter)
+                    repository.updateStage(subsequent.copy(date = newFormattedDate))
+                }
+            }
+            _userMessage.value = "Etapa del día ${stage.dayNumber} y etapas posteriores actualizadas"
+        } else {
             _userMessage.value = "Etapa del día ${stage.dayNumber} actualizada"
         }
     }

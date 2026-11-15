@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import com.example.data.gpx.GpxParser
 import com.example.data.model.AccommodationEntity
 import com.example.data.model.AgendaItem
@@ -1136,11 +1138,58 @@ fun EditStageDialog(
                     )
                 }
                 item {
+                    val context = LocalContext.current
+                    var showDatePicker by remember { mutableStateOf(false) }
+
+                    if (showDatePicker) {
+                        val parsed = try {
+                            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                            LocalDate.parse(dateStr.trim(), formatter)
+                        } catch (_: Exception) {
+                            try {
+                                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                                val cal = java.util.Calendar.getInstance()
+                                val p = sdf.parse(dateStr.trim())
+                                if (p != null) {
+                                    cal.time = p
+                                    LocalDate.of(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+                                } else LocalDate.now()
+                            } catch (_: Exception) {
+                                LocalDate.now()
+                            }
+                        }
+                        DisposableEffect(Unit) {
+                            val dialog = android.app.DatePickerDialog(
+                                context,
+                                { _, year, month, dayOfMonth ->
+                                    val selected = LocalDate.of(year, month + 1, dayOfMonth)
+                                    dateStr = selected.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                                    showDatePicker = false
+                                },
+                                parsed.year,
+                                parsed.monthValue - 1,
+                                parsed.dayOfMonth
+                            )
+                            dialog.setOnCancelListener { showDatePicker = false }
+                            dialog.setOnDismissListener { showDatePicker = false }
+                            dialog.show()
+                            onDispose { dialog.dismiss() }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = dateStr,
                         onValueChange = { dateStr = it },
                         label = { Text("Fecha de la etapa (dd/MM/yyyy)") },
                         placeholder = { Text("Ej. 10/05/2026") },
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = "Seleccionar fecha en calendario"
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

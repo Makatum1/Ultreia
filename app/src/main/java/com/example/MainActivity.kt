@@ -441,6 +441,40 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
         )
     }
 
+    val pendingStageDateUpdate by viewModel.pendingStageDateUpdate.collectAsStateWithLifecycle()
+    if (pendingStageDateUpdate != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissStageDateDialog() },
+            title = {
+                Text(
+                    text = "Actualizar fechas",
+                    fontWeight = FontWeight.Bold,
+                    color = CaminoBlue
+                )
+            },
+            text = {
+                Text(
+                    text = "Has cambiado la fecha de esta etapa. ¿Quieres actualizar también las fechas de las etapas posteriores para mantener el orden?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmStageDateUpdate(cascadeDates = true) },
+                    colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
+                ) {
+                    Text("Sí, actualizar todas")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.confirmStageDateUpdate(cascadeDates = false) }
+                ) {
+                    Text("No, solo esta etapa")
+                }
+            }
+        )
+    }
+
     if (showAddStageDialog && selectedCamino != null) {
         val nextDay = stages.size + 1
         val defaultDate = com.example.ui.settings.AppStrings.calculateStageDate(
