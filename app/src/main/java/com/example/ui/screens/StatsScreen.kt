@@ -399,11 +399,16 @@ private fun ActiveCaminoDataContent(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Icono: Compostela completa si llega al 100% (sin círculo), Medalla en caso contrario
+                    // Icono: Compostela o Pasaporte al 100% (sin círculo), Medalla en caso contrario
                     if (progressPercent >= 100) {
+                        val isTravel = camino?.isTravelGuide == true
                         Image(
-                            painter = painterResource(id = R.drawable.compostela),
-                            contentDescription = "Compostela",
+                            painter = if (isTravel) {
+                                painterResource(id = R.drawable.pasaporte)
+                            } else {
+                                painterResource(id = R.drawable.compostela)
+                            },
+                            contentDescription = if (isTravel) "Viaje Desbloqueado" else "Compostela",
                             modifier = Modifier
                                 .height(74.dp)
                                 .clip(RoundedCornerShape(8.dp)),
@@ -429,7 +434,11 @@ private fun ActiveCaminoDataContent(
 
                     Text(
                         text = if (progressPercent >= 100) {
-                            "¡100% COMPLETADO! COMPOSTELA OBTENIDA"
+                            if (camino?.isTravelGuide == true) {
+                                "¡100% COMPLETADO! VIAJE DESBLOQUEADO"
+                            } else {
+                                "¡100% COMPLETADO! COMPOSTELA OBTENIDA"
+                            }
                         } else {
                             "$progressPercent% COMPLETADO DEL ${routeTerm.uppercase()}"
                         },
