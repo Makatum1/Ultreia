@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,7 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,8 +29,15 @@ import com.example.ui.CaminoViewModel
 import com.example.ui.settings.LanguageMode
 import com.example.ui.theme.*
 
+data class FaqCategory(
+    val key: String,
+    val labelEs: String,
+    val labelEn: String
+)
+
 data class FaqItem(
     val id: String,
+    val categoryKey: String,
     val categoryEs: String,
     val categoryEn: String,
     val questionEs: String,
@@ -41,9 +46,23 @@ data class FaqItem(
     val answerEn: String
 )
 
+val FAQ_CATEGORIES = listOf(
+    FaqCategory("gpx", "GPX y Mapas", "GPX & Maps"),
+    FaqCategory("backup", "Copias y Datos", "Backups & Data"),
+    FaqCategory("stages", "Etapas y Rutas", "Stages & Routes"),
+    FaqCategory("stats", "Estadísticas", "Statistics"),
+    FaqCategory("pdf", "Exportación y PDF", "Export & PDF"),
+    FaqCategory("profiles", "Perfiles y Navegación", "Profiles & Navigation"),
+    FaqCategory("customization", "Personalización", "Customization"),
+    FaqCategory("rewards", "Recompensas", "Rewards"),
+    FaqCategory("accommodations", "Alojamientos", "Accommodations"),
+    FaqCategory("agenda", "Viajes y Agenda", "Trips & Agenda")
+)
+
 val INITIAL_FAQS = listOf(
     FaqItem(
         id = "faq_gpx",
+        categoryKey = "gpx",
         categoryEs = "GPX y Mapas",
         categoryEn = "GPX & Maps",
         questionEs = "¿Cómo importar un archivo GPX a una etapa o día?",
@@ -53,6 +72,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_backup",
+        categoryKey = "backup",
         categoryEs = "Copias y Datos",
         categoryEn = "Backups & Data",
         questionEs = "¿Cómo funciona la Copia de Seguridad (Backup) y Restauración?",
@@ -62,6 +82,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_new_stage",
+        categoryKey = "stages",
         categoryEs = "Etapas y Rutas",
         categoryEn = "Stages & Routes",
         questionEs = "¿Cómo añado una nueva etapa o día de viaje?",
@@ -71,6 +92,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_stats",
+        categoryKey = "stats",
         categoryEs = "Estadísticas",
         categoryEn = "Statistics",
         questionEs = "¿Cómo se calculan las estadísticas y los balances generales?",
@@ -80,6 +102,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_pdf",
+        categoryKey = "pdf",
         categoryEs = "Exportación y PDF",
         categoryEn = "Export & PDF",
         questionEs = "¿Cómo exportar una guía completa en PDF?",
@@ -89,6 +112,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_profiles",
+        categoryKey = "profiles",
         categoryEs = "Perfiles y Navegación",
         categoryEn = "Profiles & Navigation",
         questionEs = "¿Cómo cambiar entre el perfil de Caminos y el perfil de Viajes?",
@@ -98,6 +122,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_cover_photo",
+        categoryKey = "customization",
         categoryEs = "Personalización",
         categoryEn = "Customization",
         questionEs = "¿Cómo personalizar la foto de portada de un camino o viaje?",
@@ -107,6 +132,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_rewards",
+        categoryKey = "rewards",
         categoryEs = "Recompensas",
         categoryEn = "Rewards",
         questionEs = "¿Qué significan los reconocimientos al completar el 100%?",
@@ -116,6 +142,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_accommodations",
+        categoryKey = "accommodations",
         categoryEs = "Alojamientos",
         categoryEn = "Accommodations",
         questionEs = "¿Cómo registrar alojamientos y reservas?",
@@ -125,6 +152,7 @@ val INITIAL_FAQS = listOf(
     ),
     FaqItem(
         id = "faq_agenda",
+        categoryKey = "agenda",
         categoryEs = "Viajes y Agenda",
         categoryEn = "Trips & Agenda",
         questionEs = "¿Cómo funciona la agenda y vivencias en Viajes?",
@@ -150,45 +178,41 @@ fun HelpScreen(
     val languageMode by viewModel.languageMode.collectAsStateWithLifecycle()
     val isEnglish = languageMode == LanguageMode.EN
 
+    fun tr(key: String): String = viewModel.string(key, languageMode)
+
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var selectedCategoryKey by remember { mutableStateOf<String?>(null) }
     var expandedFaqIds by remember { mutableStateOf(setOf<String>()) }
 
-    // Lista de categorías únicas según idioma
-    val allCategoriesLabel = viewModel.string("faq_category_all")
-    val categories = remember(isEnglish) {
-        val unique = INITIAL_FAQS.map { if (isEnglish) it.categoryEn else it.categoryEs }.distinct()
-        listOf(allCategoriesLabel) + unique
-    }
-
     // Filtrado en tiempo real con normalización estricta (sin acentos, diéresis ni mayúsculas)
-    val filteredFaqs = remember(searchQuery, selectedCategory, isEnglish) {
+    val filteredFaqs = remember(searchQuery, selectedCategoryKey, isEnglish) {
         val normQuery = normalizeSearchText(searchQuery)
         val queryTerms = if (normQuery.isBlank()) emptyList() else normQuery.split(" ").filter { it.isNotBlank() }
 
         INITIAL_FAQS.filter { item ->
-            val category = if (isEnglish) item.categoryEn else item.categoryEs
-            val question = if (isEnglish) item.questionEn else item.questionEs
-            val answer = if (isEnglish) item.answerEn else item.answerEs
-
-            // Filtro por categoría seleccionada
-            val matchesCategory = selectedCategory == null || selectedCategory == allCategoriesLabel || category == selectedCategory
+            // Filtro por clave de categoría seleccionada
+            val matchesCategory = selectedCategoryKey == null || item.categoryKey == selectedCategoryKey
 
             if (!matchesCategory) return@filter false
 
             if (queryTerms.isEmpty()) return@filter true
 
             // Normalización para comparación inteligente
+            val category = if (isEnglish) item.categoryEn else item.categoryEs
+            val question = if (isEnglish) item.questionEn else item.questionEs
+            val answer = if (isEnglish) item.answerEn else item.answerEs
+
             val normQuestion = normalizeSearchText(question)
             val normAnswer = normalizeSearchText(answer)
             val normCategory = normalizeSearchText(category)
             // Soporte cruzado adicional para búsquedas bilingües
             val normAltQuestion = normalizeSearchText(if (isEnglish) item.questionEs else item.questionEn)
             val normAltAnswer = normalizeSearchText(if (isEnglish) item.answerEs else item.answerEn)
+            val normAltCategory = normalizeSearchText(if (isEnglish) item.categoryEs else item.categoryEn)
 
-            val searchableCorpus = "$normQuestion $normAnswer $normCategory $normAltQuestion $normAltAnswer"
+            val searchableCorpus = "$normQuestion $normAnswer $normCategory $normAltQuestion $normAltAnswer $normAltCategory"
 
-            // Todos los términos de búsqueda deben estar presentes en la pregunta o respuesta
+            // Todos los términos de búsqueda deben coincidir en el corpus
             queryTerms.all { term -> searchableCorpus.contains(term) }
         }
     }
@@ -199,13 +223,13 @@ fun HelpScreen(
                 title = {
                     Column {
                         Text(
-                            text = viewModel.string("help_title"),
+                            text = tr("help_title"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = CaminoBlueDark
                         )
                         Text(
-                            text = viewModel.string("help_subtitle"),
+                            text = tr("help_subtitle"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -237,7 +261,7 @@ fun HelpScreen(
                     .testTag("help_search_field"),
                 placeholder = {
                     Text(
-                        text = viewModel.string("search_faq_placeholder"),
+                        text = tr("search_faq_placeholder"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
@@ -245,7 +269,7 @@ fun HelpScreen(
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "Buscar",
+                        contentDescription = tr("search"),
                         tint = CaminoBlue
                     )
                 },
@@ -257,7 +281,7 @@ fun HelpScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Clear,
-                                contentDescription = viewModel.string("faq_clear_search"),
+                                contentDescription = tr("faq_clear_search"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -275,21 +299,49 @@ fun HelpScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // 2. Chips de Categorías
+            // 2. Chips de Categorías reactivos al idioma
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(categories) { cat ->
-                    val isSelected = (selectedCategory == null && cat == allCategoriesLabel) || selectedCategory == cat
+                // Chip 0: Todas / All
+                item {
+                    val isAllSelected = selectedCategoryKey == null
+                    FilterChip(
+                        selected = isAllSelected,
+                        onClick = { selectedCategoryKey = null },
+                        label = {
+                            Text(
+                                text = tr("faq_category_all"),
+                                fontSize = 12.sp,
+                                fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = PilgrimYellow,
+                            selectedLabelColor = CaminoBlueDark,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            labelColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        border = BorderStroke(
+                            0.8.dp,
+                            if (isAllSelected) PilgrimYellow else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+
+                items(FAQ_CATEGORIES, key = { it.key }) { cat ->
+                    val isSelected = selectedCategoryKey == cat.key
+                    val label = if (isEnglish) cat.labelEn else cat.labelEs
                     FilterChip(
                         selected = isSelected,
                         onClick = {
-                            selectedCategory = if (cat == allCategoriesLabel) null else cat
+                            selectedCategoryKey = if (isSelected) null else cat.key
                         },
                         label = {
                             Text(
-                                text = cat,
+                                text = label,
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             )
@@ -346,7 +398,7 @@ fun HelpScreen(
                             }
                             Spacer(Modifier.height(14.dp))
                             Text(
-                                text = "${viewModel.string("faq_no_results")} \"$searchQuery\"",
+                                text = "${tr("faq_no_results")} \"$searchQuery\"",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -355,7 +407,7 @@ fun HelpScreen(
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = viewModel.string("faq_no_results_hint"),
+                                text = tr("faq_no_results_hint"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -364,13 +416,13 @@ fun HelpScreen(
                             Button(
                                 onClick = {
                                     searchQuery = ""
-                                    selectedCategory = null
+                                    selectedCategoryKey = null
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
                                 Text(
-                                    text = viewModel.string("faq_clear_search"),
+                                    text = tr("faq_clear_search"),
                                     color = Color.White,
                                     fontSize = 13.sp
                                 )
@@ -444,7 +496,7 @@ fun HelpScreen(
 
                                     Icon(
                                         imageVector = Icons.Default.ExpandMore,
-                                        contentDescription = if (isExpanded) "Colapsar" else "Expandir",
+                                        contentDescription = if (isExpanded) tr("collapse") else tr("expand"),
                                         tint = CaminoBlue,
                                         modifier = Modifier
                                             .size(22.dp)
@@ -465,7 +517,7 @@ fun HelpScreen(
                                 AnimatedVisibility(visible = isExpanded) {
                                     Column {
                                         Spacer(Modifier.height(10.dp))
-                                        Divider(
+                                        HorizontalDivider(
                                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                                             thickness = 0.8.dp
                                         )

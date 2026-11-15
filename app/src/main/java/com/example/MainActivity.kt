@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun UltreiaApp(viewModel: CaminoViewModel) {
     val context = LocalContext.current
+    val languageMode by viewModel.languageMode.collectAsStateWithLifecycle()
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val isTravelProfile by viewModel.isTravelProfile.collectAsStateWithLifecycle()
     val destination by viewModel.currentDestination.collectAsStateWithLifecycle()
@@ -237,7 +238,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                             contentDescription = null
                         )
                     },
-                    label = { Text(if (isTravelProfile) "Viajes" else viewModel.string("tab_caminos")) },
+                    label = { Text(if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Trips" else "Viajes") else viewModel.string("tab_caminos", languageMode)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -250,7 +251,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     selected = currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.STAGES) },
                     icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
-                    label = { Text(if (isTravelProfile) "Días" else viewModel.string("tab_stages")) },
+                    label = { Text(if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Days" else "Días") else viewModel.string("tab_stages", languageMode)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -263,7 +264,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     selected = currentTab == MainTab.MAP && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.MAP) },
                     icon = { Icon(Icons.Default.Map, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_map")) },
+                    label = { Text(viewModel.string("tab_map", languageMode)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -276,7 +277,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     selected = currentTab == MainTab.STATS && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.STATS) },
                     icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_stats")) },
+                    label = { Text(viewModel.string("tab_stats", languageMode)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -289,7 +290,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     selected = currentTab == MainTab.SETTINGS && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.SETTINGS) },
                     icon = { Icon(Icons.Default.Tune, contentDescription = null) },
-                    label = { Text(viewModel.string("settings")) },
+                    label = { Text(viewModel.string("settings", languageMode)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -302,7 +303,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     selected = currentTab == MainTab.HELP && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.HELP) },
                     icon = { Icon(Icons.Default.HelpOutline, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_help")) },
+                    label = { Text(viewModel.string("tab_help", languageMode)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight

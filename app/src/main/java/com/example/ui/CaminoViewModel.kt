@@ -143,8 +143,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         prefs.edit().putString("saved_language_mode", mode.name).apply()
     }
 
-    fun string(key: String): String {
-        return AppStrings.get(key, _languageMode.value)
+    fun string(key: String, mode: LanguageMode? = null): String {
+        return AppStrings.get(key, mode ?: _languageMode.value)
     }
 
     private val _isInitialLoadDone = MutableStateFlow(false)
