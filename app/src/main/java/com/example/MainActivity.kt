@@ -226,6 +226,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp,
+                windowInsets = NavigationBarDefaults.windowInsets.only(WindowInsetsSides.Bottom),
                 modifier = Modifier.testTag("main_bottom_navigation_bar")
             ) {
                 // Button 1: Caminos / Viajes
@@ -235,10 +236,19 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     icon = {
                         Icon(
                             imageVector = if (isTravelProfile) Icons.Default.Luggage else Icons.Default.Hiking,
-                            contentDescription = null
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
                         )
                     },
-                    label = { Text(if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Trips" else "Viajes") else viewModel.string("tab_caminos", languageMode)) },
+                    label = {
+                        Text(
+                            text = if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Trips" else "Viajes") else viewModel.string("tab_caminos", languageMode),
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            letterSpacing = (-0.3).sp
+                        )
+                    },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -250,8 +260,22 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 NavigationBarItem(
                     selected = currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.STAGES) },
-                    icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
-                    label = { Text(if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Days" else "Días") else viewModel.string("tab_stages", languageMode)) },
+                    icon = {
+                        Icon(
+                            Icons.Default.ViewDay,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Days" else "Días") else viewModel.string("tab_stages", languageMode),
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            letterSpacing = (-0.3).sp
+                        )
+                    },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -263,8 +287,22 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 NavigationBarItem(
                     selected = currentTab == MainTab.MAP && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.MAP) },
-                    icon = { Icon(Icons.Default.Map, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_map", languageMode)) },
+                    icon = {
+                        Icon(
+                            Icons.Default.Map,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = viewModel.string("tab_map", languageMode),
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            letterSpacing = (-0.3).sp
+                        )
+                    },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -276,8 +314,22 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 NavigationBarItem(
                     selected = currentTab == MainTab.STATS && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.STATS) },
-                    icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_stats", languageMode)) },
+                    icon = {
+                        Icon(
+                            Icons.Default.BarChart,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = viewModel.string("tab_stats", languageMode),
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            letterSpacing = (-0.3).sp
+                        )
+                    },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -289,8 +341,22 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 NavigationBarItem(
                     selected = currentTab == MainTab.SETTINGS && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.SETTINGS) },
-                    icon = { Icon(Icons.Default.Tune, contentDescription = null) },
-                    label = { Text(viewModel.string("settings", languageMode)) },
+                    icon = {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = viewModel.string("settings", languageMode),
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            letterSpacing = (-0.3).sp
+                        )
+                    },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -302,8 +368,22 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 NavigationBarItem(
                     selected = currentTab == MainTab.HELP && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.HELP) },
-                    icon = { Icon(Icons.Default.HelpOutline, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_help", languageMode)) },
+                    icon = {
+                        Icon(
+                            Icons.Default.HelpOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = viewModel.string("tab_help", languageMode),
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            letterSpacing = (-0.3).sp
+                        )
+                    },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
