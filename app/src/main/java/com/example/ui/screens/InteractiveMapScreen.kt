@@ -499,6 +499,53 @@ object TownCoordinates {
         }
         return null
     }
+
+    fun findTownsNearPoints(
+        points: List<GpxPoint>,
+        maxDistKm: Double = 2.5,
+        maxCount: Int = 4
+    ): List<Pair<String, Pair<Double, Double>>> {
+        if (points.isEmpty()) return emptyList()
+        val result = mutableListOf<Pair<String, Pair<Double, Double>>>()
+        val seenCoords = mutableSetOf<Pair<Double, Double>>()
+
+        val minLat = points.minOf { it.lat } - 0.03
+        val maxLat = points.maxOf { it.lat } + 0.03
+        val minLon = points.minOf { it.lon } - 0.04
+        val maxLon = points.maxOf { it.lon } + 0.04
+
+        val step = maxOf(1, points.size / 80)
+        val sampled = points.filterIndexed { index, _ -> index % step == 0 }
+
+        for ((name, coord) in COORDINATES) {
+            val cLat = coord.first
+            val cLon = coord.second
+            if (cLat in minLat..maxLat && cLon in minLon..maxLon) {
+                val coordKey = Pair((cLat * 1000).toInt() / 1000.0, (cLon * 1000).toInt() / 1000.0)
+                if (seenCoords.contains(coordKey)) continue
+
+                var minDist = Double.MAX_VALUE
+                for (pt in sampled) {
+                    val dLat = (pt.lat - cLat) * 111.0
+                    val dLon = (pt.lon - cLon) * 111.0 * Math.cos(Math.toRadians(cLat))
+                    val d = Math.sqrt(dLat * dLat + dLon * dLon)
+                    if (d < minDist) {
+                        minDist = d
+                        if (d <= maxDistKm) break
+                    }
+                }
+
+                if (minDist <= maxDistKm) {
+                    seenCoords.add(coordKey)
+                    val formattedName = name.split(" ")
+                        .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                    result.add(Pair(formattedName, coord))
+                    if (result.size >= maxCount) break
+                }
+            }
+        }
+        return result
+    }
 }
 
 /**

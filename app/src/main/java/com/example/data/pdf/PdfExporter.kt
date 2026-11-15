@@ -718,40 +718,50 @@ object PdfExporter {
 
             currentY += cardH + 12f
 
-            // Tarjeta de Mapa / Perfil GPX Cartográfico
-            val mapBoxH = 100f
+            // Tarjeta de Mapa Cartográfico Profesional (Formato Panorámico)
+            val mapBoxH = 220f
             val chartBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + mapBoxH)
             drawCardBox(canvas, chartBox.left, chartBox.top, chartBox.width(), chartBox.height(), COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_NAVY, 4f, 8f)
 
             if (points.isNotEmpty()) {
-                drawMiniTrackOnCanvas(context, canvas, points, chartBox)
+                drawMiniTrackOnCanvas(context, canvas, points, chartBox, stage)
             } else {
-                paint.color = COLOR_NAVY
-                paint.strokeWidth = 2.5f
-                val path = Path()
-                path.moveTo(chartBox.left + 24f, chartBox.bottom - 25f)
-                path.cubicTo(
-                    chartBox.left + 150f, chartBox.top + 30f,
-                    chartBox.left + 300f, chartBox.bottom - 40f,
-                    chartBox.right - 24f, chartBox.bottom - 20f
-                )
-                paint.style = Paint.Style.STROKE
-                canvas.drawPath(path, paint)
-                paint.style = Paint.Style.FILL
+                val sCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stage.origin)
+                val eCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stage.destination)
+                if (sCoord != null && eCoord != null) {
+                    val fallbackPoints = listOf(
+                        com.example.data.model.GpxPoint(sCoord.first, sCoord.second),
+                        com.example.data.model.GpxPoint(eCoord.first, eCoord.second)
+                    )
+                    drawMiniTrackOnCanvas(context, canvas, fallbackPoints, chartBox, stage)
+                } else {
+                    paint.color = COLOR_NAVY
+                    paint.strokeWidth = 2f
+                    val path = Path()
+                    path.moveTo(chartBox.left + 35f, chartBox.bottom - 45f)
+                    path.cubicTo(
+                        chartBox.left + 150f, chartBox.top + 45f,
+                        chartBox.left + 320f, chartBox.bottom - 60f,
+                        chartBox.right - 35f, chartBox.bottom - 40f
+                    )
+                    paint.style = Paint.Style.STROKE
+                    canvas.drawPath(path, paint)
+                    paint.style = Paint.Style.FILL
 
-                // Puntos de inicio y fin decorativos
-                paint.color = COLOR_EMERALD
-                canvas.drawCircle(chartBox.left + 24f, chartBox.bottom - 25f, 5f, paint)
-                paint.color = COLOR_GOLD
-                canvas.drawCircle(chartBox.right - 24f, chartBox.bottom - 20f, 5f, paint)
+                    // Puntos de inicio y fin decorativos
+                    paint.color = COLOR_EMERALD
+                    canvas.drawCircle(chartBox.left + 35f, chartBox.bottom - 45f, 6f, paint)
+                    paint.color = COLOR_GOLD_DARK
+                    canvas.drawCircle(chartBox.right - 35f, chartBox.bottom - 40f, 6f, paint)
 
-                paint.color = COLOR_MUTED
-                paint.textSize = 8.5f
-                paint.typeface = Typeface.DEFAULT
-                canvas.drawText("Origen: ${stage.origin}", chartBox.left + 35f, chartBox.bottom - 22f, paint)
-                val destText = "Destino: ${stage.destination}"
-                val destW = paint.measureText(destText)
-                canvas.drawText(destText, chartBox.right - 35f - destW, chartBox.bottom - 17f, paint)
+                    paint.color = COLOR_SLATE
+                    paint.textSize = 9f
+                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    canvas.drawText("Origen: ${stage.origin.ifBlank { "Inicio" }}", chartBox.left + 48f, chartBox.bottom - 41f, paint)
+                    val destText = "Destino: ${stage.destination.ifBlank { "Fin" }}"
+                    val destW = paint.measureText(destText)
+                    canvas.drawText(destText, chartBox.right - 48f - destW, chartBox.bottom - 36f, paint)
+                }
             }
 
             currentY += mapBoxH + 16f
@@ -1709,7 +1719,7 @@ object PdfExporter {
             val y2 = Math.floor(latToMercatorY(minLat, z)).toInt()
             val countX = Math.abs(x2 - x1) + 1
             val countY = Math.abs(y2 - y1) + 1
-            if (countX <= 3 && countY <= 3 && (countX * countY) <= maxTiles) {
+            if (countX <= 4 && countY <= 4 && (countX * countY) <= maxTiles) {
                 bestZoom = z
                 break
             }
@@ -1745,8 +1755,8 @@ object PdfExporter {
             try {
                 val url = URL(urlString)
                 val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 700
-                conn.readTimeout = 900
+                conn.connectTimeout = 1000
+                conn.readTimeout = 1400
                 conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:100.0) Ultreia/2.0")
                 if (conn.responseCode == 200) {
                     val input = conn.inputStream
@@ -1848,8 +1858,8 @@ object PdfExporter {
         val numX = (maxTX - minTX + 1).coerceAtLeast(1)
         val numY = (maxTY - minTY + 1).coerceAtLeast(1)
 
-        // Si se requieren más de 6 teselas, recurrir directamente al mapa 2D ortogonal para evitar bloqueos
-        if (numX * numY > 6) {
+        // Si se requieren más de 16 teselas, recurrir al fondo cartográfico 2D para evitar sobrecarga
+        if (numX * numY > 16) {
             return generate2DPrintReliefBitmap(targetW, targetH)
         }
 
@@ -1893,25 +1903,171 @@ object PdfExporter {
         p.color = color
         canvas.drawCircle(x, y, 3.8f, p)
 
+        p.textSize = 7.5f
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val textW = p.measureText(label)
+        val badgeRect = RectF(x - textW / 2 - 4f, y - 16f, x + textW / 2 + 4f, y - 5f)
+        p.color = Color.argb(230, 15, 23, 42)
+        canvas.drawRoundRect(badgeRect, 3f, 3f, p)
+        p.color = Color.WHITE
+        canvas.drawText(label, x - textW / 2, y - 7.5f, p)
+    }
+
+    private fun drawTownMarker(canvas: Canvas, x: Float, y: Float, label: String) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        // Punto cartográfico con halo blanco y centro azul marino
+        p.color = Color.WHITE
+        canvas.drawCircle(x, y, 4f, p)
+        p.color = Color.rgb(30, 58, 138)
+        canvas.drawCircle(x, y, 2.5f, p)
+        p.color = Color.WHITE
+        canvas.drawCircle(x, y, 1f, p)
+
+        // Etiqueta de la localidad con pastilla protectora blanca
         p.textSize = 7f
         p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val textW = p.measureText(label)
-        val badgeRect = RectF(x - textW / 2 - 3f, y - 15f, x + textW / 2 + 3f, y - 5.5f)
-        p.color = Color.argb(220, 28, 75, 100)
-        canvas.drawRoundRect(badgeRect, 2f, 2f, p)
-        p.color = Color.WHITE
-        canvas.drawText(label, x - textW / 2, y - 7.5f, p)
+        val pillRect = RectF(x + 5f, y - 7f, x + textW + 11f, y + 5f)
+
+        p.color = Color.argb(225, 255, 255, 255)
+        canvas.drawRoundRect(pillRect, 3f, 3f, p)
+
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 0.5f
+        p.color = Color.rgb(203, 213, 225)
+        canvas.drawRoundRect(pillRect, 3f, 3f, p)
+
+        p.style = Paint.Style.FILL
+        p.color = Color.rgb(15, 23, 42)
+        canvas.drawText(label, x + 8f, y + 2.5f, p)
+    }
+
+    private fun drawMountainPassMarker(canvas: Canvas, x: Float, y: Float, label: String) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.textSize = 6.5f
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val textW = p.measureText(label)
+        val pill = RectF(x - textW / 2 - 4f, y - 14f, x + textW / 2 + 4f, y - 2f)
+
+        p.color = Color.argb(230, 254, 243, 199)
+        canvas.drawRoundRect(pill, 2.5f, 2.5f, p)
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 0.5f
+        p.color = Color.rgb(217, 119, 6)
+        canvas.drawRoundRect(pill, 2.5f, 2.5f, p)
+
+        p.style = Paint.Style.FILL
+        p.color = Color.rgb(180, 83, 9)
+        canvas.drawText(label, x - textW / 2, y - 5.5f, p)
+    }
+
+    private fun drawGraphicScaleBar(
+        canvas: Canvas,
+        bounds: RectF,
+        centerLat: Double,
+        zoom: Int,
+        scale: Float
+    ) {
+        val metersPerTilePx = (40075016.686 * Math.cos(Math.toRadians(centerLat))) / (256.0 * (1 shl zoom))
+        val pxPerMeter = scale / metersPerTilePx
+
+        val approxM = 50.0 / pxPerMeter
+        val barDistM = when {
+            approxM < 1500 -> 1000
+            approxM < 3500 -> 2000
+            approxM < 7500 -> 5000
+            approxM < 15000 -> 10000
+            else -> 20000
+        }
+        val barW = (barDistM * pxPerMeter).toFloat().coerceIn(25f, 100f)
+        val barH = 3f
+        val label = if (barDistM >= 1000) "${barDistM / 1000} km" else "$barDistM m"
+
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.textSize = 6.5f
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val textW = p.measureText(label)
+
+        val boxW = maxOf(barW, textW) + 12f
+        val boxH = 18f
+        val boxX = bounds.left + 8f
+        val boxY = bounds.bottom - boxH - 6f
+
+        p.color = Color.argb(215, 255, 255, 255)
+        canvas.drawRoundRect(RectF(boxX, boxY, boxX + boxW, boxY + boxH), 3f, 3f, p)
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 0.5f
+        p.color = Color.rgb(203, 213, 225)
+        canvas.drawRoundRect(RectF(boxX, boxY, boxX + boxW, boxY + boxH), 3f, 3f, p)
+
+        val barLeft = boxX + 6f
+        val barRight = barLeft + barW
+        val barTop = boxY + 4f
+        val barBottom = barTop + barH
+
+        p.style = Paint.Style.FILL
+        p.color = Color.rgb(30, 41, 59)
+        canvas.drawRect(barLeft, barTop, barRight, barBottom, p)
+
+        p.strokeWidth = 1f
+        canvas.drawLine(barLeft, barTop - 2f, barLeft, barBottom + 2f, p)
+        canvas.drawLine(barRight, barTop - 2f, barRight, barBottom + 2f, p)
+
+        p.color = Color.rgb(30, 41, 59)
+        canvas.drawText(label, barLeft + (barW - textW) / 2f, boxY + 15f, p)
+    }
+
+    private fun drawCompassRose(canvas: Canvas, bounds: RectF) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val cx = bounds.right - 18f
+        val cy = bounds.top + 18f
+
+        p.color = Color.argb(215, 255, 255, 255)
+        canvas.drawCircle(cx, cy, 11f, p)
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 0.5f
+        p.color = Color.rgb(203, 213, 225)
+        canvas.drawCircle(cx, cy, 11f, p)
+
+        p.style = Paint.Style.FILL
+        p.color = Color.rgb(220, 38, 38)
+        val pathN = Path().apply {
+            moveTo(cx, cy - 8f)
+            lineTo(cx - 3.5f, cy)
+            lineTo(cx, cy - 2f)
+            close()
+        }
+        canvas.drawPath(pathN, p)
+
+        p.color = Color.rgb(71, 85, 105)
+        val pathS = Path().apply {
+            moveTo(cx, cy + 8f)
+            lineTo(cx + 3.5f, cy)
+            lineTo(cx, cy + 2f)
+            close()
+        }
+        canvas.drawPath(pathS, p)
+
+        p.textSize = 6f
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.color = Color.rgb(220, 38, 38)
+        canvas.drawText("N", cx - 2.5f, cy - 9f, p)
     }
 
     private fun drawPrintBadge(canvas: Canvas, bounds: RectF) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.textSize = 6.5f
-        p.typeface = Typeface.DEFAULT
-        val label = "🗺️ Google Roadmap 2D • Callejero"
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val label = "🗺️ Google Roadmap • Cartografía 2D"
         val textW = p.measureText(label)
         val badge = RectF(bounds.right - textW - 10f, bounds.bottom - 13f, bounds.right - 4f, bounds.bottom - 3f)
-        p.color = Color.argb(210, 255, 255, 255)
+        p.color = Color.argb(220, 255, 255, 255)
         canvas.drawRoundRect(badge, 2f, 2f, p)
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 0.5f
+        p.color = Color.rgb(203, 213, 225)
+        canvas.drawRoundRect(badge, 2f, 2f, p)
+        p.style = Paint.Style.FILL
         p.color = COLOR_SLATE
         canvas.drawText(label, bounds.right - textW - 7f, bounds.bottom - 4.5f, p)
     }
@@ -1924,7 +2080,8 @@ object PdfExporter {
         context: Context,
         canvas: Canvas,
         points: List<com.example.data.model.GpxPoint>,
-        bounds: RectF
+        bounds: RectF,
+        stage: StageEntity
     ) {
         if (points.isEmpty()) return
 
@@ -1933,15 +2090,16 @@ object PdfExporter {
         val minLon = points.minOf { it.lon }
         val maxLon = points.maxOf { it.lon }
 
-        // Margen de seguridad del 10% para encuadre holgado que nunca toque los bordes
-        val latMargin = maxOf((maxLat - minLat) * 0.10, 0.005)
-        val lonMargin = maxOf((maxLon - minLon) * 0.10, 0.005)
+        // Margen de seguridad del 12% para encuadre cartográfico holgado
+        val latMargin = maxOf((maxLat - minLat) * 0.12, 0.006)
+        val lonMargin = maxOf((maxLon - minLon) * 0.12, 0.006)
         val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
         val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
         val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
         val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
 
-        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 14, 4)
+        // Zoom de alto detalle cartográfico para callejero de Google
+        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 10, 14, 12)
         val mapBitmap = getSatelliteOrReliefBitmap(
             context,
             bbMinLat,
@@ -1954,7 +2112,7 @@ object PdfExporter {
         )
 
         // Proyección Cenital 2D Ortogonal (1:1 Aspect Ratio)
-        val padding = 14f
+        val padding = 16f
         val availW = (bounds.width() - 2 * padding).coerceAtLeast(10f)
         val availH = (bounds.height() - 2 * padding).coerceAtLeast(10f)
 
@@ -1980,8 +2138,8 @@ object PdfExporter {
         canvas.save()
         canvas.clipPath(clipPath)
 
-        // Fondo del contenedor para impresión
-        val bgPaint = Paint().apply { color = Color.rgb(245, 247, 250) }
+        // Fondo del contenedor papel
+        val bgPaint = Paint().apply { color = Color.rgb(248, 249, 250) }
         canvas.drawRect(bounds, bgPaint)
 
         // Fondo de mapa 2D centrado y con proporción geográfica exacta 1:1
@@ -2013,23 +2171,52 @@ object PdfExporter {
             strokeJoin = Paint.Join.ROUND
         }
 
-        // 1. Halo blanco para máximo contraste y legibilidad en papel impreso
-        trackPaint.color = Color.WHITE
-        trackPaint.strokeWidth = 5.2f
+        // 1. Halo blanco fino para contraste nítido sin tapar los nombres del mapa
+        trackPaint.color = Color.argb(220, 255, 255, 255)
+        trackPaint.strokeWidth = 3.2f
         canvas.drawPath(trackPath, trackPaint)
 
-        // 2. Línea principal del recorrido (Azul zafiro nítido de alta densidad)
+        // 2. Línea principal del recorrido (Azul ultramar nítido, grosor fino profesional)
         trackPaint.color = Color.rgb(29, 78, 216)
-        trackPaint.strokeWidth = 2.8f
+        trackPaint.strokeWidth = 1.8f
         canvas.drawPath(trackPath, trackPaint)
 
-        // Marcadores 2D ortogonales
+        // Poblaciones intermedias detectadas a lo largo del recorrido GPX
+        val nearTowns = com.example.ui.screens.TownCoordinates.findTownsNearPoints(points, maxDistKm = 2.5, maxCount = 4)
+        for ((townName, coord) in nearTowns) {
+            val isStart = stage.origin.isNotBlank() && (stage.origin.contains(townName, ignoreCase = true) || townName.contains(stage.origin, ignoreCase = true))
+            val isEnd = stage.destination.isNotBlank() && (stage.destination.contains(townName, ignoreCase = true) || townName.contains(stage.destination, ignoreCase = true))
+            if (isStart || isEnd) continue
+
+            val tx = projectX(coord.second)
+            val ty = projectY(coord.first)
+            if (tx in (bounds.left + 25f)..(bounds.right - 25f) && ty in (bounds.top + 25f)..(bounds.bottom - 25f)) {
+                drawTownMarker(canvas, tx, ty, townName)
+            }
+        }
+
+        // Cota máxima / Paso de montaña característico si existe altitud registrada
+        val maxElePt = points.filter { it.ele > 0 }.maxByOrNull { it.ele }
+        if (maxElePt != null && maxElePt.ele > 150) {
+            val mx = projectX(maxElePt.lon)
+            val my = projectY(maxElePt.lat)
+            if (mx in (bounds.left + 25f)..(bounds.right - 25f) && my in (bounds.top + 25f)..(bounds.bottom - 25f)) {
+                drawMountainPassMarker(canvas, mx, my, "⛰️ ${maxElePt.ele.toInt()} m")
+            }
+        }
+
+        // Marcadores de Inicio y Fin con nombres de las localidades
         val pStart = points.first()
-        drawMapPin(canvas, projectX(pStart.lon), projectY(pStart.lat), COLOR_EMERALD, "Inicio")
+        val startLabel = if (stage.origin.isNotBlank()) "Inicio: ${stage.origin}" else "Inicio"
+        drawMapPin(canvas, projectX(pStart.lon), projectY(pStart.lat), COLOR_EMERALD, startLabel)
 
         val pEnd = points.last()
-        drawMapPin(canvas, projectX(pEnd.lon), projectY(pEnd.lat), COLOR_GOLD_DARK, "Fin")
+        val endLabel = if (stage.destination.isNotBlank()) "Fin: ${stage.destination}" else "Fin"
+        drawMapPin(canvas, projectX(pEnd.lon), projectY(pEnd.lat), COLOR_GOLD_DARK, endLabel)
 
+        // Escala gráfica y rosa de los vientos
+        drawGraphicScaleBar(canvas, bounds, (bbMinLat + bbMaxLat) / 2.0, zoom, scale)
+        drawCompassRose(canvas, bounds)
         drawPrintBadge(canvas, bounds)
 
         canvas.restore()
@@ -2088,7 +2275,7 @@ object PdfExporter {
         val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
         val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
 
-        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 13, 6)
+        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 7, 13, 14)
         val mapBitmap = getSatelliteOrReliefBitmap(
             context,
             bbMinLat,
@@ -2171,15 +2358,15 @@ object PdfExporter {
                 if (i == 0) stagePath.moveTo(x, y) else stagePath.lineTo(x, y)
             }
 
-            // Halo blanco
-            linePaint.color = Color.WHITE
-            linePaint.strokeWidth = 4.8f
+            // Halo blanco fino
+            linePaint.color = Color.argb(220, 255, 255, 255)
+            linePaint.strokeWidth = 3.2f
             canvas.drawPath(stagePath, linePaint)
 
-            // Línea de la etapa
+            // Línea de la etapa (grosor fino profesional)
             val color = stageColors[index % stageColors.size]
             linePaint.color = color
-            linePaint.strokeWidth = 2.6f
+            linePaint.strokeWidth = 1.8f
             canvas.drawPath(stagePath, linePaint)
         }
 
@@ -2187,26 +2374,28 @@ object PdfExporter {
         val lastTrack = stageTracks.lastOrNull()?.second
         if (firstTrack != null && firstTrack.isNotEmpty()) {
             val p = firstTrack.first()
-            drawMapPin(canvas, projectX(p.lon), projectY(p.lat), COLOR_EMERALD, "Inicio")
+            val startTown = stages.firstOrNull()?.origin?.ifBlank { "Inicio" } ?: "Inicio"
+            drawMapPin(canvas, projectX(p.lon), projectY(p.lat), COLOR_EMERALD, "Inicio: $startTown")
         }
         if (lastTrack != null && lastTrack.isNotEmpty()) {
             val p = lastTrack.last()
-            drawMapPin(canvas, projectX(p.lon), projectY(p.lat), COLOR_GOLD_DARK, "Meta")
+            val endTown = stages.lastOrNull()?.destination?.ifBlank { "Meta" } ?: "Meta"
+            drawMapPin(canvas, projectX(p.lon), projectY(p.lat), COLOR_GOLD_DARK, "Meta: $endTown")
         }
 
-        val pBadge = Paint(Paint.ANTI_ALIAS_FLAG)
-        stageTracks.forEachIndexed { index, (_, pts) ->
+        stageTracks.forEachIndexed { index, (stg, pts) ->
             if (index > 0 && pts.isNotEmpty()) {
                 val p = pts.first()
                 val x = projectX(p.lon)
                 val y = projectY(p.lat)
-                pBadge.color = Color.WHITE
-                canvas.drawCircle(x, y, 4.5f, pBadge)
-                pBadge.color = stageColors[index % stageColors.size]
-                canvas.drawCircle(x, y, 3f, pBadge)
+                if (stg.origin.isNotBlank()) {
+                    drawTownMarker(canvas, x, y, stg.origin)
+                }
             }
         }
 
+        drawGraphicScaleBar(canvas, bounds, (bbMinLat + bbMaxLat) / 2.0, zoom, scale)
+        drawCompassRose(canvas, bounds)
         drawPrintBadge(canvas, bounds)
 
         canvas.restore()
