@@ -165,6 +165,17 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             if (savedLang != null) {
                 try { _languageMode.value = LanguageMode.valueOf(savedLang) } catch (_: Exception) {}
             }
+
+            // Auto-migración / actualización de nombre "Camino baztanes" / "Camino Baztanés" -> "Camino del Baztán"
+            try {
+                val allCams = repository.getAllCaminosOnce()
+                allCams.forEach { c ->
+                    if (c.title.equals("Camino Baztanés", ignoreCase = true) || c.title.equals("Camino baztanes", ignoreCase = true)) {
+                        repository.updateCamino(c.copy(title = "Camino del Baztán"))
+                    }
+                }
+            } catch (_: Exception) {}
+
             _isInitialLoadDone.value = true
         }
     }

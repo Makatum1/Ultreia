@@ -234,6 +234,7 @@ fun CaminoDetailScreen(
         AddStageDialog(
             nextDay = nextDay,
             initialDate = defaultDate,
+            isTravel = camino.isTravelGuide,
             onDismiss = { showAddStageDialog = false },
             onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes ->
                 viewModel.addStage(
@@ -891,6 +892,7 @@ fun StageCardItem(
 fun AddStageDialog(
     nextDay: Int,
     initialDate: String,
+    isTravel: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (origin: String, dest: String, km: Double, gain: Int, loss: Int, time: String, diff: String, date: String, notes: String) -> Unit
 ) {
@@ -908,7 +910,7 @@ fun AddStageDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Añadir Día $nextDay al Camino") },
+        title = { Text(if (isTravel) "Añadir Día $nextDay al Viaje" else "Añadir Etapa $nextDay al Camino") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {

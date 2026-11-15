@@ -19,6 +19,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 
 object PdfExporter {
 
@@ -65,9 +68,18 @@ object PdfExporter {
             val pageInfo1 = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
             val page1 = pdfDocument.startPage(pageInfo1)
             val canvas1 = page1.canvas
-            drawCoverPage(context, canvas1, camino, stages, repository)
+            val mapDrawnOnCover = drawCoverPage(context, canvas1, camino, stages, repository)
             pdfDocument.finishPage(page1)
             pageNumber++
+
+            // Si el mapa general no cupo en la portada por exceso de etapas, crear página 2 dedicada al mapa satélite
+            if (!mapDrawnOnCover) {
+                val pageInfoMap = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
+                val pageMap = pdfDocument.startPage(pageInfoMap)
+                drawFullPageMap(context, pageMap.canvas, camino, stages, pageNumber)
+                pdfDocument.finishPage(pageMap)
+                pageNumber++
+            }
 
             // ---------------- PAGES 2+: ETAPAS Y VIVENCIAS ----------------
             val allAccommodations = repository.getAllAccommodationsForCaminoOnce(camino.id)
@@ -216,7 +228,7 @@ object PdfExporter {
         camino: CaminoEntity,
         stages: List<StageEntity>,
         repository: CaminoRepository
-    ) {
+    ): Boolean {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val isTravel = camino.isTravelGuide
 
@@ -490,8 +502,61 @@ object PdfExporter {
             tableY += rowH
         }
 
-        // Pie de página de la portada
-        drawEditorialFooter(canvas, 1, isTravel, camino.title)
+        // Mapa general de la ruta (Portada del PDF) justo debajo del listado de etapas
+        val availableH = PAGE_HEIGHT - 35f - tableY
+        val mapDrawnOnCover = if (availableH >= 135f) {
+            val bannerY = drawSectionBanner(
+                canvas,
+                tableY + 6f,
+                if (isTravel) "MAPA GENERAL DEL VIAJE (VISTA SATÉLITE)" else "MAPA GENERAL DEL CAMINO (VISTA SATÉLITE)",
+                COLOR_NAVY,
+                "🛰️"
+            )
+            val mapBox = RectF(MARGIN, bannerY + 4f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 35f)
+            drawMultiStageMapOnCanvas(context, canvas, stages, mapBox, isTravel)
+            drawEditorialFooter(canvas, 1, isTravel, camino.title)
+            true
+        } else {
+            drawEditorialFooter(canvas, 1, isTravel, camino.title)
+            false
+        }
+
+        return mapDrawnOnCover
+    }
+
+    private fun drawFullPageMap(
+        context: Context,
+        canvas: Canvas,
+        camino: CaminoEntity,
+        stages: List<StageEntity>,
+        pageNumber: Int
+    ) {
+        val isTravel = camino.isTravelGuide
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Cabecera superior
+        paint.color = COLOR_HEADER_BG
+        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 56f, paint)
+        paint.color = COLOR_GOLD
+        canvas.drawRect(0f, 53f, PAGE_WIDTH.toFloat(), 56f, paint)
+
+        paint.color = Color.WHITE
+        paint.textSize = 9.5f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText(
+            if (isTravel) "ULTREIA VIAJES • MAPA CARTOGRÁFICO GENERAL" else "ULTREIA • MAPA CARTOGRÁFICO GENERAL DEL CAMINO",
+            MARGIN,
+            24f,
+            paint
+        )
+
+        paint.textSize = 15f
+        canvas.drawText(camino.title, MARGIN, 44f, paint)
+
+        val mapBox = RectF(MARGIN, 68f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 45f)
+        drawMultiStageMapOnCanvas(context, canvas, stages, mapBox, isTravel)
+
+        drawEditorialFooter(canvas, pageNumber, isTravel, camino.title)
     }
 
     // ----------------------------------------------------
@@ -651,7 +716,7 @@ object PdfExporter {
             drawCardBox(canvas, chartBox.left, chartBox.top, chartBox.width(), chartBox.height(), COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_NAVY, 4f, 8f)
 
             if (points.isNotEmpty()) {
-                drawMiniTrackOnCanvas(canvas, points, chartBox)
+                drawMiniTrackOnCanvas(context, canvas, points, chartBox)
             } else {
                 paint.color = COLOR_NAVY
                 paint.strokeWidth = 2.5f
@@ -1610,55 +1675,471 @@ object PdfExporter {
         }
     }
 
-    private fun drawMiniTrackOnCanvas(canvas: Canvas, points: List<com.example.data.model.GpxPoint>, bounds: RectF) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tileMemoryCache = ConcurrentHashMap<String, Bitmap>()
+
+    private fun lonToTileX(lon: Double, zoom: Int): Double = (lon + 180.0) / 360.0 * (1 shl zoom)
+
+    private fun latToMercatorY(lat: Double, zoom: Int): Double {
+        val sinLat = Math.sin(Math.toRadians(lat.coerceIn(-85.0511, 85.0511)))
+        return (0.5 - Math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * Math.PI)) * (1 shl zoom)
+    }
+
+    private fun calculateBestZoom(
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        minZ: Int,
+        maxZ: Int,
+        maxTiles: Int
+    ): Int {
+        var bestZoom = minZ
+        for (z in maxZ downTo minZ) {
+            val x1 = Math.floor(lonToTileX(minLon, z)).toInt()
+            val x2 = Math.floor(lonToTileX(maxLon, z)).toInt()
+            val y1 = Math.floor(latToMercatorY(maxLat, z)).toInt()
+            val y2 = Math.floor(latToMercatorY(minLat, z)).toInt()
+            val countX = Math.abs(x2 - x1) + 1
+            val countY = Math.abs(y2 - y1) + 1
+            if (countX <= 3 && countY <= 3 && (countX * countY) <= maxTiles) {
+                bestZoom = z
+                break
+            }
+        }
+        return bestZoom
+    }
+
+    private fun downloadTile(context: Context, zoom: Int, x: Int, y: Int): Bitmap? {
+        val cacheKey = "$zoom-$x-$y"
+        tileMemoryCache[cacheKey]?.let { return it }
+
+        val cacheDir = File(context.cacheDir, "osm_tiles")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        val tileFile = File(cacheDir, "$cacheKey.png")
+        if (tileFile.exists() && tileFile.length() > 0) {
+            val bmp = BitmapFactory.decodeFile(tileFile.absolutePath)
+            if (bmp != null) {
+                tileMemoryCache[cacheKey] = bmp
+                return bmp
+            }
+        }
+
+        val urls = listOf(
+            "https://mt1.google.com/vt/lyrs=y&hl=es&x=$x&y=$y&z=$zoom",
+            "https://tile.openstreetmap.org/$zoom/$x/$y.png"
+        )
+
+        for (urlString in urls) {
+            try {
+                val url = URL(urlString)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 1800
+                conn.readTimeout = 2200
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:100.0) Ultreia/2.0")
+                if (conn.responseCode == 200) {
+                    val input = conn.inputStream
+                    val bytes = input.readBytes()
+                    input.close()
+                    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (bmp != null) {
+                        try {
+                            tileFile.writeBytes(bytes)
+                        } catch (_: Exception) {}
+                        tileMemoryCache[cacheKey] = bmp
+                        return bmp
+                    }
+                }
+            } catch (_: Exception) {
+                // Ignore network errors and try next
+            }
+        }
+        return null
+    }
+
+    private fun generateOfflineReliefBitmap(w: Int, h: Int): Bitmap {
+        val safeW = w.coerceAtLeast(120)
+        val safeH = h.coerceAtLeast(80)
+        val bitmap = Bitmap.createBitmap(safeW, safeH, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bitmap)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        val gradient = LinearGradient(
+            0f, 0f, safeW.toFloat(), safeH.toFloat(),
+            intArrayOf(Color.rgb(38, 55, 46), Color.rgb(52, 70, 58), Color.rgb(60, 80, 64), Color.rgb(44, 62, 50)),
+            null, Shader.TileMode.CLAMP
+        )
+        p.shader = gradient
+        c.drawRect(0f, 0f, safeW.toFloat(), safeH.toFloat(), p)
+        p.shader = null
+
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 1f
+        p.color = Color.argb(45, 255, 255, 255)
+        val numCurves = 6
+        for (i in 1..numCurves) {
+            val yBase = (safeH * i) / (numCurves + 1f)
+            val path = Path()
+            path.moveTo(0f, yBase)
+            path.cubicTo(safeW * 0.3f, yBase - 12f + (i * 2), safeW * 0.7f, yBase + 12f - (i * 2), safeW.toFloat(), yBase)
+            c.drawPath(path, p)
+        }
+
+        p.strokeWidth = 0.5f
+        p.color = Color.argb(20, 255, 255, 255)
+        var gx = 0
+        while (gx < safeW) {
+            c.drawLine(gx.toFloat(), 0f, gx.toFloat(), safeH.toFloat(), p)
+            gx += 50
+        }
+        var gy = 0
+        while (gy < safeH) {
+            c.drawLine(0f, gy.toFloat(), safeW.toFloat(), gy.toFloat(), p)
+            gy += 50
+        }
+
+        return bitmap
+    }
+
+    private fun getSatelliteOrReliefBitmap(
+        context: Context,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        zoom: Int,
+        targetW: Int,
+        targetH: Int
+    ): Bitmap {
+        val minTX = Math.floor(lonToTileX(minLon, zoom)).toInt()
+        val maxTX = Math.floor(lonToTileX(maxLon, zoom)).toInt()
+        val minTY = Math.floor(latToMercatorY(maxLat, zoom)).toInt()
+        val maxTY = Math.floor(latToMercatorY(minLat, zoom)).toInt()
+
+        val numX = (maxTX - minTX + 1).coerceAtLeast(1)
+        val numY = (maxTY - minTY + 1).coerceAtLeast(1)
+
+        val stitched = Bitmap.createBitmap(numX * 256, numY * 256, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(stitched)
+        var anyTileSuccess = false
+
+        for (tx in minTX..maxTX) {
+            for (ty in minTY..maxTY) {
+                val tile = downloadTile(context, zoom, tx, ty)
+                if (tile != null) {
+                    anyTileSuccess = true
+                    canvas.drawBitmap(tile, ((tx - minTX) * 256).toFloat(), ((ty - minTY) * 256).toFloat(), null)
+                }
+            }
+        }
+
+        if (!anyTileSuccess) {
+            return generateOfflineReliefBitmap(targetW, targetH)
+        }
+
+        val x1 = ((lonToTileX(minLon, zoom) - minTX) * 256.0).toFloat().coerceIn(0f, (numX * 256).toFloat())
+        val x2 = ((lonToTileX(maxLon, zoom) - minTX) * 256.0).toFloat().coerceIn(0f, (numX * 256).toFloat())
+        val y1 = ((latToMercatorY(maxLat, zoom) - minTY) * 256.0).toFloat().coerceIn(0f, (numY * 256).toFloat())
+        val y2 = ((latToMercatorY(minLat, zoom) - minTY) * 256.0).toFloat().coerceIn(0f, (numY * 256).toFloat())
+
+        val cropW = (x2 - x1).toInt().coerceAtLeast(1)
+        val cropH = (y2 - y1).toInt().coerceAtLeast(1)
+
+        return try {
+            Bitmap.createBitmap(stitched, x1.toInt(), y1.toInt(), cropW, cropH)
+        } catch (_: Exception) {
+            stitched
+        }
+    }
+
+    private fun drawMapPin(canvas: Canvas, x: Float, y: Float, color: Int, label: String) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.color = Color.WHITE
+        canvas.drawCircle(x, y, 6f, p)
+        p.color = color
+        canvas.drawCircle(x, y, 4f, p)
+
+        p.textSize = 7.5f
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val textW = p.measureText(label)
+        val badgeRect = RectF(x - textW / 2 - 3f, y - 16f, x + textW / 2 + 3f, y - 6f)
+        p.color = Color.argb(220, 28, 75, 100)
+        canvas.drawRoundRect(badgeRect, 2f, 2f, p)
+        p.color = Color.WHITE
+        canvas.drawText(label, x - textW / 2, y - 8.5f, p)
+    }
+
+    private fun drawSatelliteBadge(canvas: Canvas, bounds: RectF) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.textSize = 6.5f
+        p.typeface = Typeface.DEFAULT
+        val label = "🛰️ Satélite • Ultreia"
+        val textW = p.measureText(label)
+        val badge = RectF(bounds.right - textW - 10f, bounds.bottom - 13f, bounds.right - 4f, bounds.bottom - 3f)
+        p.color = Color.argb(160, 0, 0, 0)
+        canvas.drawRoundRect(badge, 2f, 2f, p)
+        p.color = Color.WHITE
+        canvas.drawText(label, bounds.right - textW - 7f, bounds.bottom - 5f, p)
+    }
+
+    private fun drawMiniTrackOnCanvas(
+        context: Context,
+        canvas: Canvas,
+        points: List<com.example.data.model.GpxPoint>,
+        bounds: RectF
+    ) {
+        if (points.isEmpty()) return
 
         val minLat = points.minOf { it.lat }
         val maxLat = points.maxOf { it.lat }
         val minLon = points.minOf { it.lon }
         val maxLon = points.maxOf { it.lon }
 
-        val latSpan = if (maxLat - minLat > 0.0001) maxLat - minLat else 0.01
-        val lonSpan = if (maxLon - minLon > 0.0001) maxLon - minLon else 0.01
+        val latMargin = maxOf((maxLat - minLat) * 0.12, 0.005)
+        val lonMargin = maxOf((maxLon - minLon) * 0.12, 0.005)
+        val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
+        val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
+        val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
+        val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
 
-        val padding = 16f
-        val w = bounds.width() - 2 * padding
-        val h = bounds.height() - 2 * padding
+        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 15, 6)
+        val mapBitmap = getSatelliteOrReliefBitmap(
+            context,
+            bbMinLat,
+            bbMaxLat,
+            bbMinLon,
+            bbMaxLon,
+            zoom,
+            bounds.width().toInt(),
+            bounds.height().toInt()
+        )
 
-        val path = Path()
-        for (i in points.indices) {
-            val p = points[i]
-            val x = bounds.left + padding + ((p.lon - minLon) / lonSpan * w).toFloat()
-            val y = bounds.bottom - padding - ((p.lat - minLat) / latSpan * h).toFloat()
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        val clipPath = Path().apply {
+            addRoundRect(bounds, 6f, 6f, Path.Direction.CW)
+        }
+        canvas.save()
+        canvas.clipPath(clipPath)
+
+        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
+        }
+        canvas.drawBitmap(mapBitmap, null, bounds, bmpPaint)
+
+        val overlayPaint = Paint().apply {
+            color = Color.argb(25, 0, 0, 0)
+        }
+        canvas.drawRect(bounds, overlayPaint)
+
+        fun projectX(lon: Double): Float {
+            return bounds.left + ((lon - bbMinLon) / (bbMaxLon - bbMinLon) * bounds.width()).toFloat()
+        }
+        fun projectY(lat: Double): Float {
+            val y1 = latToMercatorY(bbMaxLat, zoom)
+            val y2 = latToMercatorY(bbMinLat, zoom)
+            val yP = latToMercatorY(lat, zoom)
+            val span = (y2 - y1).coerceAtLeast(0.000001)
+            val norm = ((yP - y1) / span).coerceIn(0.0, 1.0)
+            return bounds.top + (norm * bounds.height()).toFloat()
         }
 
-        // Línea del recorrido (Azul Zafiro de Guía)
-        paint.color = COLOR_BLUE
-        paint.strokeWidth = 2.8f
-        paint.style = Paint.Style.STROKE
-        canvas.drawPath(path, paint)
-        paint.style = Paint.Style.FILL
+        val trackPath = Path()
+        for (i in points.indices) {
+            val p = points[i]
+            val x = projectX(p.lon)
+            val y = projectY(p.lat)
+            if (i == 0) trackPath.moveTo(x, y) else trackPath.lineTo(x, y)
+        }
 
-        // Punto de Salida / Origen (Verde Esmeralda)
+        val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        trackPaint.color = Color.WHITE
+        trackPaint.strokeWidth = 5.2f
+        canvas.drawPath(trackPath, trackPaint)
+
+        trackPaint.color = Color.rgb(0, 102, 238)
+        trackPaint.strokeWidth = 2.8f
+        canvas.drawPath(trackPath, trackPaint)
+
         val pStart = points.first()
-        val xStart = bounds.left + padding + ((pStart.lon - minLon) / lonSpan * w).toFloat()
-        val yStart = bounds.bottom - padding - ((pStart.lat - minLat) / latSpan * h).toFloat()
-        paint.color = COLOR_EMERALD
-        canvas.drawCircle(xStart, yStart, 4.5f, paint)
+        val sx = projectX(pStart.lon)
+        val sy = projectY(pStart.lat)
+        drawMapPin(canvas, sx, sy, COLOR_EMERALD, "Inicio")
 
-        // Punto de Llegada / Destino (Dorado)
         val pEnd = points.last()
-        val xEnd = bounds.left + padding + ((pEnd.lon - minLon) / lonSpan * w).toFloat()
-        val yEnd = bounds.bottom - padding - ((pEnd.lat - minLat) / latSpan * h).toFloat()
-        paint.color = COLOR_GOLD
-        canvas.drawCircle(xEnd, yEnd, 4.5f, paint)
+        val ex = projectX(pEnd.lon)
+        val ey = projectY(pEnd.lat)
+        drawMapPin(canvas, ex, ey, COLOR_GOLD_DARK, "Fin")
 
-        // Etiquetas
-        paint.textSize = 8f
-        paint.color = COLOR_MUTED
-        canvas.drawText("Inicio", xStart - 8f, yStart - 7f, paint)
-        canvas.drawText("Fin", xEnd - 6f, yEnd - 7f, paint)
+        drawSatelliteBadge(canvas, bounds)
+
+        canvas.restore()
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = COLOR_CARD_BORDER
+            strokeWidth = 1f
+        }
+        canvas.drawRoundRect(bounds, 6f, 6f, borderPaint)
+    }
+
+    private fun drawMultiStageMapOnCanvas(
+        context: Context,
+        canvas: Canvas,
+        stages: List<StageEntity>,
+        bounds: RectF,
+        isTravel: Boolean
+    ) {
+        if (stages.isEmpty()) return
+
+        val stageTracks = stages.map { stg ->
+            val pts = GpxParser.deserializePoints(stg.gpxTrackJson)
+            if (pts.size >= 2) {
+                stg to pts
+            } else {
+                val sCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.origin)
+                val eCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.destination)
+                val sLat = sCoord?.first ?: (42.88 - (stg.dayNumber * 0.06))
+                val sLon = sCoord?.second ?: (-8.54 - (stg.dayNumber * 0.09))
+                val eLat = eCoord?.first ?: (sLat - 0.08)
+                val eLon = eCoord?.second ?: (sLon - 0.12)
+                stg to listOf(
+                    com.example.data.model.GpxPoint(sLat, sLon),
+                    com.example.data.model.GpxPoint(eLat, eLon)
+                )
+            }
+        }
+
+        val allPoints = stageTracks.flatMap { it.second }
+        if (allPoints.isEmpty()) return
+
+        val minLat = allPoints.minOf { it.lat }
+        val maxLat = allPoints.maxOf { it.lat }
+        val minLon = allPoints.minOf { it.lon }
+        val maxLon = allPoints.maxOf { it.lon }
+
+        val latMargin = maxOf((maxLat - minLat) * 0.12, 0.01)
+        val lonMargin = maxOf((maxLon - minLon) * 0.12, 0.01)
+        val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
+        val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
+        val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
+        val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
+
+        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 14, 8)
+        val mapBitmap = getSatelliteOrReliefBitmap(
+            context,
+            bbMinLat,
+            bbMaxLat,
+            bbMinLon,
+            bbMaxLon,
+            zoom,
+            bounds.width().toInt(),
+            bounds.height().toInt()
+        )
+
+        val clipPath = Path().apply {
+            addRoundRect(bounds, 6f, 6f, Path.Direction.CW)
+        }
+        canvas.save()
+        canvas.clipPath(clipPath)
+
+        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
+        }
+        canvas.drawBitmap(mapBitmap, null, bounds, bmpPaint)
+
+        val overlayPaint = Paint().apply {
+            color = Color.argb(25, 0, 0, 0)
+        }
+        canvas.drawRect(bounds, overlayPaint)
+
+        fun projectX(lon: Double): Float {
+            return bounds.left + ((lon - bbMinLon) / (bbMaxLon - bbMinLon) * bounds.width()).toFloat()
+        }
+        fun projectY(lat: Double): Float {
+            val y1 = latToMercatorY(bbMaxLat, zoom)
+            val y2 = latToMercatorY(bbMinLat, zoom)
+            val yP = latToMercatorY(lat, zoom)
+            val span = (y2 - y1).coerceAtLeast(0.000001)
+            val norm = ((yP - y1) / span).coerceIn(0.0, 1.0)
+            return bounds.top + (norm * bounds.height()).toFloat()
+        }
+
+        val stageColors = listOf(
+            Color.rgb(37, 99, 235),  // Azul
+            Color.rgb(22, 163, 74),  // Verde
+            Color.rgb(217, 119, 6),  // Ámbar
+            Color.rgb(147, 51, 234), // Púrpura
+            Color.rgb(225, 29, 72),  // Rojo Carmín
+            Color.rgb(13, 148, 136), // Turquesa
+            Color.rgb(234, 88, 12),  // Naranja
+            Color.rgb(79, 70, 229)   // Índigo
+        )
+
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        stageTracks.forEachIndexed { index, (_, pts) ->
+            if (pts.size < 2) return@forEachIndexed
+            val stagePath = Path()
+            for (i in pts.indices) {
+                val p = pts[i]
+                val x = projectX(p.lon)
+                val y = projectY(p.lat)
+                if (i == 0) stagePath.moveTo(x, y) else stagePath.lineTo(x, y)
+            }
+
+            linePaint.color = Color.WHITE
+            linePaint.strokeWidth = 4.8f
+            canvas.drawPath(stagePath, linePaint)
+
+            val color = stageColors[index % stageColors.size]
+            linePaint.color = color
+            linePaint.strokeWidth = 2.6f
+            canvas.drawPath(stagePath, linePaint)
+        }
+
+        val firstTrack = stageTracks.firstOrNull()?.second
+        val lastTrack = stageTracks.lastOrNull()?.second
+        if (firstTrack != null && firstTrack.isNotEmpty()) {
+            val p = firstTrack.first()
+            drawMapPin(canvas, projectX(p.lon), projectY(p.lat), COLOR_EMERALD, "Inicio")
+        }
+        if (lastTrack != null && lastTrack.isNotEmpty()) {
+            val p = lastTrack.last()
+            drawMapPin(canvas, projectX(p.lon), projectY(p.lat), COLOR_GOLD_DARK, "Meta")
+        }
+
+        val pBadge = Paint(Paint.ANTI_ALIAS_FLAG)
+        stageTracks.forEachIndexed { index, (_, pts) ->
+            if (index > 0 && pts.isNotEmpty()) {
+                val p = pts.first()
+                val x = projectX(p.lon)
+                val y = projectY(p.lat)
+                pBadge.color = Color.WHITE
+                canvas.drawCircle(x, y, 4.5f, pBadge)
+                pBadge.color = stageColors[index % stageColors.size]
+                canvas.drawCircle(x, y, 3f, pBadge)
+            }
+        }
+
+        drawSatelliteBadge(canvas, bounds)
+
+        canvas.restore()
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = COLOR_CARD_BORDER
+            strokeWidth = 1f
+        }
+        canvas.drawRoundRect(bounds, 6f, 6f, borderPaint)
     }
 
     private fun measureMultilineTextHeight(

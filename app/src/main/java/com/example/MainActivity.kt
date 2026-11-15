@@ -299,14 +299,24 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             }
         },
         floatingActionButton = {
-            if (currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail && selectedCamino != null) {
+            val activeList = caminos.filter { it.isTravelGuide == isTravelProfile }
+            val targetCamino = selectedCamino ?: activeList.firstOrNull()
+            if (currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail && targetCamino != null) {
                 FloatingActionButton(
-                    onClick = { showAddStageDialog = true },
-                    containerColor = CaminoBlue,
+                    onClick = {
+                        if (selectedCamino == null) {
+                            viewModel.selectCamino(targetCamino.id)
+                        }
+                        showAddStageDialog = true
+                    },
+                    containerColor = if (isTravelProfile) CaminoBlueDark else CaminoBlue,
                     contentColor = Color.White,
                     modifier = Modifier.testTag("fab_add_stage_main")
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Añadir etapa")
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = if (isTravelProfile) viewModel.string("new_trip_day") else viewModel.string("new_camino_stage")
+                    )
                 }
             }
         },
@@ -482,20 +492,23 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
         )
     }
 
-    if (showAddStageDialog && selectedCamino != null) {
+    val activeCaminoForAdd = selectedCamino ?: caminos.firstOrNull { it.isTravelGuide == isTravelProfile }
+    if (showAddStageDialog && activeCaminoForAdd != null) {
+        val isTravel = activeCaminoForAdd.isTravelGuide
         val nextDay = stages.size + 1
         val defaultDate = com.example.ui.settings.AppStrings.calculateStageDate(
-            selectedCamino!!.startDate.ifBlank { "15/05/2026" },
+            activeCaminoForAdd.startDate.ifBlank { "15/05/2026" },
             nextDay - 1
         )
         AddStageDialog(
             nextDay = nextDay,
             initialDate = defaultDate,
+            isTravel = isTravel,
             onDismiss = { showAddStageDialog = false },
             onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes ->
                 viewModel.addStage(
-                    caminoId = selectedCamino!!.id,
-                    title = "Etapa $nextDay: $origin a $dest",
+                    caminoId = activeCaminoForAdd.id,
+                    title = "${if (isTravel) "Día" else "Etapa"} $nextDay: $origin a $dest",
                     origin = origin,
                     destination = dest,
                     distanceKm = km,

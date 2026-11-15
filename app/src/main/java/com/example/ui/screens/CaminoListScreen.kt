@@ -112,15 +112,13 @@ fun CaminoListScreen(
                             modifier = Modifier.size(24.dp)
                         )
                         Text(
-                            text = if (isTravelProfile) "Caminos" else "Viajes",
+                            text = if (isTravelProfile) viewModel.string("tab_caminos") else viewModel.string("tab_trips"),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = if (isTravelProfile) CaminoBlueDark else CaminoBlue,
                             fontSize = 10.sp
                         )
                     }
-
-                    com.example.ui.components.SettingsActionMenu(viewModel = viewModel)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
@@ -136,7 +134,7 @@ fun CaminoListScreen(
                         icon = { Icon(Icons.Default.Explore, contentDescription = null) },
                         text = {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Principales Rutas", style = MaterialTheme.typography.labelLarge)
+                                Text(viewModel.string("main_routes"), style = MaterialTheme.typography.labelLarge)
                                 Text("(Ejemplos)", style = MaterialTheme.typography.labelSmall)
                             }
                         },
@@ -150,7 +148,7 @@ fun CaminoListScreen(
                 ExtendedFloatingActionButton(
                     onClick = { showAddCaminoDialog = true },
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text = { Text(if (isTravelProfile) "Nuevo Viaje" else "Nuevo Camino") },
+                    text = { Text(if (isTravelProfile) viewModel.string("new_trip") else viewModel.string("new_camino")) },
                     containerColor = CaminoBlue,
                     contentColor = Color.White,
                     shape = RoundedCornerShape(16.dp),
@@ -191,7 +189,7 @@ fun CaminoListScreen(
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
-                                    text = if (isTravelProfile) "¡BUEN VIAJE!" else "¡BUEN CAMINO!",
+                                    text = if (isTravelProfile) viewModel.string("welcome_greeting_trip") else viewModel.string("welcome_greeting"),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CaminoBlueDark,
@@ -200,7 +198,7 @@ fun CaminoListScreen(
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = if (isTravelProfile) "Tus Viajes y Rutas" else "Tus Rutas y Guías",
+                                text = if (isTravelProfile) viewModel.string("your_routes_trip") else viewModel.string("your_routes"),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -209,7 +207,7 @@ fun CaminoListScreen(
                                 text = if (isTravelProfile)
                                     "Organiza tus viajes por días, etapas, mapas interactivos, notas y alojamientos."
                                 else
-                                    "Elige un camino para ver sus etapas organizadas por días, mapa interactivo y memorias.",
+                                    viewModel.string("your_routes_desc"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.85f)
                             )
@@ -242,7 +240,7 @@ fun CaminoListScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isTravelProfile) "Viajes Disponibles (${filteredCaminos.size})" else "Caminos Disponibles (${filteredCaminos.size})",
+                        text = if (isTravelProfile) "${viewModel.string("trips_title")} (${filteredCaminos.size})" else "${viewModel.string("caminos_title")} (${filteredCaminos.size})",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = CaminoBlue
@@ -305,7 +303,10 @@ fun CaminoListScreen(
                             }
                             Spacer(Modifier.height(14.dp))
                             Text(
-                                text = if (isTravelProfile) "No tienes ningún viaje creado" else "No tienes ningún camino creado",
+                                text = if (isTravelProfile)
+                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "You don't have any trips created" else "No tienes ningún viaje creado")
+                                else
+                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "You don't have any caminos created" else "No tienes ningún camino creado"),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = CaminoBlue
@@ -313,9 +314,9 @@ fun CaminoListScreen(
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 text = if (isTravelProfile)
-                                    "Comienza importando un archivo o añade un viaje de prueba para ver el funcionamiento."
+                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "Start by importing a file or add a sample trip to see how it works." else "Comienza importando un archivo o añade un viaje de prueba para ver el funcionamiento.")
                                 else
-                                    "Comienza importando un archivo o añade un camino de prueba para explorar sus etapas.",
+                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "Start by importing a file or add a sample camino to explore its stages." else "Comienza importando un archivo o añade un camino de prueba para explorar sus etapas."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -336,7 +337,7 @@ fun CaminoListScreen(
                                 Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = if (isTravelProfile) "Importar Viaje" else "Importar Camino",
+                                    text = if (isTravelProfile) viewModel.string("empty_import_trip") else viewModel.string("empty_import_camino"),
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -356,7 +357,7 @@ fun CaminoListScreen(
                                 Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = if (isTravelProfile) "Añadir Viaje de Prueba" else "Añadir Camino de Prueba",
+                                    text = if (isTravelProfile) viewModel.string("empty_add_sample_trip") else viewModel.string("empty_add_sample_camino"),
                                     fontWeight = FontWeight.Bold
                                 )
                             }

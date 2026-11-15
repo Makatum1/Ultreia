@@ -260,9 +260,9 @@ object SampleData {
             )
         ),
 
-        // 10. Camino Baztanés
+        // 10. Camino del Baztán
         PredefinedRouteInfo(
-            title = "Camino Baztanés",
+            title = "Camino del Baztán",
             subtitle = "De Bayona a Pamplona a través del valle atlántico de Baztán",
             totalKm = 109.0,
             note = null,

@@ -403,7 +403,7 @@ object TownCoordinates {
         "pajares" to Pair(43.0039, -5.7867),
         "pola de lena" to Pair(43.1611, -5.8286),
 
-        // Camino Baztanés
+        // Camino del Baztán
         "bayona" to Pair(43.4929, -1.4748),
         "ustaritz" to Pair(43.3986, -1.4558),
         "ainhoa" to Pair(43.3067, -1.4986),
@@ -610,10 +610,12 @@ fun InteractiveMapScreen(
     val allStagesState = viewModel?.allStages?.collectAsStateWithLifecycle(emptyList())
     val allCaminos = allCaminosState?.value?.ifEmpty { listOf(camino) } ?: listOf(camino)
     val allStages = allStagesState?.value?.ifEmpty { stages } ?: stages
+    val isTravel = camino.isTravelGuide
 
-    // Modo de visualización: "Este Camino" (por defecto) vs "Total" (todas las rutas)
+    // Modo de visualización: "Este Camino" / "Este Viaje" (por defecto) vs "Total Caminos" / "Total Viajes"
     var mapScopeMode by remember { mutableStateOf(MapScopeMode.CURRENT_CAMINO) }
     var showScopeDropdown by remember { mutableStateOf(false) }
+    var isTotalHidden by remember { mutableStateOf(false) }
 
     // Inicializar configuración de OSMDroid con User-Agent seguro
     LaunchedEffect(Unit) {
@@ -676,7 +678,7 @@ fun InteractiveMapScreen(
     }
 
     // Efecto para actualizar overlays del mapa cuando cambian las etapas seleccionadas, capas o modo de filtro
-    LaunchedEffect(selectedStageIds, sortedStages, allStages, allCaminos, mapViewRef, currentLayer, mapScopeMode) {
+    LaunchedEffect(selectedStageIds, sortedStages, allStages, allCaminos, mapViewRef, currentLayer, mapScopeMode, isTotalHidden) {
         val map = mapViewRef ?: return@LaunchedEffect
 
         // Actualizar TileSource según la capa seleccionada
@@ -785,14 +787,21 @@ fun InteractiveMapScreen(
             }
         } else {
             // ==========================================
-            // LÓGICA: TOTAL (DISTINCIÓN POR COLORES DE CADA CAMINO)
+            // LÓGICA: TOTAL (DISTINCIÓN POR COLORES DE CADA CAMINO / VIAJE)
             // ==========================================
-            val caminoColorMap = allCaminos.mapIndexed { index, c ->
-                c.id to getCaminoColorHex(c.id, index)
-            }.toMap()
+            if (isTotalHidden) {
+                map.invalidate()
+            } else {
+                val filteredCaminos = allCaminos.filter { it.isTravelGuide == isTravel }
+                val filteredCaminoIds = filteredCaminos.map { it.id }.toSet()
+                val candidateStages = if (allStages.isNotEmpty()) allStages else sortedStages
+                val stagesToDraw = candidateStages.filter { filteredCaminoIds.contains(it.caminoId) }
 
-            val stagesToDraw = if (allStages.isNotEmpty()) allStages else sortedStages
-            for (stg in stagesToDraw) {
+                val caminoColorMap = filteredCaminos.mapIndexed { index, c ->
+                    c.id to getCaminoColorHex(c.id, index)
+                }.toMap()
+
+                for (stg in stagesToDraw) {
                 // Color único e idéntico para todas las etapas, polilíneas y marcadores del mismo camino
                 val colorHex = caminoColorMap[stg.caminoId] ?: getCaminoColorHex(stg.caminoId)
                 val colorInt = try {
@@ -876,6 +885,7 @@ fun InteractiveMapScreen(
                 }
             }
         }
+    }
 
         // Ajuste automático de cámara mediante BoundingBox con padding (para Este Camino o Total)
         if (allGeoPoints.isNotEmpty()) {
@@ -1353,7 +1363,7 @@ fun InteractiveMapScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Botón 1: "Etapas" con menú desplegable vertical
+                // Botón 1: "Etapas" / "Días" con menú desplegable vertical
                 Box(modifier = Modifier.weight(1f)) {
                     Button(
                         onClick = { showStagesDropdown = true },
@@ -1367,7 +1377,7 @@ fun InteractiveMapScreen(
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "Etapas",
+                            text = if (isTravel) "Días" else "Etapas",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1
@@ -1404,7 +1414,7 @@ fun InteractiveMapScreen(
                                         Spacer(Modifier.width(8.dp))
                                         Column {
                                             Text(
-                                                text = "Día ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
+                                                text = if (isTravel) "Día ${stg.dayNumber}: ${stg.origin} → ${stg.destination}" else "Etapa ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
                                                 maxLines = 1,
@@ -1428,8 +1438,14 @@ fun InteractiveMapScreen(
                     }
                 }
 
-                // Botón 2: Menú Desplegable con opciones "Este Camino" y "Total"
+                // Botón 2: Menú Desplegable con opciones "Este Camino" / "Este Viaje" y "Total Caminos" / "Total Viajes"
                 Box(modifier = Modifier.weight(1.1f)) {
+                    val currentScopeText = if (mapScopeMode == MapScopeMode.TOTAL) {
+                        if (isTravel) "Total Viajes" else "Total Caminos"
+                    } else {
+                        if (isTravel) "Este Viaje" else "Este Camino"
+                    }
+
                     Button(
                         onClick = { showScopeDropdown = true },
                         colors = ButtonDefaults.buttonColors(containerColor = PilgrimYellow),
@@ -1447,7 +1463,7 @@ fun InteractiveMapScreen(
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = if (mapScopeMode == MapScopeMode.TOTAL) "Total" else "Este Camino",
+                            text = currentScopeText,
                             color = CaminoBlueDark,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -1472,14 +1488,14 @@ fun InteractiveMapScreen(
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = Icons.Default.Hiking,
+                                        imageVector = if (isTravel) Icons.Default.Luggage else Icons.Default.Hiking,
                                         contentDescription = null,
                                         tint = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) CaminoBlue else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = "Este Camino",
+                                        text = if (isTravel) "Este Viaje" else "Este Camino",
                                         fontWeight = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) FontWeight.Bold else FontWeight.Normal,
                                         color = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) CaminoBlue else MaterialTheme.colorScheme.onSurface
                                     )
@@ -1487,6 +1503,7 @@ fun InteractiveMapScreen(
                             },
                             onClick = {
                                 mapScopeMode = MapScopeMode.CURRENT_CAMINO
+                                isTotalHidden = false
                                 selectedStageIds = sortedStages.map { it.id }.toSet()
                                 selectedDetailStage = null
                                 showScopeDropdown = false
@@ -1504,7 +1521,7 @@ fun InteractiveMapScreen(
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = "Total",
+                                        text = if (isTravel) "Total Viajes" else "Total Caminos",
                                         fontWeight = if (mapScopeMode == MapScopeMode.TOTAL) FontWeight.Bold else FontWeight.Normal,
                                         color = if (mapScopeMode == MapScopeMode.TOTAL) CaminoBlue else MaterialTheme.colorScheme.onSurface
                                     )
@@ -1512,6 +1529,7 @@ fun InteractiveMapScreen(
                             },
                             onClick = {
                                 mapScopeMode = MapScopeMode.TOTAL
+                                isTotalHidden = false
                                 selectedDetailStage = null
                                 showScopeDropdown = false
                             }
@@ -1519,10 +1537,14 @@ fun InteractiveMapScreen(
                     }
                 }
 
-                // Botón 3: "Ocultar Etapas" (Oculta las líneas y puntos del mapa)
+                // Botón 3: "Ocultar" (Oculta las líneas y puntos del mapa en Este Camino/Viaje o en Total Caminos/Viajes)
                 OutlinedButton(
                     onClick = {
-                        selectedStageIds = emptySet()
+                        if (mapScopeMode == MapScopeMode.TOTAL) {
+                            isTotalHidden = true
+                        } else {
+                            selectedStageIds = emptySet()
+                        }
                         selectedDetailStage = null
                     },
                     shape = RoundedCornerShape(10.dp),
@@ -1534,7 +1556,7 @@ fun InteractiveMapScreen(
                     Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "Ocultar Etapas",
+                        text = if (isTravel) "Ocultar Días" else "Ocultar Etapas",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
