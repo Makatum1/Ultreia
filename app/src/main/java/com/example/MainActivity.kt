@@ -47,7 +47,6 @@ import com.example.data.backup.GlobalBackupType
 import com.example.ui.CaminoViewModel
 import com.example.ui.MainTab
 import com.example.ui.NavigationDestination
-import com.example.ui.components.SettingsActionMenu
 import com.example.ui.components.ThemeOptionRow
 import com.example.ui.screens.*
 import com.example.ui.settings.LanguageMode

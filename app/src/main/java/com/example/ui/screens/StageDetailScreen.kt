@@ -66,7 +66,6 @@ import com.example.data.model.RoomPriceOption
 import com.example.data.model.StageEntity
 import com.example.data.model.VivenciaItem
 import com.example.ui.CaminoViewModel
-import com.example.ui.components.SettingsActionMenu
 import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
