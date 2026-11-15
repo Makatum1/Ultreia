@@ -237,7 +237,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                         Icon(
                             imageVector = if (isTravelProfile) Icons.Default.Luggage else Icons.Default.Hiking,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     },
                     label = {
@@ -264,7 +264,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                         Icon(
                             Icons.Default.ViewDay,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     },
                     label = {
@@ -291,7 +291,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                         Icon(
                             Icons.Default.Map,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     },
                     label = {
@@ -318,7 +318,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                         Icon(
                             Icons.Default.BarChart,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     },
                     label = {
@@ -345,7 +345,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                         Icon(
                             Icons.Default.Tune,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     },
                     label = {
@@ -372,7 +372,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                         Icon(
                             Icons.Default.HelpOutline,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     },
                     label = {

@@ -539,28 +539,17 @@ fun CaminoHeaderBanner(
                     )
             )
 
-            // Fecha en la esquina superior derecha (alineada a la derecha, limpia sin recuadro)
+            // Fecha en la esquina superior derecha (alineada a la derecha, solo texto sin icono ni recuadro)
             if (camino.startDate.isNotBlank()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Text(
+                    text = camino.startDate,
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(14.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarToday,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        text = camino.startDate,
-                        fontSize = 11.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                )
             }
 
             // Header Texts (centro e izquierda limpios para el título)
