@@ -177,7 +177,10 @@ fun CaminoDetailScreen(
         floatingActionButton = {
             if (selectedTab == 0) {
                 FloatingActionButton(
-                    onClick = { showAddStageDialog = true },
+                    onClick = {
+                        viewModel.resetExportingState()
+                        showAddStageDialog = true
+                    },
                     containerColor = CaminoBlue,
                     contentColor = Color.White,
                     modifier = Modifier.testTag("fab_add_stage")

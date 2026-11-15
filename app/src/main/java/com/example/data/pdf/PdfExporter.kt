@@ -147,15 +147,23 @@ object PdfExporter {
             pdfDocument.close()
 
             withContext(Dispatchers.Main) {
-                val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/pdf"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_SUBJECT, titleText)
-                    putExtra(Intent.EXTRA_TEXT, "Comparto la estadística de viaje generada con Ultreia.")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                try {
+                    val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, titleText)
+                        putExtra(Intent.EXTRA_TEXT, "Comparto la estadística de viaje generada con Ultreia.")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    val chooser = Intent.createChooser(intent, "Compartir Estadística en PDF").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(chooser)
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                context.startActivity(Intent.createChooser(intent, "Compartir Estadística en PDF"))
             }
             pdfFile
         } catch (e: Exception) {
@@ -502,15 +510,15 @@ object PdfExporter {
             tableY += rowH
         }
 
-        // Mapa general de la ruta (Portada del PDF) justo debajo del listado de etapas
+        // Mapa general de la ruta (Portada del PDF) justo debajo del listado de etapas (Vista Cenital 2D)
         val availableH = PAGE_HEIGHT - 35f - tableY
-        val mapDrawnOnCover = if (availableH >= 135f) {
+        val mapDrawnOnCover = if (availableH >= 120f) {
             val bannerY = drawSectionBanner(
                 canvas,
                 tableY + 6f,
-                if (isTravel) "MAPA GENERAL DEL VIAJE (VISTA SATÉLITE)" else "MAPA GENERAL DEL CAMINO (VISTA SATÉLITE)",
+                if (isTravel) "MAPA GENERAL DEL VIAJE (VISTA CENITAL 2D)" else "MAPA GENERAL DEL CAMINO (VISTA CENITAL 2D)",
                 COLOR_NAVY,
-                "🛰️"
+                "🗺️"
             )
             val mapBox = RectF(MARGIN, bannerY + 4f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 35f)
             drawMultiStageMapOnCanvas(context, canvas, stages, mapBox, isTravel)
@@ -544,7 +552,7 @@ object PdfExporter {
         paint.textSize = 9.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         canvas.drawText(
-            if (isTravel) "ULTREIA VIAJES • MAPA CARTOGRÁFICO GENERAL" else "ULTREIA • MAPA CARTOGRÁFICO GENERAL DEL CAMINO",
+            if (isTravel) "ULTREIA VIAJES • MAPA CARTOGRÁFICO GENERAL (VISTA CENITAL 2D)" else "ULTREIA • MAPA CARTOGRÁFICO GENERAL DEL CAMINO (VISTA CENITAL 2D)",
             MARGIN,
             24f,
             paint
@@ -1733,8 +1741,8 @@ object PdfExporter {
             try {
                 val url = URL(urlString)
                 val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 1800
-                conn.readTimeout = 2200
+                conn.connectTimeout = 600
+                conn.readTimeout = 800
                 conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:100.0) Ultreia/2.0")
                 if (conn.responseCode == 200) {
                     val input = conn.inputStream
@@ -1750,52 +1758,70 @@ object PdfExporter {
                     }
                 }
             } catch (_: Exception) {
-                // Ignore network errors and try next
+                // Si la conexión falla o tarda, saltar de inmediato para no demorar la exportación
             }
         }
         return null
     }
 
-    private fun generateOfflineReliefBitmap(w: Int, h: Int): Bitmap {
+    /**
+     * Generador de fondo de mapa 2D en vista cenital (plana) optimizado específicamente
+     * para impresión en papel (ahorro de tinta, contraste alto y curvas de nivel ortogonales).
+     */
+    private fun generate2DPrintReliefBitmap(w: Int, h: Int): Bitmap {
         val safeW = w.coerceAtLeast(120)
         val safeH = h.coerceAtLeast(80)
         val bitmap = Bitmap.createBitmap(safeW, safeH, Bitmap.Config.ARGB_8888)
         val c = Canvas(bitmap)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
 
+        // Fondo claro en tonos papel de alta calidad (evita manchas oscuras al imprimir)
         val gradient = LinearGradient(
-            0f, 0f, safeW.toFloat(), safeH.toFloat(),
-            intArrayOf(Color.rgb(38, 55, 46), Color.rgb(52, 70, 58), Color.rgb(60, 80, 64), Color.rgb(44, 62, 50)),
+            0f, 0f, 0f, safeH.toFloat(),
+            intArrayOf(Color.rgb(250, 252, 254), Color.rgb(243, 246, 250), Color.rgb(238, 243, 248)),
             null, Shader.TileMode.CLAMP
         )
         p.shader = gradient
         c.drawRect(0f, 0f, safeW.toFloat(), safeH.toFloat(), p)
         p.shader = null
 
+        // Cuadrícula cartográfica 2D ortogonal fina
         p.style = Paint.Style.STROKE
-        p.strokeWidth = 1f
-        p.color = Color.argb(45, 255, 255, 255)
-        val numCurves = 6
-        for (i in 1..numCurves) {
-            val yBase = (safeH * i) / (numCurves + 1f)
-            val path = Path()
-            path.moveTo(0f, yBase)
-            path.cubicTo(safeW * 0.3f, yBase - 12f + (i * 2), safeW * 0.7f, yBase + 12f - (i * 2), safeW.toFloat(), yBase)
-            c.drawPath(path, p)
-        }
-
-        p.strokeWidth = 0.5f
-        p.color = Color.argb(20, 255, 255, 255)
+        p.strokeWidth = 0.6f
+        p.color = Color.rgb(226, 232, 240)
         var gx = 0
         while (gx < safeW) {
             c.drawLine(gx.toFloat(), 0f, gx.toFloat(), safeH.toFloat(), p)
-            gx += 50
+            gx += 40
         }
         var gy = 0
         while (gy < safeH) {
             c.drawLine(0f, gy.toFloat(), safeW.toFloat(), gy.toFloat(), p)
-            gy += 50
+            gy += 40
         }
+
+        // Curvas de nivel topográficas 2D ortogonales (vista de pájaro plana)
+        p.strokeWidth = 0.8f
+        p.color = Color.argb(45, 100, 116, 139)
+        val numCurves = 5
+        for (i in 1..numCurves) {
+            val yBase = (safeH * i) / (numCurves + 1f)
+            val path = Path()
+            path.moveTo(0f, yBase)
+            path.cubicTo(
+                safeW * 0.25f, yBase - 10f + (i * 2),
+                safeW * 0.75f, yBase + 10f - (i * 2),
+                safeW.toFloat(), yBase
+            )
+            c.drawPath(path, p)
+        }
+
+        // Flecha indicadora de Norte plano ortogonal (cenital)
+        p.style = Paint.Style.FILL
+        p.color = Color.argb(120, 71, 85, 105)
+        p.textSize = 8f
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        c.drawText("↑ N", safeW - 24f, 16f, p)
 
         return bitmap
     }
@@ -1818,6 +1844,11 @@ object PdfExporter {
         val numX = (maxTX - minTX + 1).coerceAtLeast(1)
         val numY = (maxTY - minTY + 1).coerceAtLeast(1)
 
+        // Si se requieren más de 6 teselas, recurrir directamente al mapa 2D ortogonal para evitar bloqueos
+        if (numX * numY > 6) {
+            return generate2DPrintReliefBitmap(targetW, targetH)
+        }
+
         val stitched = Bitmap.createBitmap(numX * 256, numY * 256, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(stitched)
         var anyTileSuccess = false
@@ -1833,7 +1864,7 @@ object PdfExporter {
         }
 
         if (!anyTileSuccess) {
-            return generateOfflineReliefBitmap(targetW, targetH)
+            return generate2DPrintReliefBitmap(targetW, targetH)
         }
 
         val x1 = ((lonToTileX(minLon, zoom) - minTX) * 256.0).toFloat().coerceIn(0f, (numX * 256).toFloat())
@@ -1845,7 +1876,23 @@ object PdfExporter {
         val cropH = (y2 - y1).toInt().coerceAtLeast(1)
 
         return try {
-            Bitmap.createBitmap(stitched, x1.toInt(), y1.toInt(), cropW, cropH)
+            val cropped = Bitmap.createBitmap(stitched, x1.toInt(), y1.toInt(), cropW, cropH)
+            // Filtro de brillo y contraste adaptado a papel para que no gaste tinta excesiva ni resulte oscuro
+            val printOptimized = Bitmap.createBitmap(cropped.width, cropped.height, Bitmap.Config.ARGB_8888)
+            val printCanvas = Canvas(printOptimized)
+            val printPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                val cm = ColorMatrix().apply {
+                    set(floatArrayOf(
+                        1.12f, 0f, 0f, 0f, 25f,
+                        0f, 1.12f, 0f, 0f, 25f,
+                        0f, 0f, 1.12f, 0f, 25f,
+                        0f, 0f, 0f, 1f, 0f
+                    ))
+                }
+                colorFilter = ColorMatrixColorFilter(cm)
+            }
+            printCanvas.drawBitmap(cropped, 0f, 0f, printPaint)
+            printOptimized
         } catch (_: Exception) {
             stitched
         }
@@ -1854,33 +1901,37 @@ object PdfExporter {
     private fun drawMapPin(canvas: Canvas, x: Float, y: Float, color: Int, label: String) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = Color.WHITE
-        canvas.drawCircle(x, y, 6f, p)
+        canvas.drawCircle(x, y, 5.5f, p)
         p.color = color
-        canvas.drawCircle(x, y, 4f, p)
+        canvas.drawCircle(x, y, 3.8f, p)
 
-        p.textSize = 7.5f
+        p.textSize = 7f
         p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val textW = p.measureText(label)
-        val badgeRect = RectF(x - textW / 2 - 3f, y - 16f, x + textW / 2 + 3f, y - 6f)
+        val badgeRect = RectF(x - textW / 2 - 3f, y - 15f, x + textW / 2 + 3f, y - 5.5f)
         p.color = Color.argb(220, 28, 75, 100)
         canvas.drawRoundRect(badgeRect, 2f, 2f, p)
         p.color = Color.WHITE
-        canvas.drawText(label, x - textW / 2, y - 8.5f, p)
+        canvas.drawText(label, x - textW / 2, y - 7.5f, p)
     }
 
-    private fun drawSatelliteBadge(canvas: Canvas, bounds: RectF) {
+    private fun drawPrintBadge(canvas: Canvas, bounds: RectF) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.textSize = 6.5f
         p.typeface = Typeface.DEFAULT
-        val label = "🛰️ Satélite • Ultreia"
+        val label = "🗺️ Vista Cenital 2D • Impresión en papel"
         val textW = p.measureText(label)
         val badge = RectF(bounds.right - textW - 10f, bounds.bottom - 13f, bounds.right - 4f, bounds.bottom - 3f)
-        p.color = Color.argb(160, 0, 0, 0)
+        p.color = Color.argb(210, 255, 255, 255)
         canvas.drawRoundRect(badge, 2f, 2f, p)
-        p.color = Color.WHITE
-        canvas.drawText(label, bounds.right - textW - 7f, bounds.bottom - 5f, p)
+        p.color = COLOR_SLATE
+        canvas.drawText(label, bounds.right - textW - 7f, bounds.bottom - 4.5f, p)
     }
 
+    /**
+     * Dibuja el mapa individual del track en vista 2D (cenital plana / vista de pájaro sin perspectiva 3D).
+     * Aplica preservación estricta de la relación de aspecto 1:1 mediante BoundingBox con encuadre perfecto.
+     */
     private fun drawMiniTrackOnCanvas(
         context: Context,
         canvas: Canvas,
@@ -1894,14 +1945,15 @@ object PdfExporter {
         val minLon = points.minOf { it.lon }
         val maxLon = points.maxOf { it.lon }
 
-        val latMargin = maxOf((maxLat - minLat) * 0.12, 0.005)
-        val lonMargin = maxOf((maxLon - minLon) * 0.12, 0.005)
+        // Margen de seguridad del 10% para encuadre holgado que nunca toque los bordes
+        val latMargin = maxOf((maxLat - minLat) * 0.10, 0.005)
+        val lonMargin = maxOf((maxLon - minLon) * 0.10, 0.005)
         val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
         val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
         val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
         val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
 
-        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 15, 6)
+        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 14, 4)
         val mapBitmap = getSatelliteOrReliefBitmap(
             context,
             bbMinLat,
@@ -1919,27 +1971,39 @@ object PdfExporter {
         canvas.save()
         canvas.clipPath(clipPath)
 
+        // 1. Fondo de mapa 2D
         val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             isFilterBitmap = true
             isDither = true
         }
         canvas.drawBitmap(mapBitmap, null, bounds, bmpPaint)
 
-        val overlayPaint = Paint().apply {
-            color = Color.argb(25, 0, 0, 0)
-        }
-        canvas.drawRect(bounds, overlayPaint)
+        // 2. Proyección Cenital 2D Ortogonal (1:1 Aspect Ratio)
+        val padding = 14f
+        val availW = (bounds.width() - 2 * padding).coerceAtLeast(10f)
+        val availH = (bounds.height() - 2 * padding).coerceAtLeast(10f)
+
+        val xMinTile = lonToTileX(bbMinLon, zoom)
+        val xMaxTile = lonToTileX(bbMaxLon, zoom)
+        val yMinMerc = latToMercatorY(bbMaxLat, zoom) // Norte
+        val yMaxMerc = latToMercatorY(bbMinLat, zoom) // Sur
+
+        val spanX = ((xMaxTile - xMinTile) * 256.0).coerceAtLeast(1.0)
+        val spanY = ((yMaxMerc - yMinMerc) * 256.0).coerceAtLeast(1.0)
+
+        // Escala uniforme para mantener estrictamente la vista cenital 2D sin inclinación 3D ni distorsión
+        val scale = minOf(availW / spanX, availH / spanY).toFloat()
+        val actualW = (spanX * scale).toFloat()
+        val actualH = (spanY * scale).toFloat()
+
+        val originX = bounds.left + padding + (availW - actualW) / 2f
+        val originY = bounds.top + padding + (availH - actualH) / 2f
 
         fun projectX(lon: Double): Float {
-            return bounds.left + ((lon - bbMinLon) / (bbMaxLon - bbMinLon) * bounds.width()).toFloat()
+            return originX + ((lonToTileX(lon, zoom) - xMinTile) * 256.0 * scale).toFloat()
         }
         fun projectY(lat: Double): Float {
-            val y1 = latToMercatorY(bbMaxLat, zoom)
-            val y2 = latToMercatorY(bbMinLat, zoom)
-            val yP = latToMercatorY(lat, zoom)
-            val span = (y2 - y1).coerceAtLeast(0.000001)
-            val norm = ((yP - y1) / span).coerceIn(0.0, 1.0)
-            return bounds.top + (norm * bounds.height()).toFloat()
+            return originY + ((latToMercatorY(lat, zoom) - yMinMerc) * 256.0 * scale).toFloat()
         }
 
         val trackPath = Path()
@@ -1956,25 +2020,24 @@ object PdfExporter {
             strokeJoin = Paint.Join.ROUND
         }
 
+        // 1. Halo blanco para máximo contraste y legibilidad en papel impreso
         trackPaint.color = Color.WHITE
         trackPaint.strokeWidth = 5.2f
         canvas.drawPath(trackPath, trackPaint)
 
-        trackPaint.color = Color.rgb(0, 102, 238)
+        // 2. Línea principal del recorrido (Azul zafiro nítido de alta densidad)
+        trackPaint.color = Color.rgb(29, 78, 216)
         trackPaint.strokeWidth = 2.8f
         canvas.drawPath(trackPath, trackPaint)
 
+        // Marcadores 2D ortogonales
         val pStart = points.first()
-        val sx = projectX(pStart.lon)
-        val sy = projectY(pStart.lat)
-        drawMapPin(canvas, sx, sy, COLOR_EMERALD, "Inicio")
+        drawMapPin(canvas, projectX(pStart.lon), projectY(pStart.lat), COLOR_EMERALD, "Inicio")
 
         val pEnd = points.last()
-        val ex = projectX(pEnd.lon)
-        val ey = projectY(pEnd.lat)
-        drawMapPin(canvas, ex, ey, COLOR_GOLD_DARK, "Fin")
+        drawMapPin(canvas, projectX(pEnd.lon), projectY(pEnd.lat), COLOR_GOLD_DARK, "Fin")
 
-        drawSatelliteBadge(canvas, bounds)
+        drawPrintBadge(canvas, bounds)
 
         canvas.restore()
 
@@ -1986,6 +2049,10 @@ object PdfExporter {
         canvas.drawRoundRect(bounds, 6f, 6f, borderPaint)
     }
 
+    /**
+     * Dibuja el mapa general de todos los tracks en vista 2D plana (cenital / de pájaro)
+     * adaptado para la primera página o página completa del PDF para su óptima impresión en papel.
+     */
     private fun drawMultiStageMapOnCanvas(
         context: Context,
         canvas: Canvas,
@@ -2021,14 +2088,14 @@ object PdfExporter {
         val minLon = allPoints.minOf { it.lon }
         val maxLon = allPoints.maxOf { it.lon }
 
-        val latMargin = maxOf((maxLat - minLat) * 0.12, 0.01)
-        val lonMargin = maxOf((maxLon - minLon) * 0.12, 0.01)
+        val latMargin = maxOf((maxLat - minLat) * 0.10, 0.01)
+        val lonMargin = maxOf((maxLon - minLon) * 0.10, 0.01)
         val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
         val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
         val bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
         val bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
 
-        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 14, 8)
+        val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 13, 6)
         val mapBitmap = getSatelliteOrReliefBitmap(
             context,
             bbMinLat,
@@ -2046,33 +2113,44 @@ object PdfExporter {
         canvas.save()
         canvas.clipPath(clipPath)
 
+        // 1. Fondo de mapa 2D
         val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             isFilterBitmap = true
             isDither = true
         }
         canvas.drawBitmap(mapBitmap, null, bounds, bmpPaint)
 
-        val overlayPaint = Paint().apply {
-            color = Color.argb(25, 0, 0, 0)
-        }
-        canvas.drawRect(bounds, overlayPaint)
+        // 2. Proyección cenital 2D ortogonal con escala uniforme 1:1
+        val padding = 16f
+        val availW = (bounds.width() - 2 * padding).coerceAtLeast(10f)
+        val availH = (bounds.height() - 2 * padding).coerceAtLeast(10f)
+
+        val xMinTile = lonToTileX(bbMinLon, zoom)
+        val xMaxTile = lonToTileX(bbMaxLon, zoom)
+        val yMinMerc = latToMercatorY(bbMaxLat, zoom)
+        val yMaxMerc = latToMercatorY(bbMinLat, zoom)
+
+        val spanX = ((xMaxTile - xMinTile) * 256.0).coerceAtLeast(1.0)
+        val spanY = ((yMaxMerc - yMinMerc) * 256.0).coerceAtLeast(1.0)
+
+        val scale = minOf(availW / spanX, availH / spanY).toFloat()
+        val actualW = (spanX * scale).toFloat()
+        val actualH = (spanY * scale).toFloat()
+
+        val originX = bounds.left + padding + (availW - actualW) / 2f
+        val originY = bounds.top + padding + (availH - actualH) / 2f
 
         fun projectX(lon: Double): Float {
-            return bounds.left + ((lon - bbMinLon) / (bbMaxLon - bbMinLon) * bounds.width()).toFloat()
+            return originX + ((lonToTileX(lon, zoom) - xMinTile) * 256.0 * scale).toFloat()
         }
         fun projectY(lat: Double): Float {
-            val y1 = latToMercatorY(bbMaxLat, zoom)
-            val y2 = latToMercatorY(bbMinLat, zoom)
-            val yP = latToMercatorY(lat, zoom)
-            val span = (y2 - y1).coerceAtLeast(0.000001)
-            val norm = ((yP - y1) / span).coerceIn(0.0, 1.0)
-            return bounds.top + (norm * bounds.height()).toFloat()
+            return originY + ((latToMercatorY(lat, zoom) - yMinMerc) * 256.0 * scale).toFloat()
         }
 
         val stageColors = listOf(
-            Color.rgb(37, 99, 235),  // Azul
-            Color.rgb(22, 163, 74),  // Verde
-            Color.rgb(217, 119, 6),  // Ámbar
+            Color.rgb(29, 78, 216),  // Azul Real
+            Color.rgb(22, 163, 74),  // Verde Esmeralda
+            Color.rgb(217, 119, 6),  // Ámbar Dorado
             Color.rgb(147, 51, 234), // Púrpura
             Color.rgb(225, 29, 72),  // Rojo Carmín
             Color.rgb(13, 148, 136), // Turquesa
@@ -2096,10 +2174,12 @@ object PdfExporter {
                 if (i == 0) stagePath.moveTo(x, y) else stagePath.lineTo(x, y)
             }
 
+            // Halo blanco
             linePaint.color = Color.WHITE
             linePaint.strokeWidth = 4.8f
             canvas.drawPath(stagePath, linePaint)
 
+            // Línea de la etapa
             val color = stageColors[index % stageColors.size]
             linePaint.color = color
             linePaint.strokeWidth = 2.6f
@@ -2130,7 +2210,7 @@ object PdfExporter {
             }
         }
 
-        drawSatelliteBadge(canvas, bounds)
+        drawPrintBadge(canvas, bounds)
 
         canvas.restore()
 
@@ -2214,24 +2294,32 @@ object PdfExporter {
     }
 
     private fun sharePdfFile(context: Context, file: File, title: String, isTravel: Boolean) {
-        val uri: Uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
+        try {
+            val uri: Uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
 
-        val subject = title
-        val bodyText = title
+            val subject = title
+            val bodyText = title
 
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, subject)
-            putExtra(Intent.EXTRA_TEXT, bodyText)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, subject)
+                putExtra(Intent.EXTRA_TEXT, bodyText)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            val chooserTitle = "Compartir: $title"
+            val chooser = Intent.createChooser(intent, chooserTitle).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-
-        val chooserTitle = "Compartir: $title"
-        context.startActivity(Intent.createChooser(intent, chooserTitle))
     }
 }

@@ -281,9 +281,9 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     _userMessage.value = "¡Importación completada! ($count rutas procesadas)"
                     val first = repository.getAllCaminosOnce().firstOrNull()
                     if (first != null) selectCamino(first.id)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    _userMessage.value = "Error al aplicar importación: ${e.message}"
+                } catch (t: Throwable) {
+                    t.printStackTrace()
+                    _userMessage.value = "Error al aplicar importación: ${t.message}"
                 } finally {
                     _isExportingPdf.value = false
                 }
@@ -323,9 +323,9 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     val first = repository.getAllCaminosOnce().firstOrNull()
                     if (first != null) selectCamino(first.id)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _userMessage.value = "Error al importar: ${e.message}"
+            } catch (t: Throwable) {
+                t.printStackTrace()
+                _userMessage.value = "Error al importar: ${t.message}"
             } finally {
                 _isExportingPdf.value = false
             }
@@ -364,8 +364,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     _userMessage.value = "Error al generar archivo ZIP"
                 }
-            } catch (e: Exception) {
-                _userMessage.value = "Error al exportar ZIP: ${e.message}"
+            } catch (t: Throwable) {
+                _userMessage.value = "Error al exportar ZIP: ${t.message}"
             } finally {
                 _isExportingPdf.value = false
             }
@@ -382,8 +382,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     _userMessage.value = "Error al generar copia de seguridad"
                 }
-            } catch (e: Exception) {
-                _userMessage.value = "Error: ${e.message}"
+            } catch (t: Throwable) {
+                _userMessage.value = "Error: ${t.message}"
             } finally {
                 _isExportingPdf.value = false
             }
@@ -404,8 +404,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     _userMessage.value = "Error al exportar ruta"
                 }
-            } catch (e: Exception) {
-                _userMessage.value = "Error al exportar: ${e.message}"
+            } catch (t: Throwable) {
+                _userMessage.value = "Error al exportar: ${t.message}"
             } finally {
                 _isExportingPdf.value = false
             }
@@ -444,6 +444,10 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _isExportingPdf = MutableStateFlow(false)
     val isExportingPdf: StateFlow<Boolean> = _isExportingPdf.asStateFlow()
+
+    fun resetExportingState() {
+        _isExportingPdf.value = false
+    }
 
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
@@ -1152,7 +1156,12 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun exportToPdf(context: Context) {
-        val currentCamino = selectedCamino.value ?: return
+        val currentCamino = selectedCamino.value
+        if (currentCamino == null) {
+            _userMessage.value = "Selecciona una ruta antes de exportar"
+            _isExportingPdf.value = false
+            return
+        }
         val currentStages = stages.value
 
         viewModelScope.launch {
@@ -1160,13 +1169,13 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val file = PdfExporter.generateAndSharePdf(context, currentCamino, currentStages, repository)
                 if (file != null) {
-                    _userMessage.value = "Guía de viaje profesional en PDF generada con éxito."
+                    _userMessage.value = "Guía de viaje en PDF generada con éxito."
                 } else {
                     _userMessage.value = "No se pudo generar el documento PDF"
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _userMessage.value = "Error al generar PDF: ${e.message}"
+            } catch (t: Throwable) {
+                t.printStackTrace()
+                _userMessage.value = "Error al generar PDF: ${t.message}"
             } finally {
                 _isExportingPdf.value = false
             }
@@ -1188,13 +1197,13 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     stages = stageList
                 )
                 if (file != null) {
-                    _userMessage.value = "Estadística del viaje exportada con éxito"
+                    _userMessage.value = "Estadística de viaje exportada con éxito"
                 } else {
                     _userMessage.value = "No se pudo generar el PDF de estadísticas"
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _userMessage.value = "Error al exportar estadística: ${e.message}"
+            } catch (t: Throwable) {
+                t.printStackTrace()
+                _userMessage.value = "Error al exportar estadística: ${t.message}"
             } finally {
                 _isExportingPdf.value = false
             }

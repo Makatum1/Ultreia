@@ -304,6 +304,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             if (currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail && targetCamino != null) {
                 FloatingActionButton(
                     onClick = {
+                        viewModel.resetExportingState()
                         if (selectedCamino == null) {
                             viewModel.selectCamino(targetCamino.id)
                         }
@@ -398,10 +399,19 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 }
             }
 
+            LaunchedEffect(isExportingPdf) {
+                if (isExportingPdf) {
+                    delay(12000)
+                    viewModel.resetExportingState()
+                }
+            }
+
             if (isExportingPdf) {
                 Surface(
                     color = Color.Black.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { viewModel.resetExportingState() }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Card(
