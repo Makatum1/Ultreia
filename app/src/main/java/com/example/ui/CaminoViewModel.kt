@@ -60,33 +60,67 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     private val _isTravelProfile = MutableStateFlow(false)
     val isTravelProfile: StateFlow<Boolean> = _isTravelProfile.asStateFlow()
 
+    private var _lastSelectedCaminoId: Long? = null
+    private var _lastSelectedTripId: Long? = null
+
+    fun restoreLastSelectedForProfile(isTravel: Boolean) {
+        val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+        val candidateList = caminos.value.filter { it.isTravelGuide == isTravel }
+        val key = if (isTravel) "last_active_trip_id" else "last_active_camino_id"
+        val inMemoryId = if (isTravel) _lastSelectedTripId else _lastSelectedCaminoId
+        val savedId = inMemoryId ?: prefs.getLong(key, -1L).takeIf { it != -1L }
+
+        val targetId = if (savedId != null && candidateList.any { it.id == savedId }) {
+            savedId
+        } else {
+            candidateList.firstOrNull()?.id
+        }
+
+        if (targetId != null) {
+            _selectedCaminoId.value = targetId
+            _selectedStageId.value = null
+            if (isTravel) {
+                _lastSelectedTripId = targetId
+                prefs.edit().putLong("last_active_trip_id", targetId).apply()
+            } else {
+                _lastSelectedCaminoId = targetId
+                prefs.edit().putLong("last_active_camino_id", targetId).apply()
+            }
+        } else {
+            _selectedCaminoId.value = null
+            _selectedStageId.value = null
+        }
+    }
+
     fun toggleTravelProfile() {
-        _isTravelProfile.value = !_isTravelProfile.value
+        val newProfile = !_isTravelProfile.value
+        _isTravelProfile.value = newProfile
+        restoreLastSelectedForProfile(newProfile)
     }
 
     fun selectTab(tab: MainTab) {
         _currentTab.value = tab
         _selectedStageId.value = null
         if ((tab == MainTab.STAGES || tab == MainTab.MAP || tab == MainTab.STATS) && _selectedCaminoId.value == null) {
-            val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
-            val lastId = prefs.getLong("last_active_camino_id", -1L)
-            if (lastId != -1L && caminos.value.any { it.id == lastId }) {
-                _selectedCaminoId.value = lastId
-            } else {
-                val first = caminos.value.firstOrNull()
-                if (first != null) {
-                    _selectedCaminoId.value = first.id
-                }
-            }
+            restoreLastSelectedForProfile(_isTravelProfile.value)
         }
     }
 
     fun selectCamino(caminoId: Long) {
+        val target = caminos.value.firstOrNull { it.id == caminoId }
+        val isTravel = target?.isTravelGuide ?: _isTravelProfile.value
+        val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+        if (isTravel) {
+            _lastSelectedTripId = caminoId
+            prefs.edit().putLong("last_active_trip_id", caminoId).apply()
+        } else {
+            _lastSelectedCaminoId = caminoId
+            prefs.edit().putLong("last_active_camino_id", caminoId).apply()
+        }
+        _isTravelProfile.value = isTravel
         _selectedCaminoId.value = caminoId
         _selectedStageId.value = null
         _currentTab.value = MainTab.STAGES
-        val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putLong("last_active_camino_id", caminoId).apply()
     }
 
     // Settings: Theme & Language
@@ -408,6 +442,17 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun navigateToCamino(caminoId: Long, initialTab: Int = 0) {
+        val target = caminos.value.firstOrNull { it.id == caminoId }
+        val isTravel = target?.isTravelGuide ?: _isTravelProfile.value
+        val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+        if (isTravel) {
+            _lastSelectedTripId = caminoId
+            prefs.edit().putLong("last_active_trip_id", caminoId).apply()
+        } else {
+            _lastSelectedCaminoId = caminoId
+            prefs.edit().putLong("last_active_camino_id", caminoId).apply()
+        }
+        _isTravelProfile.value = isTravel
         _selectedCaminoId.value = caminoId
         _currentDestination.value = NavigationDestination.CaminoDetail(caminoId, initialTab)
     }

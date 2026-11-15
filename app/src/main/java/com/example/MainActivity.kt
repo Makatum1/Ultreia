@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
 fun UltreiaApp(viewModel: CaminoViewModel) {
     val context = LocalContext.current
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    val isTravelProfile by viewModel.isTravelProfile.collectAsStateWithLifecycle()
     val destination by viewModel.currentDestination.collectAsStateWithLifecycle()
     val caminos by viewModel.caminos.collectAsStateWithLifecycle()
     val selectedCamino by viewModel.selectedCamino.collectAsStateWithLifecycle()
@@ -203,15 +204,17 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
         }
     }
 
-    // Default select first or last active Camino if none is selected
-    LaunchedEffect(caminos, selectedCamino) {
+    // Default select first or last active Camino/Trip if none is selected
+    LaunchedEffect(caminos, selectedCamino, isTravelProfile) {
         if (selectedCamino == null && caminos.isNotEmpty()) {
             val prefs = context.getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
-            val lastId = prefs.getLong("last_active_camino_id", -1L)
-            if (lastId != -1L && caminos.any { it.id == lastId }) {
+            val filtered = caminos.filter { it.isTravelGuide == isTravelProfile }
+            val key = if (isTravelProfile) "last_active_trip_id" else "last_active_camino_id"
+            val lastId = prefs.getLong(key, -1L)
+            if (lastId != -1L && filtered.any { it.id == lastId }) {
                 viewModel.selectCamino(lastId)
             } else {
-                viewModel.selectCamino(caminos.first().id)
+                filtered.firstOrNull()?.let { viewModel.selectCamino(it.id) }
             }
         }
     }
@@ -224,12 +227,17 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 tonalElevation = 8.dp,
                 modifier = Modifier.testTag("main_bottom_navigation_bar")
             ) {
-                // Button 1: Caminos
+                // Button 1: Caminos / Viajes
                 NavigationBarItem(
                     selected = currentTab == MainTab.CAMINOS && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.CAMINOS) },
-                    icon = { Icon(Icons.Default.Hiking, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_caminos")) },
+                    icon = {
+                        Icon(
+                            imageVector = if (isTravelProfile) Icons.Default.Luggage else Icons.Default.Hiking,
+                            contentDescription = null
+                        )
+                    },
+                    label = { Text(if (isTravelProfile) "Viajes" else viewModel.string("tab_caminos")) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -237,12 +245,12 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     modifier = Modifier.testTag("btn_bottom_caminos")
                 )
 
-                // Button 2: Etapas
+                // Button 2: Etapas / Días
                 NavigationBarItem(
                     selected = currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail,
                     onClick = { viewModel.selectTab(MainTab.STAGES) },
                     icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
-                    label = { Text(viewModel.string("tab_stages")) },
+                    label = { Text(if (isTravelProfile) "Días" else viewModel.string("tab_stages")) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight

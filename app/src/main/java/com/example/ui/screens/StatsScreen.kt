@@ -379,6 +379,7 @@ private fun ActiveCaminoDataContent(
     }
 
     val completedKmStr = remember(completedKm) { String.format(Locale.US, "%.1f", completedKm) }
+    val isTravel = camino?.isTravelGuide == true
 
     LazyColumn(
         modifier = Modifier
@@ -403,7 +404,6 @@ private fun ActiveCaminoDataContent(
                 ) {
                     // Icono: Compostela o Pasaporte al 100% (sin círculo), Medalla en caso contrario
                     if (progressPercent >= 100) {
-                        val isTravel = camino?.isTravelGuide == true
                         Image(
                             painter = if (isTravel) {
                                 painterResource(id = R.drawable.pasaporte)
@@ -593,7 +593,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Nombre de la ruta:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Nombre:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(camino.title, fontWeight = FontWeight.Bold)
                     }
 
@@ -601,7 +601,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Distancia completada:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Distancia:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("$completedKmStr km", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
 
@@ -609,7 +609,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel positivo superado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Desnivel positivo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("+$completedElevationGain m", fontWeight = FontWeight.Bold)
                     }
 
@@ -617,7 +617,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel negativo completado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Desnivel negativo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("-$completedElevationLoss m", fontWeight = FontWeight.Bold)
                     }
 
@@ -625,7 +625,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Tiempo en ruta completado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Tiempo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(completedTimeStr, fontWeight = FontWeight.Bold, color = CaminoBlueDark)
                     }
 
@@ -633,7 +633,10 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("$stageTermPlural completadas:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (isTravel) "Días completados:" else "Etapas completadas:",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text("$completedStages de $totalStages", fontWeight = FontWeight.Bold)
                     }
 
@@ -656,8 +659,8 @@ private fun ActiveCaminoDataContent(
             }
         }
 
-        // DESGLOSE DE ALOJAMIENTOS DE ESTE CAMINO
-        if (caminoAccommodations.isNotEmpty()) {
+        // DESGLOSE DE ALOJAMIENTOS DE ESTE CAMINO (Solo en perfil Caminos)
+        if (!isTravel && caminoAccommodations.isNotEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -961,7 +964,10 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Caminos completados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (isTravel) "Viajes:" else "Caminos completados:",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text("$totalCaminosRealizados de $totalCaminosCount", fontWeight = FontWeight.Bold)
                     }
 
@@ -969,7 +975,10 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Distancia total recorrida:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (isTravel) "Distancia Total:" else "Distancia total:",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text("$completedKmStr km", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
 
@@ -977,7 +986,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel positivo superado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Desnivel positivo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("+$completedElevationGain m", fontWeight = FontWeight.Bold)
                     }
 
@@ -985,7 +994,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel negativo completado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Desnivel negativo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("-$completedElevationLoss m", fontWeight = FontWeight.Bold)
                     }
 
@@ -993,7 +1002,10 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Tiempo total en ruta:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (isTravel) "Tiempo:" else "Tiempo total:",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text(completedTimeStr, fontWeight = FontWeight.Bold, color = CaminoBlueDark)
                     }
 
@@ -1001,7 +1013,10 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Etapas completadas totales:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (isTravel) "Días completados:" else "Etapas completadas:",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text("$completedStages de $totalStages", fontWeight = FontWeight.Bold)
                     }
 
@@ -1009,7 +1024,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Alojamientos totales registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Alojamientos registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("$totalAccommodationsCount", fontWeight = FontWeight.Bold)
                     }
 
@@ -1017,7 +1032,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Gasto global acumulado:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Gasto en alojamientos:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${String.format(Locale.US, "%.2f", totalExpenseEur)} €", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
                 }
