@@ -539,36 +539,44 @@ fun CaminoHeaderBanner(
                     )
             )
 
-            // Header Texts
+            // Fecha en la esquina superior derecha (alineada a la derecha)
+            if (camino.startDate.isNotBlank()) {
+                Surface(
+                    color = Color.Black.copy(alpha = 0.50f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        text = "📅 ${camino.startDate}",
+                        fontSize = 11.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            // Header Texts (centro e izquierda limpios para el título)
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
-                    .padding(end = if (camino.isTravelGuide && onUpdateCoverPhoto != null) 120.dp else 0.dp)
+                    .padding(end = if (camino.isTravelGuide && onUpdateCoverPhoto != null) 120.dp else 16.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = PilgrimYellow,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "ULTREIA GUÍA",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CaminoBlueDark,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-
-                    if (camino.startDate.isNotBlank()) {
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "📅 ${camino.startDate}",
-                            fontSize = 11.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                Surface(
+                    color = PilgrimYellow,
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CaminoBlueDark,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
                 }
 
                 Spacer(Modifier.height(4.dp))

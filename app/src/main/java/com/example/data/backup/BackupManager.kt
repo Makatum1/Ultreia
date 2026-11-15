@@ -43,10 +43,43 @@ enum class GlobalBackupType {
 
 object BackupManager {
 
+    fun stripAccents(text: String): String {
+        val map = mapOf(
+            'á' to 'a', 'é' to 'e', 'í' to 'i', 'ó' to 'o', 'ú' to 'u', 'ü' to 'u', 'ñ' to 'n',
+            'Á' to 'A', 'É' to 'E', 'Í' to 'I', 'Ó' to 'O', 'Ú' to 'U', 'Ü' to 'U', 'Ñ' to 'N'
+        )
+        val sb = StringBuilder(text.length)
+        for (ch in text) {
+            sb.append(map[ch] ?: ch)
+        }
+        val normalized = Normalizer.normalize(sb.toString(), Normalizer.Form.NFD)
+        return normalized.replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+    }
+
+    fun sanitizeForFileName(input: String): String {
+        val unaccented = stripAccents(input.trim())
+            .removePrefix("Camino_")
+            .removePrefix("Viaje_")
+            .removePrefix("camino_")
+            .removePrefix("viaje_")
+        return unaccented
+            .replace("\\s+".toRegex(), "_")
+            .replace("[^a-zA-Z0-9_-]".toRegex(), "")
+            .replace("_+".toRegex(), "_")
+            .trim('_')
+            .ifBlank { "Ruta" }
+    }
+
     fun normalizeName(s: String): String {
-        return Normalizer.normalize(s.trim(), Normalizer.Form.NFD)
-            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        val clean = s.trim()
+            .removePrefix("Camino_")
+            .removePrefix("Viaje_")
+            .removePrefix("camino_")
+            .removePrefix("viaje_")
+        val unaccented = stripAccents(clean)
+        return unaccented
             .lowercase()
+            .replace("[^a-z0-9]".toRegex(), "")
     }
 
     fun capitalizeFirst(s: String): String {
@@ -63,14 +96,7 @@ object BackupManager {
      */
     fun getSanitizedFileName(title: String, isTravelGuide: Boolean, extension: String = "zip"): String {
         val prefix = if (isTravelGuide) "Viaje_" else "Camino_"
-        val clean = title.trim()
-            .replace("\\s+".toRegex(), "_")
-            .replace("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ_-]".toRegex(), "")
-            .removePrefix("Camino_")
-            .removePrefix("Viaje_")
-            .removePrefix("camino_")
-            .removePrefix("viaje_")
-            .ifBlank { "Ruta" }
+        val clean = sanitizeForFileName(title)
         return "${prefix}${clean}.${extension.removePrefix(".")}"
     }
 

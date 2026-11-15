@@ -350,7 +350,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 } else if (list.size == 1) {
                     com.example.data.backup.BackupManager.getSanitizedFileName(list.first().title, list.first().isTravelGuide, "zip")
                 } else {
-                    "${title.replace("\\s+".toRegex(), "_")}.zip"
+                    "${com.example.data.backup.BackupManager.sanitizeForFileName(title)}.zip"
                 }
                 val file = com.example.data.backup.BackupManager.exportToZip(
                     context = context,

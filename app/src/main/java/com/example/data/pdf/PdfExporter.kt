@@ -94,7 +94,7 @@ object PdfExporter {
             val outputDir = File(context.cacheDir, "shared_docs")
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val sanitizedTitle = camino.title.replace("[^a-zA-Z0-9]".toRegex(), "_")
+            val sanitizedTitle = com.example.data.backup.BackupManager.sanitizeForFileName(camino.title)
             val pdfFile = File(outputDir, "${sanitizedTitle}.pdf")
             val fos = FileOutputStream(pdfFile)
             pdfDocument.writeTo(fos)
@@ -139,7 +139,7 @@ object PdfExporter {
             val outputDir = File(context.cacheDir, "shared_docs")
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val safeTitle = if (isTotal) "Totales" else (camino?.title?.replace("[^a-zA-Z0-9]".toRegex(), "_") ?: "Ruta")
+            val safeTitle = if (isTotal) "Totales" else com.example.data.backup.BackupManager.sanitizeForFileName(camino?.title ?: "Ruta")
             val pdfFile = File(outputDir, "Ultreia_Estadisticas_${safeTitle}.pdf")
             val fos = FileOutputStream(pdfFile)
             pdfDocument.writeTo(fos)
@@ -1718,10 +1718,10 @@ object PdfExporter {
     }
 
     private fun downloadTile(context: Context, zoom: Int, x: Int, y: Int): Bitmap? {
-        val cacheKey = "$zoom-$x-$y"
+        val cacheKey = "roadmap-$zoom-$x-$y"
         tileMemoryCache[cacheKey]?.let { return it }
 
-        val cacheDir = File(context.cacheDir, "osm_tiles")
+        val cacheDir = File(context.cacheDir, "roadmap_tiles")
         if (!cacheDir.exists()) cacheDir.mkdirs()
         val tileFile = File(cacheDir, "$cacheKey.png")
         if (tileFile.exists() && tileFile.length() > 0) {
@@ -1732,8 +1732,12 @@ object PdfExporter {
             }
         }
 
+        // Capa por defecto idéntica a la pestaña Mapas de la app: Google Roadmap (Callejero lyrs=m)
         val urls = listOf(
-            "https://mt1.google.com/vt/lyrs=y&hl=es&x=$x&y=$y&z=$zoom",
+            "https://mt1.google.com/vt/lyrs=m&hl=es&x=$x&y=$y&z=$zoom",
+            "https://mt0.google.com/vt/lyrs=m&hl=es&x=$x&y=$y&z=$zoom",
+            "https://mt2.google.com/vt/lyrs=m&hl=es&x=$x&y=$y&z=$zoom",
+            "https://mt3.google.com/vt/lyrs=m&hl=es&x=$x&y=$y&z=$zoom",
             "https://tile.openstreetmap.org/$zoom/$x/$y.png"
         )
 
@@ -1741,8 +1745,8 @@ object PdfExporter {
             try {
                 val url = URL(urlString)
                 val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 600
-                conn.readTimeout = 800
+                conn.connectTimeout = 700
+                conn.readTimeout = 900
                 conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:100.0) Ultreia/2.0")
                 if (conn.responseCode == 200) {
                     val input = conn.inputStream
@@ -1876,23 +1880,7 @@ object PdfExporter {
         val cropH = (y2 - y1).toInt().coerceAtLeast(1)
 
         return try {
-            val cropped = Bitmap.createBitmap(stitched, x1.toInt(), y1.toInt(), cropW, cropH)
-            // Filtro de brillo y contraste adaptado a papel para que no gaste tinta excesiva ni resulte oscuro
-            val printOptimized = Bitmap.createBitmap(cropped.width, cropped.height, Bitmap.Config.ARGB_8888)
-            val printCanvas = Canvas(printOptimized)
-            val printPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                val cm = ColorMatrix().apply {
-                    set(floatArrayOf(
-                        1.12f, 0f, 0f, 0f, 25f,
-                        0f, 1.12f, 0f, 0f, 25f,
-                        0f, 0f, 1.12f, 0f, 25f,
-                        0f, 0f, 0f, 1f, 0f
-                    ))
-                }
-                colorFilter = ColorMatrixColorFilter(cm)
-            }
-            printCanvas.drawBitmap(cropped, 0f, 0f, printPaint)
-            printOptimized
+            Bitmap.createBitmap(stitched, x1.toInt(), y1.toInt(), cropW, cropH)
         } catch (_: Exception) {
             stitched
         }
@@ -1919,7 +1907,7 @@ object PdfExporter {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.textSize = 6.5f
         p.typeface = Typeface.DEFAULT
-        val label = "🗺️ Vista Cenital 2D • Impresión en papel"
+        val label = "🗺️ Google Roadmap 2D • Callejero"
         val textW = p.measureText(label)
         val badge = RectF(bounds.right - textW - 10f, bounds.bottom - 13f, bounds.right - 4f, bounds.bottom - 3f)
         p.color = Color.argb(210, 255, 255, 255)
@@ -1965,20 +1953,7 @@ object PdfExporter {
             bounds.height().toInt()
         )
 
-        val clipPath = Path().apply {
-            addRoundRect(bounds, 6f, 6f, Path.Direction.CW)
-        }
-        canvas.save()
-        canvas.clipPath(clipPath)
-
-        // 1. Fondo de mapa 2D
-        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            isFilterBitmap = true
-            isDither = true
-        }
-        canvas.drawBitmap(mapBitmap, null, bounds, bmpPaint)
-
-        // 2. Proyección Cenital 2D Ortogonal (1:1 Aspect Ratio)
+        // Proyección Cenital 2D Ortogonal (1:1 Aspect Ratio)
         val padding = 14f
         val availW = (bounds.width() - 2 * padding).coerceAtLeast(10f)
         val availH = (bounds.height() - 2 * padding).coerceAtLeast(10f)
@@ -1998,6 +1973,24 @@ object PdfExporter {
 
         val originX = bounds.left + padding + (availW - actualW) / 2f
         val originY = bounds.top + padding + (availH - actualH) / 2f
+
+        val clipPath = Path().apply {
+            addRoundRect(bounds, 6f, 6f, Path.Direction.CW)
+        }
+        canvas.save()
+        canvas.clipPath(clipPath)
+
+        // Fondo del contenedor para impresión
+        val bgPaint = Paint().apply { color = Color.rgb(245, 247, 250) }
+        canvas.drawRect(bounds, bgPaint)
+
+        // Fondo de mapa 2D centrado y con proporción geográfica exacta 1:1
+        val mapDestRect = RectF(originX, originY, originX + actualW, originY + actualH)
+        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
+        }
+        canvas.drawBitmap(mapBitmap, null, mapDestRect, bmpPaint)
 
         fun projectX(lon: Double): Float {
             return originX + ((lonToTileX(lon, zoom) - xMinTile) * 256.0 * scale).toFloat()
@@ -2107,20 +2100,6 @@ object PdfExporter {
             bounds.height().toInt()
         )
 
-        val clipPath = Path().apply {
-            addRoundRect(bounds, 6f, 6f, Path.Direction.CW)
-        }
-        canvas.save()
-        canvas.clipPath(clipPath)
-
-        // 1. Fondo de mapa 2D
-        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            isFilterBitmap = true
-            isDither = true
-        }
-        canvas.drawBitmap(mapBitmap, null, bounds, bmpPaint)
-
-        // 2. Proyección cenital 2D ortogonal con escala uniforme 1:1
         val padding = 16f
         val availW = (bounds.width() - 2 * padding).coerceAtLeast(10f)
         val availH = (bounds.height() - 2 * padding).coerceAtLeast(10f)
@@ -2139,6 +2118,24 @@ object PdfExporter {
 
         val originX = bounds.left + padding + (availW - actualW) / 2f
         val originY = bounds.top + padding + (availH - actualH) / 2f
+
+        val clipPath = Path().apply {
+            addRoundRect(bounds, 6f, 6f, Path.Direction.CW)
+        }
+        canvas.save()
+        canvas.clipPath(clipPath)
+
+        // Fondo del contenedor para impresión
+        val bgPaint = Paint().apply { color = Color.rgb(245, 247, 250) }
+        canvas.drawRect(bounds, bgPaint)
+
+        // Fondo de mapa 2D centrado y con proporción geográfica exacta 1:1
+        val mapDestRect = RectF(originX, originY, originX + actualW, originY + actualH)
+        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
+        }
+        canvas.drawBitmap(mapBitmap, null, mapDestRect, bmpPaint)
 
         fun projectX(lon: Double): Float {
             return originX + ((lonToTileX(lon, zoom) - xMinTile) * 256.0 * scale).toFloat()

@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -994,48 +995,65 @@ fun InteractiveMapScreen(
                         )
                 )
 
+                // Fecha o contador en la esquina superior derecha
+                if (mapScopeMode == MapScopeMode.CURRENT_CAMINO && camino.startDate.isNotBlank()) {
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.50f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "📅 ${camino.startDate}",
+                            fontSize = 11.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                } else if (mapScopeMode == MapScopeMode.TOTAL) {
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.50f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "🌍 ${allCaminos.size} caminos",
+                            fontSize = 11.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(14.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            color = PilgrimYellow,
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = if (mapScopeMode == MapScopeMode.TOTAL) {
-                                    "RED GLOBAL DE RUTAS"
-                                } else if (camino.isTravelGuide) {
-                                    "ULTREIA VIAJE"
-                                } else {
-                                    "ULTREIA GUÍA"
-                                },
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CaminoBlueDark,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-
-                        if (mapScopeMode == MapScopeMode.CURRENT_CAMINO && camino.startDate.isNotBlank()) {
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "📅 ${camino.startDate}",
-                                fontSize = 11.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        } else if (mapScopeMode == MapScopeMode.TOTAL) {
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "🌍 ${allCaminos.size} caminos guardados",
-                                fontSize = 11.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                    Surface(
+                        color = PilgrimYellow,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                "RED GLOBAL DE RUTAS"
+                            } else if (camino.isTravelGuide) {
+                                "ULTREIA VIAJE"
+                            } else {
+                                "ULTREIA GUÍA"
+                            },
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CaminoBlueDark,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
 
                     Spacer(Modifier.height(4.dp))
