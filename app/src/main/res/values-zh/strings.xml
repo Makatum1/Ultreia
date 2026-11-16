@@ -9,4 +9,6 @@
     <string name="tab_stats">数据</string>
     <string name="settings">设置</string>
     <string name="tab_help">帮助</string>
+    <string name="feedback_title">建议与问题</string>
+    <string name="feedback_desc">... 有改进 Ultreia 的想法、发现了问题，或者只是在组织某条路线时需要帮助...</string>
 </resources>

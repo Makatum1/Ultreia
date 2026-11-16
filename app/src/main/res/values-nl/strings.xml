@@ -9,4 +9,6 @@
     <string name="tab_stats">Gegevens</string>
     <string name="settings">Instellingen</string>
     <string name="tab_help">Hulp</string>
+    <string name="feedback_title">Suggesties en Fouten</string>
+    <string name="feedback_desc">... idee om Ultreia te verbeteren, een probleem opgemerkt of gewoon hulp nodig bij het organiseren van een Camino...</string>
 </resources>

@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -772,6 +775,7 @@ fun HelpScreen(
     viewModel: CaminoViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val languageMode by viewModel.languageMode.collectAsStateWithLifecycle()
 
     fun tr(key: String): String = viewModel.string(key, languageMode)
@@ -840,6 +844,69 @@ fun HelpScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(Modifier.height(8.dp))
+
+            // Sección: Sugerencias y Errores (Centralizado en la parte superior de Ayuda)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("help_feedback_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Feedback,
+                            contentDescription = null,
+                            tint = CaminoBlue,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = tr("feedback_title"),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = CaminoBlue
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = tr("feedback_desc"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:sugerenciastravelcash@gmail.com")
+                                putExtra(Intent.EXTRA_SUBJECT, "Sugerencia / Error - Ultreia")
+                            }
+                            try {
+                                context.startActivity(Intent.createChooser(intent, "Enviar correo"))
+                            } catch (_: Exception) {}
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Mail, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "sugerenciastravelcash@gmail.com",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
 
             // 1. Buscador Inteligente en tiempo real
             OutlinedTextField(

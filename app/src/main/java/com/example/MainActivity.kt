@@ -703,53 +703,6 @@ fun SettingsScreen(
             )
         }
 
-        // Sección: Sugerencias y Errores
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Feedback, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Text("Sugerencias y Errores", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = CaminoBlue)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "¿Tienes alguna idea para mejorar Ultreia o has detectado algún problema? Tu opinión es muy valiosa para nosotros. Pulsa abajo para escribirnos.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:sugerenciastravelcash@gmail.com")
-                                putExtra(Intent.EXTRA_SUBJECT, "Sugerencia / Error - Ultreia")
-                            }
-                            try {
-                                context.startActivity(Intent.createChooser(intent, "Enviar correo"))
-                            } catch (_: Exception) {}
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Mail, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("sugerenciastravelcash@gmail.com", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
         // Accordion 2: Idioma (Collapsed by default, only Español and English, NO Sistema)
         item {
             Card(
