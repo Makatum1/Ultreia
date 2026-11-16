@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Ultreia</string>
+    <string name="app_subtitle">Guía de Viaje y Memorias del Camino y Rutas</string>
+    <string name="tab_caminos">Caminos</string>
+    <string name="tab_trips">Viajes</string>
+    <string name="tab_stages">Etapas</string>
+    <string name="tab_days">Días</string>
+    <string name="tab_map">Mapa</string>
+    <string name="tab_stats">Datos</string>
+    <string name="settings">Ajustes</string>
+    <string name="tab_help">Ayuda</string>
+</resources>

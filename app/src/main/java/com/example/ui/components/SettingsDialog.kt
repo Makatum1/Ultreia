@@ -2,6 +2,8 @@ package com.example.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -48,10 +50,7 @@ fun SettingsActionMenu(
                 text = {
                     Column {
                         Text(viewModel.string("language"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        val langLabel = when (currentLang) {
-                            LanguageMode.ES -> viewModel.string("lang_es")
-                            LanguageMode.EN -> viewModel.string("lang_en")
-                        }
+                        val langLabel = "${currentLang.localizedName} (${currentLang.displayName})"
                         Text(langLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
@@ -79,25 +78,21 @@ fun SettingsActionMenu(
                 }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ThemeOptionRow(
-                        title = viewModel.string("lang_es"),
-                        subtitle = "Español (por defecto)",
-                        isSelected = currentLang == LanguageMode.ES,
-                        onClick = {
-                            viewModel.setLanguageMode(LanguageMode.ES)
-                            showLangDialog = false
-                        }
-                    )
-                    ThemeOptionRow(
-                        title = viewModel.string("lang_en"),
-                        subtitle = "English",
-                        isSelected = currentLang == LanguageMode.EN,
-                        onClick = {
-                            viewModel.setLanguageMode(LanguageMode.EN)
-                            showLangDialog = false
-                        }
-                    )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())
+                ) {
+                    LanguageMode.entries.forEach { mode ->
+                        ThemeOptionRow(
+                            title = mode.localizedName,
+                            subtitle = mode.displayName,
+                            isSelected = currentLang == mode,
+                            onClick = {
+                                viewModel.setLanguageMode(mode)
+                                showLangDialog = false
+                            }
+                        )
+                    }
                 }
             },
             confirmButton = {

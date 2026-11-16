@@ -242,7 +242,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     },
                     label = {
                         Text(
-                            text = if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Trips" else "Viajes") else viewModel.string("tab_caminos", languageMode),
+                            text = viewModel.string(if (isTravelProfile) "tab_trips" else "tab_caminos", languageMode),
                             fontSize = 10.5.sp,
                             maxLines = 1,
                             softWrap = false,
@@ -269,7 +269,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     },
                     label = {
                         Text(
-                            text = if (isTravelProfile) (if (languageMode == com.example.ui.settings.LanguageMode.EN) "Days" else "Días") else viewModel.string("tab_stages", languageMode),
+                            text = viewModel.string(if (isTravelProfile) "tab_days" else "tab_stages", languageMode),
                             fontSize = 10.5.sp,
                             maxLines = 1,
                             softWrap = false,
@@ -773,10 +773,7 @@ fun SettingsScreen(
                             Column {
                                 Text(viewModel.string("language"), fontWeight = FontWeight.Bold)
                                 Text(
-                                    when (currentLang) {
-                                        LanguageMode.ES -> viewModel.string("lang_es")
-                                        LanguageMode.EN -> viewModel.string("lang_en")
-                                    },
+                                    "${currentLang.localizedName} (${currentLang.displayName})",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -801,18 +798,14 @@ fun SettingsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
-                            ThemeOptionRow(
-                                title = viewModel.string("lang_es"),
-                                subtitle = "Español (por defecto)",
-                                isSelected = currentLang == LanguageMode.ES,
-                                onClick = { viewModel.setLanguageMode(LanguageMode.ES) }
-                            )
-                            ThemeOptionRow(
-                                title = viewModel.string("lang_en"),
-                                subtitle = "English",
-                                isSelected = currentLang == LanguageMode.EN,
-                                onClick = { viewModel.setLanguageMode(LanguageMode.EN) }
-                            )
+                            LanguageMode.entries.forEach { mode ->
+                                ThemeOptionRow(
+                                    title = mode.localizedName,
+                                    subtitle = mode.displayName,
+                                    isSelected = currentLang == mode,
+                                    onClick = { viewModel.setLanguageMode(mode) }
+                                )
+                            }
                         }
                     }
                 }

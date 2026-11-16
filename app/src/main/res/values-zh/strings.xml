@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Ultreia</string>
+    <string name="app_subtitle">圣雅各之路与徒步旅行指南及回忆录</string>
+    <string name="tab_caminos">朝圣之路</string>
+    <string name="tab_trips">旅程</string>
+    <string name="tab_stages">赛段</string>
+    <string name="tab_days">日程</string>
+    <string name="tab_map">地图</string>
+    <string name="tab_stats">数据</string>
+    <string name="settings">设置</string>
+    <string name="tab_help">帮助</string>
+</resources>

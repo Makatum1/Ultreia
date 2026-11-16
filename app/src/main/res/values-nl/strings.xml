@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Ultreia</string>
+    <string name="app_subtitle">Reisgids en Herinneringen voor Camino en Reizen</string>
+    <string name="tab_caminos">Camino\'s</string>
+    <string name="tab_trips">Reizen</string>
+    <string name="tab_stages">Etappes</string>
+    <string name="tab_days">Dagen</string>
+    <string name="tab_map">Kaart</string>
+    <string name="tab_stats">Gegevens</string>
+    <string name="settings">Instellingen</string>
+    <string name="tab_help">Hulp</string>
+</resources>

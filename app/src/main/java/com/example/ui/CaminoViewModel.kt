@@ -124,11 +124,22 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         _currentTab.value = MainTab.STAGES
     }
 
+    companion object {
+        fun detectSystemLanguage(): LanguageMode {
+            return try {
+                val sysCode = Locale.getDefault().language.lowercase()
+                LanguageMode.fromCode(sysCode)
+            } catch (_: Exception) {
+                LanguageMode.EN
+            }
+        }
+    }
+
     // Settings: Theme & Language
     private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
-    private val _languageMode = MutableStateFlow(LanguageMode.ES)
+    private val _languageMode = MutableStateFlow(detectSystemLanguage())
     val languageMode: StateFlow<LanguageMode> = _languageMode.asStateFlow()
 
     fun setThemeMode(mode: ThemeMode) {
@@ -164,7 +175,13 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             }
             val savedLang = prefs.getString("saved_language_mode", null)
             if (savedLang != null) {
-                try { _languageMode.value = LanguageMode.valueOf(savedLang) } catch (_: Exception) {}
+                try {
+                    _languageMode.value = LanguageMode.valueOf(savedLang)
+                } catch (_: Exception) {
+                    _languageMode.value = detectSystemLanguage()
+                }
+            } else {
+                _languageMode.value = detectSystemLanguage()
             }
 
             // Auto-migración / actualización de nombre "Camino baztanes" / "Camino Baztanés" -> "Camino del Baztán"
@@ -1168,7 +1185,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _isExportingPdf.value = true
             try {
-                val file = PdfExporter.generateAndSharePdf(context, currentCamino, currentStages, repository)
+                val file = PdfExporter.generateAndSharePdf(context, currentCamino, currentStages, repository, _languageMode.value)
                 if (file != null) {
                     _userMessage.value = "Guía de viaje en PDF generada con éxito."
                 } else {

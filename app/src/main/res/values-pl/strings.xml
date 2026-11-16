@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Ultreia</string>
+    <string name="app_subtitle">Przewodnik i Wspomnienia ze Szlaku i Wypraw</string>
+    <string name="tab_caminos">Szlaki</string>
+    <string name="tab_trips">Wyprawy</string>
+    <string name="tab_stages">Etapy</string>
+    <string name="tab_days">Dni</string>
+    <string name="tab_map">Mapa</string>
+    <string name="tab_stats">Dane</string>
+    <string name="settings">Ustawienia</string>
+    <string name="tab_help">Pomoc</string>
+</resources>
