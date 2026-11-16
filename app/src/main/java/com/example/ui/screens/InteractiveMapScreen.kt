@@ -1044,41 +1044,29 @@ fun InteractiveMapScreen(
                         )
                 )
 
-                // Fecha o contador en la esquina superior derecha
+                // Fecha o contador en la esquina superior derecha (solo texto flotante sin recuadro)
                 if (mapScopeMode == MapScopeMode.CURRENT_CAMINO && camino.startDate.isNotBlank()) {
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.50f),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.4f)),
+                    Text(
+                        text = "📅 ${camino.startDate}",
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = "📅 ${camino.startDate}",
-                            fontSize = 11.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
+                            .padding(14.dp)
+                    )
                 } else if (mapScopeMode == MapScopeMode.TOTAL) {
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.50f),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.4f)),
+                    val count = allCaminos.count { it.isTravelGuide == camino.isTravelGuide }.let { if (it > 0) it else allCaminos.size }
+                    val label = if (camino.isTravelGuide) tr("tab_trips", "viajes").lowercase() else tr("tab_caminos", "caminos").lowercase()
+                    Text(
+                        text = "🌍 $count $label",
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = "🌍 ${allCaminos.size} caminos",
-                            fontSize = 11.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
+                            .padding(14.dp)
+                    )
                 }
 
                 Column(
