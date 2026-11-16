@@ -352,11 +352,28 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun addPredefinedCamino(route: com.example.data.sample.PredefinedRouteInfo) {
         viewModelScope.launch {
-            val newId = com.example.data.sample.SampleData.createPredefinedCamino(route, repository)
+            val newId = com.example.data.sample.SampleData.createPredefinedCamino(route, repository, languageMode = _languageMode.value)
             selectCamino(newId)
-            _userMessage.value = "¡${route.title} creado correctamente!"
+            val locTitle = com.example.data.sample.PredefinedRoutesData.getLocalizedTitle(route.title, _languageMode.value)
+            val msgFormat = AppStrings.get("camino_created_msg", _languageMode.value)
+            _userMessage.value = msgFormat.replace("%s", locTitle)
         }
     }
+
+    fun localizeStageTitle(title: String): String =
+        com.example.data.sample.PredefinedRoutesData.getLocalizedStageTitle(title, _languageMode.value)
+
+    fun localizeDifficulty(diff: String): String =
+        com.example.data.sample.PredefinedRoutesData.getLocalizedDifficulty(diff, _languageMode.value)
+
+    fun localizeNotes(notes: String): String =
+        com.example.data.sample.PredefinedRoutesData.getLocalizedNotes(notes, _languageMode.value)
+
+    fun localizeRouteTitle(title: String): String =
+        com.example.data.sample.PredefinedRoutesData.getLocalizedTitle(title, _languageMode.value)
+
+    fun localizeRouteSubtitle(subtitle: String): String =
+        com.example.data.sample.PredefinedRoutesData.getLocalizedSubtitle(subtitle, _languageMode.value)
 
     fun exportZip(context: Context, caminoIds: List<Long>, isAll: Boolean, title: String) {
         viewModelScope.launch {

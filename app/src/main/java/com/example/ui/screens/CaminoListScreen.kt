@@ -135,7 +135,7 @@ fun CaminoListScreen(
                         text = {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(viewModel.string("main_routes"), style = MaterialTheme.typography.labelLarge)
-                                Text("(Ejemplos)", style = MaterialTheme.typography.labelSmall)
+                                Text(viewModel.string("examples_label"), style = MaterialTheme.typography.labelSmall)
                             }
                         },
                         containerColor = PilgrimYellow,
@@ -382,6 +382,7 @@ fun CaminoListScreen(
 
     if (showMainRoutesDialog) {
         MainRoutesDialog(
+            viewModel = viewModel,
             onDismiss = { showMainRoutesDialog = false },
             onSelectRoute = { route ->
                 viewModel.addPredefinedCamino(route)
@@ -408,8 +409,8 @@ fun CaminoListScreen(
     if (caminoToDelete != null) {
         AlertDialog(
             onDismissRequest = { caminoToDelete = null },
-            title = { Text("¿Eliminar ${caminoToDelete!!.title}?") },
-            text = { Text("Se borrará esta guía completa junto con todas sus etapas, alojamientos, archivos y vivencias registradas. Esta acción no se puede deshacer.") },
+            title = { Text("${viewModel.string("delete")} ${caminoToDelete!!.title}?") },
+            text = { Text(viewModel.string("delete_camino_confirm")) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -418,12 +419,12 @@ fun CaminoListScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Sí, eliminar")
+                    Text(viewModel.string("delete"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { caminoToDelete = null }) {
-                    Text("Cancelar")
+                    Text(viewModel.string("cancel"))
                 }
             }
         )
@@ -792,9 +793,11 @@ fun AddCaminoDialog(
 
 @Composable
 fun MainRoutesDialog(
+    viewModel: CaminoViewModel,
     onDismiss: () -> Unit,
     onSelectRoute: (com.example.data.sample.PredefinedRouteInfo) -> Unit
 ) {
+    val currentLang by viewModel.languageMode.collectAsStateWithLifecycle()
     var selectedRoute by remember { mutableStateOf<com.example.data.sample.PredefinedRouteInfo?>(null) }
 
     AlertDialog(
@@ -804,9 +807,9 @@ fun MainRoutesDialog(
                 Icon(Icons.Default.Explore, contentDescription = null, tint = CaminoBlue)
                 Spacer(Modifier.width(8.dp))
                 Column {
-                    Text("Principales Rutas", fontWeight = FontWeight.Bold, color = CaminoBlue)
+                    Text(viewModel.string("main_routes"), fontWeight = FontWeight.Bold, color = CaminoBlue)
                     Text(
-                        "(Ejemplos)",
+                        viewModel.string("examples_label"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -821,12 +824,13 @@ fun MainRoutesDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Selecciona una de las rutas históricas para crear tu guía con sus etapas predefinidas:",
+                    text = viewModel.string("main_routes_dialog_desc"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 com.example.data.sample.SampleData.PREDEFINED_ROUTES.forEach { route ->
+                    val locRoute = com.example.data.sample.PredefinedRoutesData.getLocalizedRouteInfo(route, currentLang)
                     val isChosen = selectedRoute?.title == route.title
                     Card(
                         modifier = Modifier
@@ -845,24 +849,24 @@ fun MainRoutesDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = route.title,
+                                    text = locRoute.title,
                                     fontWeight = FontWeight.Bold,
                                     color = CaminoBlueDark
                                 )
                                 Text(
-                                    text = "${route.totalKm.toInt()} km",
+                                    text = "${locRoute.totalKm.toInt()} km",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = CaminoBlue
                                 )
                             }
                             Text(
-                                text = route.subtitle,
+                                text = locRoute.subtitle,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            if (route.note != null) {
+                            if (locRoute.note != null) {
                                 Spacer(Modifier.height(6.dp))
                                 Surface(
                                     color = PilgrimYellow.copy(alpha = 0.3f),
@@ -880,7 +884,7 @@ fun MainRoutesDialog(
                                         )
                                         Spacer(Modifier.width(6.dp))
                                         Text(
-                                            text = route.note,
+                                            text = locRoute.note,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = CaminoBlueDark
@@ -901,12 +905,12 @@ fun MainRoutesDialog(
                 enabled = selectedRoute != null,
                 colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
             ) {
-                Text("Crear Camino")
+                Text(viewModel.string("create_camino_btn"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(viewModel.string("cancel"))
             }
         }
     )

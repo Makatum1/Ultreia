@@ -51,9 +51,9 @@ fun StatsScreen(
     val context = LocalContext.current
     val isTravelProfile by viewModel.isTravelProfile.collectAsStateWithLifecycle()
     val isTravel = camino?.isTravelGuide == true || isTravelProfile
-    val stageTerm = if (isTravel) "Día" else "Etapa"
-    val stageTermPlural = if (isTravel) "Días" else "Etapas"
-    val routeTerm = if (isTravel) "Viaje" else "Camino"
+    val stageTerm = if (isTravel) viewModel.string("day") else viewModel.string("stage_prefix")
+    val stageTermPlural = if (isTravel) viewModel.string("tab_days") else viewModel.string("tab_stages")
+    val routeTerm = if (isTravel) viewModel.string("tab_trips") else viewModel.string("tab_caminos")
 
     // Sub-pestaña seleccionada: 0 = "Datos del Camino" (por defecto), 1 = "Datos Totales"
     var selectedSubTab by remember { mutableIntStateOf(0) }
@@ -224,7 +224,7 @@ fun StatsScreen(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = "Datos del $routeTerm",
+                                    text = "${viewModel.string("tab_stats")} ($routeTerm)",
                                     fontWeight = if (selectedSubTab == 0) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp
                                 )
@@ -245,7 +245,7 @@ fun StatsScreen(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = "Datos Totales",
+                                    text = viewModel.string("total_stats_tab"),
                                     fontWeight = if (selectedSubTab == 1) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp
                                 )
@@ -291,6 +291,7 @@ fun StatsScreen(
                 // VISTA: DATOS TOTALES GLOBALES (TODOS LOS CAMINOS)
                 GlobalTotalDataContent(
                     isTravel = isTravel,
+                    viewModel = viewModel,
                     totalCaminosRealizados = totalGlobalCaminosRealizados,
                     totalCaminosCount = allCaminos.size,
                     totalKm = totalGlobalKm,
@@ -593,15 +594,15 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Nombre:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(camino.title, fontWeight = FontWeight.Bold)
+                        Text(viewModel.string("balance_name"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.localizeRouteTitle(camino.title), fontWeight = FontWeight.Bold)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Distancia:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_distance"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("$completedKmStr km", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
 
@@ -609,7 +610,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel positivo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_gain"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("+$completedElevationGain m", fontWeight = FontWeight.Bold)
                     }
 
@@ -617,7 +618,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel negativo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_loss"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("-$completedElevationLoss m", fontWeight = FontWeight.Bold)
                     }
 
@@ -625,7 +626,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Tiempo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_time"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(completedTimeStr, fontWeight = FontWeight.Bold, color = CaminoBlueDark)
                     }
 
@@ -634,7 +635,7 @@ private fun ActiveCaminoDataContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = if (isTravel) "Días completados:" else "Etapas completadas:",
+                            text = if (isTravel) viewModel.string("balance_days_done") else viewModel.string("balance_stages_done"),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text("$completedStages de $totalStages", fontWeight = FontWeight.Bold)
@@ -644,7 +645,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Alojamientos registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_accommodations"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${caminoAccommodations.size}", fontWeight = FontWeight.Bold)
                     }
 
@@ -652,7 +653,7 @@ private fun ActiveCaminoDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Gasto en alojamientos:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_expense"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${String.format(Locale.US, "%.2f", totalExpenseEur)} €", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
                 }
@@ -756,7 +757,7 @@ private fun ActiveCaminoDataContent(
             ) {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Exportar Informe del $routeTerm a PDF", color = CaminoBlue, fontWeight = FontWeight.SemiBold)
+                Text("${viewModel.string("export_report_pdf")} ($routeTerm)", color = CaminoBlue, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -770,6 +771,7 @@ private fun ActiveCaminoDataContent(
 @Composable
 private fun GlobalTotalDataContent(
     isTravel: Boolean = false,
+    viewModel: CaminoViewModel,
     totalCaminosRealizados: Int,
     totalCaminosCount: Int,
     totalKm: Double,
@@ -965,7 +967,7 @@ private fun GlobalTotalDataContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = if (isTravel) "Viajes:" else "Caminos completados:",
+                            text = if (isTravel) viewModel.string("balance_trips_done") else viewModel.string("balance_caminos_done"),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text("$totalCaminosRealizados de $totalCaminosCount", fontWeight = FontWeight.Bold)
@@ -976,7 +978,7 @@ private fun GlobalTotalDataContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = if (isTravel) "Distancia Total:" else "Distancia total:",
+                            text = if (isTravel) viewModel.string("balance_total_dist_trip") else viewModel.string("balance_total_dist"),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text("$completedKmStr km", fontWeight = FontWeight.Bold, color = CaminoGreen)
@@ -986,7 +988,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel positivo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_gain"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("+$completedElevationGain m", fontWeight = FontWeight.Bold)
                     }
 
@@ -994,7 +996,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Desnivel negativo:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_loss"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("-$completedElevationLoss m", fontWeight = FontWeight.Bold)
                     }
 
@@ -1003,7 +1005,7 @@ private fun GlobalTotalDataContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = if (isTravel) "Tiempo:" else "Tiempo total:",
+                            text = if (isTravel) viewModel.string("balance_time") else viewModel.string("balance_total_time"),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(completedTimeStr, fontWeight = FontWeight.Bold, color = CaminoBlueDark)
@@ -1014,7 +1016,7 @@ private fun GlobalTotalDataContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = if (isTravel) "Días completados:" else "Etapas completadas:",
+                            text = if (isTravel) viewModel.string("balance_days_done") else viewModel.string("balance_stages_done"),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text("$completedStages de $totalStages", fontWeight = FontWeight.Bold)
@@ -1024,7 +1026,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Alojamientos registrados:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_accommodations"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("$totalAccommodationsCount", fontWeight = FontWeight.Bold)
                     }
 
@@ -1032,7 +1034,7 @@ private fun GlobalTotalDataContent(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Gasto en alojamientos:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(viewModel.string("balance_expense"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${String.format(Locale.US, "%.2f", totalExpenseEur)} €", fontWeight = FontWeight.Bold, color = CaminoGreen)
                     }
                 }
@@ -1048,7 +1050,7 @@ private fun GlobalTotalDataContent(
             ) {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Exportar Informe Global a PDF", color = CaminoBlue, fontWeight = FontWeight.SemiBold)
+                Text(viewModel.string("export_global_report_pdf"), color = CaminoBlue, fontWeight = FontWeight.SemiBold)
             }
         }
 

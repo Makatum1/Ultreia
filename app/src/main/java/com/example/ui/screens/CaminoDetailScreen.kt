@@ -80,8 +80,10 @@ fun CaminoDetailScreen(
                             color = PilgrimYellow.copy(alpha = 0.25f),
                             shape = RoundedCornerShape(4.dp)
                         ) {
+                            val inPrefix = if (camino.isTravelGuide) viewModel.string("you_are_in_trip") else viewModel.string("you_are_in")
+                            val routeTitle = viewModel.localizeRouteTitle(camino.title)
                             Text(
-                                text = if (camino.isTravelGuide) "Estás en el viaje: ${camino.title}" else "Estás en: ${camino.title}",
+                                text = "$inPrefix: $routeTitle",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = CaminoBlueDark,
@@ -89,7 +91,7 @@ fun CaminoDetailScreen(
                             )
                         }
                         Text(
-                            text = camino.title,
+                            text = viewModel.localizeRouteTitle(camino.title),
                             maxLines = 1,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
@@ -101,7 +103,7 @@ fun CaminoDetailScreen(
                         onClick = onBack,
                         modifier = Modifier.testTag("camino_detail_back_button")
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver a la lista")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = viewModel.string("cancel"))
                     }
                 },
                 actions = {
@@ -139,11 +141,12 @@ fun CaminoDetailScreen(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp
             ) {
+                val stagesTabLabel = if (camino.isTravelGuide) viewModel.string("tab_days") else viewModel.string("tab_stages")
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
                     icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
-                    label = { Text("${viewModel.string("tab_stages")} (${stages.size})") },
+                    label = { Text("$stagesTabLabel (${stages.size})") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = CaminoBlue,
                         indicatorColor = PilgrimYellowLight
@@ -176,6 +179,7 @@ fun CaminoDetailScreen(
         },
         floatingActionButton = {
             if (selectedTab == 0) {
+                val addStageDesc = if (camino.isTravelGuide) "${viewModel.string("add_btn")} ${viewModel.string("day")}" else "${viewModel.string("add_btn")} ${viewModel.string("stage_prefix")}"
                 FloatingActionButton(
                     onClick = {
                         viewModel.resetExportingState()
@@ -185,7 +189,7 @@ fun CaminoDetailScreen(
                     contentColor = Color.White,
                     modifier = Modifier.testTag("fab_add_stage")
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Añadir etapa")
+                    Icon(Icons.Default.Add, contentDescription = addStageDesc)
                 }
             }
         }
@@ -238,11 +242,14 @@ fun CaminoDetailScreen(
             nextDay = nextDay,
             initialDate = defaultDate,
             isTravel = camino.isTravelGuide,
+            viewModel = viewModel,
             onDismiss = { showAddStageDialog = false },
             onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes ->
+                val stagePrefix = if (camino.isTravelGuide) viewModel.string("day") else viewModel.string("stage_prefix")
+                val toConnector = viewModel.string("to_connector")
                 viewModel.addStage(
                     caminoId = camino.id,
-                    title = "Etapa $nextDay: $origin a $dest",
+                    title = "$stagePrefix $nextDay: $origin $toConnector $dest",
                     origin = origin,
                     destination = dest,
                     distanceKm = km,
@@ -262,6 +269,7 @@ fun CaminoDetailScreen(
     if (stageToEdit != null) {
         EditStageDialog(
             stage = stageToEdit!!,
+            viewModel = viewModel,
             onDismiss = { stageToEdit = null },
             onSave = { updated ->
                 viewModel.updateStage(updated)
@@ -405,9 +413,9 @@ fun StagesListTab(
                     ) {
                         Icon(Icons.Default.Route, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(40.dp))
                         Spacer(Modifier.height(8.dp))
-                        Text("No hay etapas registradas aún", fontWeight = FontWeight.Medium)
+                        Text(viewModel.string("no_stages_yet"), fontWeight = FontWeight.Medium)
                         Text(
-                            "Pulsa el botón + para añadir tu primera etapa de viaje",
+                            viewModel.string("main_routes_dialog_desc"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -423,6 +431,7 @@ fun StagesListTab(
                     stage = stage,
                     stageDate = stageDate,
                     isToday = isToday,
+                    viewModel = viewModel,
                     onClick = { onStageClick(stage.id) },
                     onToggle = { onToggleStage(stage) },
                     onEdit = { onEditStage(stage) },
@@ -441,13 +450,13 @@ fun StagesListTab(
             onDismissRequest = { stageToDelete = null },
             title = {
                 Text(
-                    text = "Eliminar etapa",
+                    text = viewModel.string("delete_stage_title"),
                     fontWeight = FontWeight.Bold,
                     color = CaminoBlue
                 )
             },
             text = {
-                Text("¿Estás seguro de que quieres eliminar esta etapa?")
+                Text(viewModel.string("delete_stage_confirm"))
             },
             confirmButton = {
                 Button(
@@ -458,14 +467,14 @@ fun StagesListTab(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                 ) {
-                    Text("Eliminar", color = Color.White)
+                    Text(viewModel.string("delete"), color = Color.White)
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = { stageToDelete = null }
                 ) {
-                    Text("Cancelar")
+                    Text(viewModel.string("cancel"))
                 }
             }
         )
@@ -651,6 +660,7 @@ fun StageCardItem(
     stage: StageEntity,
     stageDate: String,
     isToday: Boolean,
+    viewModel: CaminoViewModel,
     onClick: () -> Unit,
     onToggle: () -> Unit,
     onEdit: () -> Unit,
@@ -703,7 +713,7 @@ fun StageCardItem(
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "HOY",
+                                text = viewModel.string("today_day"),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = CaminoBlueDark,
@@ -721,7 +731,7 @@ fun StageCardItem(
                     ) {
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = "Editar etapa",
+                            contentDescription = viewModel.string("edit_stage"),
                             tint = CaminoBlue,
                             modifier = Modifier.size(16.dp)
                         )
@@ -736,7 +746,7 @@ fun StageCardItem(
                     ) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = "Eliminar etapa",
+                            contentDescription = viewModel.string("delete_stage_title"),
                             tint = Color(0xFFD32F2F),
                             modifier = Modifier.size(16.dp)
                         )
@@ -766,7 +776,7 @@ fun StageCardItem(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         Text(
-                            text = "DÍA",
+                            text = viewModel.string("day").uppercase(),
                             style = TextStyle(
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
@@ -796,7 +806,7 @@ fun StageCardItem(
                 // Main Info
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "${stage.origin} → ${stage.destination}",
+                        text = viewModel.localizeStageTitle("${stage.origin} → ${stage.destination}"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -836,19 +846,19 @@ fun StageCardItem(
                     ) {
                         Surface(
                             color = when (stage.difficulty) {
-                                "Fácil" -> CaminoGreen.copy(alpha = 0.12f)
-                                "Moderada" -> PilgrimYellow.copy(alpha = 0.25f)
+                                "Fácil", "Easy", "Facile", "Leicht", "Łatwy", "Makkelijk", "简单" -> CaminoGreen.copy(alpha = 0.12f)
+                                "Moderada", "Moderate", "Modérée", "Moderata", "Mäßig", "Umiarkowany", "Gemiddeld", "中等" -> PilgrimYellow.copy(alpha = 0.25f)
                                 else -> Color(0xFFEF4444).copy(alpha = 0.12f)
                             },
                             shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                text = stage.difficulty,
+                                text = viewModel.localizeDifficulty(stage.difficulty),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = when (stage.difficulty) {
-                                    "Fácil" -> CaminoGreen
-                                    "Moderada" -> PilgrimYellowDark
+                                    "Fácil", "Easy", "Facile", "Leicht", "Łatwy", "Makkelijk", "简单" -> CaminoGreen
+                                    "Moderada", "Moderate", "Modérée", "Moderata", "Mäßig", "Umiarkowany", "Gemiddeld", "中等" -> PilgrimYellowDark
                                     else -> Color(0xFFDC2626)
                                 },
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -866,7 +876,7 @@ fun StageCardItem(
                                 ) {
                                     Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(10.dp), tint = PilgrimYellowDark)
                                     Spacer(Modifier.width(2.dp))
-                                    Text("Consejos", fontSize = 10.sp, color = PilgrimYellowDark, fontWeight = FontWeight.Bold)
+                                    Text(viewModel.string("stage_tips_tag"), fontSize = 10.sp, color = PilgrimYellowDark, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -897,6 +907,7 @@ fun AddStageDialog(
     nextDay: Int,
     initialDate: String,
     isTravel: Boolean = false,
+    viewModel: CaminoViewModel? = null,
     onDismiss: () -> Unit,
     onConfirm: (origin: String, dest: String, km: Double, gain: Int, loss: Int, time: String, diff: String, date: String, notes: String) -> Unit
 ) {
@@ -911,17 +922,19 @@ fun AddStageDialog(
     var notes by remember { mutableStateOf("") }
 
     val difficulties = listOf("Fácil", "Moderada", "Difícil", "Muy exigente")
+    val titleTerm = if (isTravel) viewModel?.string("day") ?: "Día" else viewModel?.string("stage_prefix") ?: "Etapa"
+    val addTerm = viewModel?.string("add_btn") ?: "Añadir"
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isTravel) "Añadir Día $nextDay al Viaje" else "Añadir Etapa $nextDay al Camino") },
+        title = { Text("$addTerm $titleTerm $nextDay") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
                     OutlinedTextField(
                         value = origin,
                         onValueChange = { origin = it },
-                        label = { Text("Origen *") },
+                        label = { Text("${viewModel?.string("origin") ?: "Origen"} *") },
                         placeholder = { Text("Ej. Roncesvalles") },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -930,7 +943,7 @@ fun AddStageDialog(
                     OutlinedTextField(
                         value = destination,
                         onValueChange = { destination = it },
-                        label = { Text("Destino *") },
+                        label = { Text("${viewModel?.string("destination") ?: "Destino"} *") },
                         placeholder = { Text("Ej. Zubiri") },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -939,7 +952,7 @@ fun AddStageDialog(
                     OutlinedTextField(
                         value = dateStr,
                         onValueChange = { dateStr = it },
-                        label = { Text("Fecha (dd/MM/yyyy)") },
+                        label = { Text("${viewModel?.string("date") ?: "Fecha"} (dd/MM/yyyy)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -948,14 +961,14 @@ fun AddStageDialog(
                         OutlinedTextField(
                             value = distanceStr,
                             onValueChange = { distanceStr = it },
-                            label = { Text("Distancia (km)") },
+                            label = { Text("${viewModel?.string("distance") ?: "Distancia"} (km)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
                             value = timeStr,
                             onValueChange = { timeStr = it },
-                            label = { Text("Tiempo est.") },
+                            label = { Text(viewModel?.string("est_time") ?: "Tiempo est.") },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -965,21 +978,21 @@ fun AddStageDialog(
                         OutlinedTextField(
                             value = gainStr,
                             onValueChange = { gainStr = it },
-                            label = { Text("Desnivel + (m)") },
+                            label = { Text("${viewModel?.string("elevation_gain_short") ?: "Desnivel +"} (m)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
                             value = lossStr,
                             onValueChange = { lossStr = it },
-                            label = { Text("Desnivel - (m)") },
+                            label = { Text("${viewModel?.string("elevation_loss_short") ?: "Desnivel -"} (m)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
                 item {
-                    Text("Dificultad:", style = MaterialTheme.typography.labelSmall)
+                    Text("${viewModel?.string("difficulty") ?: "Dificultad"}:", style = MaterialTheme.typography.labelSmall)
                     Spacer(Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -991,7 +1004,7 @@ fun AddStageDialog(
                                 onClick = { difficulty = diff },
                                 label = {
                                     Text(
-                                        diff,
+                                        viewModel?.localizeDifficulty(diff) ?: diff,
                                         fontSize = 12.sp,
                                         maxLines = 1,
                                         textAlign = TextAlign.Center,
@@ -1015,7 +1028,7 @@ fun AddStageDialog(
                                 onClick = { difficulty = diff },
                                 label = {
                                     Text(
-                                        diff,
+                                        viewModel?.localizeDifficulty(diff) ?: diff,
                                         fontSize = 12.sp,
                                         maxLines = 1,
                                         textAlign = TextAlign.Center,
@@ -1033,7 +1046,7 @@ fun AddStageDialog(
                     OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
-                        label = { Text("Consejos / Notas del día") },
+                        label = { Text(viewModel?.string("notes_label") ?: "Consejos / Notas del día") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1057,11 +1070,11 @@ fun AddStageDialog(
                     }
                 }
             ) {
-                Text("Añadir Etapa")
+                Text("$addTerm $titleTerm")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text(viewModel?.string("cancel") ?: "Cancelar") }
         }
     )
 }

@@ -614,11 +614,14 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             nextDay = nextDay,
             initialDate = defaultDate,
             isTravel = isTravel,
+            viewModel = viewModel,
             onDismiss = { showAddStageDialog = false },
             onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes ->
+                val stagePrefix = if (isTravel) viewModel.string("day") else viewModel.string("stage_prefix")
+                val toConnector = viewModel.string("to_connector")
                 viewModel.addStage(
                     caminoId = activeCaminoForAdd.id,
-                    title = "${if (isTravel) "Día" else "Etapa"} $nextDay: $origin a $dest",
+                    title = "$stagePrefix $nextDay: $origin $toConnector $dest",
                     origin = origin,
                     destination = dest,
                     distanceKm = km,
@@ -637,6 +640,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
     if (stageToEdit != null) {
         EditStageDialog(
             stage = stageToEdit!!,
+            viewModel = viewModel,
             onDismiss = { stageToEdit = null },
             onSave = { updated ->
                 viewModel.updateStage(updated)
@@ -669,7 +673,7 @@ fun SettingsScreen(
     val caminos by viewModel.caminos.collectAsStateWithLifecycle()
 
     var isLanguageExpanded by remember { mutableStateOf(false) }
-    var isExportImportExpanded by remember { mutableStateOf(true) }
+    var isExportImportExpanded by remember { mutableStateOf(false) }
     var showExportSelectionDialog by remember { mutableStateOf(false) }
     var showGlobalExportDialog by remember { mutableStateOf(false) }
 
@@ -697,7 +701,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Personalización, exportación y preferencias de la aplicación",
+                text = viewModel.string("settings_desc"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -788,7 +792,7 @@ fun SettingsScreen(
                             Column {
                                 Text(viewModel.string("export_import_title"), fontWeight = FontWeight.Bold)
                                 Text(
-                                    "Copias de seguridad en formato ZIP y archivos de datos",
+                                    viewModel.string("export_import_desc"),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -852,7 +856,7 @@ fun SettingsScreen(
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                             Text(
-                                text = "Copia de Seguridad Global (Backup Completo):",
+                                text = viewModel.string("backup_section_title"),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = CaminoBlue

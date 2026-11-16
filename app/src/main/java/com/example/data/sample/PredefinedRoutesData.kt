@@ -1,5 +1,7 @@
 package com.example.data.sample
 
+import com.example.ui.settings.LanguageMode
+
 object PredefinedRoutesData {
 
     val ROUTES: List<PredefinedRouteInfo> = listOf(
@@ -1101,4 +1103,370 @@ object PredefinedRoutesData {
             )
         )
     )
+
+    fun getLocalizedTitle(title: String, mode: LanguageMode): String {
+        if (mode == LanguageMode.ES) return title
+        return when (title) {
+            "Camino Francés (últimos 100 km)" -> when (mode) {
+                LanguageMode.EN -> "French Way (Last 100 km)"
+                LanguageMode.FR -> "Chemin Français (100 derniers km)"
+                LanguageMode.IT -> "Cammino Francese (Ultimi 100 km)"
+                LanguageMode.DE -> "Französischer Weg (Letzte 100 km)"
+                LanguageMode.NL -> "Franse Weg (Laatste 100 km)"
+                LanguageMode.PL -> "Szlak Francuski (Ostatnie 100 km)"
+                LanguageMode.ZH -> "法国之路（最后 100 公里）"
+                else -> title
+            }
+            "Camino Francés" -> when (mode) {
+                LanguageMode.EN -> "French Way (Complete)"
+                LanguageMode.FR -> "Chemin Français Complet"
+                LanguageMode.IT -> "Cammino Francese Completo"
+                LanguageMode.DE -> "Französischer Weg (Komplett)"
+                LanguageMode.NL -> "Volledige Franse Weg"
+                LanguageMode.PL -> "Szlak Francuski (Kompletny)"
+                LanguageMode.ZH -> "完整法国之路"
+                else -> title
+            }
+            "Camino Primitivo" -> when (mode) {
+                LanguageMode.EN -> "Primitive Way"
+                LanguageMode.FR -> "Chemin Primitif"
+                LanguageMode.IT -> "Cammino Primitivo"
+                LanguageMode.DE -> "Ursprünglicher Weg"
+                LanguageMode.NL -> "Primitieve Weg"
+                LanguageMode.PL -> "Szlak Pierwotny"
+                LanguageMode.ZH -> "原始之路"
+                else -> title
+            }
+            "Camino del Norte" -> when (mode) {
+                LanguageMode.EN -> "Northern Way"
+                LanguageMode.FR -> "Chemin du Nord"
+                LanguageMode.IT -> "Cammino del Nord"
+                LanguageMode.DE -> "Nordweg"
+                LanguageMode.NL -> "Noordelijke Weg"
+                LanguageMode.PL -> "Szlak Północny"
+                LanguageMode.ZH -> "北方之路"
+                else -> title
+            }
+            "Camino Portugués Central" -> when (mode) {
+                LanguageMode.EN -> "Portuguese Way (Central)"
+                LanguageMode.FR -> "Chemin Portugais (Central)"
+                LanguageMode.IT -> "Cammino Portoghese Centrale"
+                LanguageMode.DE -> "Portugiesischer Weg (Zentral)"
+                LanguageMode.NL -> "Portugese Weg (Centraal)"
+                LanguageMode.PL -> "Szlak Portugalski Centralny"
+                LanguageMode.ZH -> "葡萄牙中心之路"
+                else -> title
+            }
+            "Camino Inglés" -> when (mode) {
+                LanguageMode.EN -> "English Way"
+                LanguageMode.FR -> "Chemin Anglais"
+                LanguageMode.IT -> "Cammino Inglese"
+                LanguageMode.DE -> "Englischer Weg"
+                LanguageMode.NL -> "Engelse Weg"
+                LanguageMode.PL -> "Szlak Angielski"
+                LanguageMode.ZH -> "英国之路"
+                else -> title
+            }
+            "Vía de la Plata" -> when (mode) {
+                LanguageMode.EN -> "Silver Way"
+                LanguageMode.FR -> "Voie de la Plata"
+                LanguageMode.IT -> "Via de la Plata"
+                LanguageMode.DE -> "Silberweg"
+                LanguageMode.NL -> "Zilverweg"
+                LanguageMode.PL -> "Srebrny Szlak"
+                LanguageMode.ZH -> "白银之路"
+                else -> title
+            }
+            "Camino Sanabrés" -> when (mode) {
+                LanguageMode.EN -> "Sanabrés Way"
+                LanguageMode.FR -> "Chemin Sanabrais"
+                LanguageMode.IT -> "Cammino Sanabrese"
+                LanguageMode.DE -> "Sanabrés-Weg"
+                LanguageMode.NL -> "Sanabrés Weg"
+                LanguageMode.PL -> "Szlak Sanabrés"
+                LanguageMode.ZH -> "萨纳夫雷斯之路"
+                else -> title
+            }
+            "Camino Vasco del Interior" -> when (mode) {
+                LanguageMode.EN -> "Basque Inland Way"
+                LanguageMode.FR -> "Chemin Basque de l'Intérieur"
+                LanguageMode.IT -> "Cammino Basco dell'Interno"
+                LanguageMode.DE -> "Baskischer Inlandsweg"
+                LanguageMode.NL -> "Baskische Binnenlandse Weg"
+                LanguageMode.PL -> "Baskijski Szlak Wewnętrzny"
+                LanguageMode.ZH -> "巴斯克内陆之路"
+                else -> title
+            }
+            "Camino del Baztán" -> when (mode) {
+                LanguageMode.EN -> "Baztán Way"
+                LanguageMode.FR -> "Chemin du Baztán"
+                LanguageMode.IT -> "Cammino del Baztán"
+                LanguageMode.DE -> "Baztán-Weg"
+                LanguageMode.NL -> "Baztán Weg"
+                LanguageMode.PL -> "Szlak Baztán"
+                LanguageMode.ZH -> "巴兹坦之路"
+                else -> title
+            }
+            "Camino de San Salvador" -> when (mode) {
+                LanguageMode.EN -> "San Salvador Way"
+                LanguageMode.FR -> "Chemin de Saint-Sauveur"
+                LanguageMode.IT -> "Cammino di San Salvador"
+                LanguageMode.DE -> "San Salvador-Weg"
+                LanguageMode.NL -> "San Salvador Weg"
+                LanguageMode.PL -> "Szlak San Salvador"
+                LanguageMode.ZH -> "圣萨尔瓦多之路"
+                else -> title
+            }
+            "Finisterre y Muxía" -> when (mode) {
+                LanguageMode.EN -> "Finisterre and Muxía"
+                LanguageMode.FR -> "Finisterre et Muxía"
+                LanguageMode.IT -> "Finisterre e Muxía"
+                LanguageMode.DE -> "Finisterre und Muxía"
+                LanguageMode.NL -> "Finisterre en Muxía"
+                LanguageMode.PL -> "Finisterre i Muxía"
+                LanguageMode.ZH -> "菲尼斯特雷与穆希亚"
+                else -> title
+            }
+            else -> title
+        }
+    }
+
+    fun getLocalizedSubtitle(subtitle: String, mode: LanguageMode): String {
+        if (mode == LanguageMode.ES) return subtitle
+        return when {
+            subtitle.contains("Sarria a Santiago", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "The last 100 km from Sarria to Santiago de Compostela"
+                LanguageMode.FR -> "Les 100 derniers km de Sarria à Saint-Jacques-de-Compostelle"
+                LanguageMode.IT -> "Gli ultimi 100 km da Sarria a Santiago de Compostela"
+                LanguageMode.DE -> "Die letzten 100 km von Sarria nach Santiago de Compostela"
+                LanguageMode.NL -> "De laatste 100 km van Sarria naar Santiago de Compostela"
+                LanguageMode.PL -> "Ostatnie 100 km z Sarria do Santiago de Compostela"
+                LanguageMode.ZH -> "从萨里亚到圣地亚哥-德孔波斯特拉的最后 100 公里"
+                else -> subtitle
+            }
+            subtitle.contains("Saint-Jean-Pied-de-Port a Santiago", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From Saint-Jean-Pied-de-Port to Santiago along the historic route"
+                LanguageMode.FR -> "De Saint-Jean-Pied-de-Port à Saint-Jacques par la route jacobéenne historique"
+                LanguageMode.IT -> "Da Saint-Jean-Pied-de-Port a Santiago lungo lo storico cammino"
+                LanguageMode.DE -> "Von Saint-Jean-Pied-de-Port nach Santiago auf der historischen Route"
+                LanguageMode.NL -> "Van Saint-Jean-Pied-de-Port naar Santiago via de historische route"
+                LanguageMode.PL -> "Z Saint-Jean-Pied-de-Port do Santiago historycznym szlakiem"
+                LanguageMode.ZH -> "从圣让-皮耶德波尔沿历史朝圣路线到圣地亚哥"
+                else -> subtitle
+            }
+            subtitle.contains("primera ruta de peregrinación", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "The first pilgrimage route through the Astur-Galician mountains"
+                LanguageMode.FR -> "Le premier itinéraire de pèlerinage à travers les montagnes asturo-galiciennes"
+                LanguageMode.IT -> "Il primo cammino di pellegrinaggio attraverso le montagne astur-galiziane"
+                LanguageMode.DE -> "Der erste Pilgerweg durch die asturisch-galicischen Berge"
+                LanguageMode.NL -> "De eerste pelgrimsroute door de Asturisch-Galicische bergen"
+                LanguageMode.PL -> "Pierwszy szlak pielgrzymkowy przez góry asturyjsko-galicyjskie"
+                LanguageMode.ZH -> "穿越阿斯图里亚斯-加利西亚山区的首条朝圣路线"
+                else -> subtitle
+            }
+            subtitle.contains("Ribadeo a Santiago", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From Ribadeo to Santiago through inland Galicia"
+                LanguageMode.FR -> "De Ribadeo à Saint-Jacques par l'intérieur de la Galice"
+                LanguageMode.IT -> "Da Ribadeo a Santiago attraverso l'interno della Galizia"
+                LanguageMode.DE -> "Von Ribadeo nach Santiago durch das galicische Binnenland"
+                LanguageMode.NL -> "Van Ribadeo naar Santiago door het binnenland van Galicië"
+                LanguageMode.PL -> "Z Ribadeo do Santiago przez wnętrze Galicji"
+                LanguageMode.ZH -> "从里瓦德奥经加利西亚内陆到圣地亚哥"
+                else -> subtitle
+            }
+            subtitle.contains("Tui a Santiago", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From Tui to Santiago among Albariño vineyards and Galician estuaries"
+                LanguageMode.FR -> "De Tui à Saint-Jacques entre vignobles d'albariño et rias galiciennes"
+                LanguageMode.IT -> "Da Tui a Santiago tra vigneti di albariño e rías galiziane"
+                LanguageMode.DE -> "Von Tui nach Santiago zwischen Albariño-Weinbergen und galicischen Rias"
+                LanguageMode.NL -> "Van Tui naar Santiago tussen Albariño-wijngaarden en Galicische ría's"
+                LanguageMode.PL -> "Z Tui do Santiago wśród winnic albariño i galicyjskich zatok"
+                LanguageMode.ZH -> "从图伊穿行于阿尔巴利诺葡萄园和加利西亚海湾前往圣地亚哥"
+                else -> subtitle
+            }
+            subtitle.contains("Ferrol a Santiago", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From Ferrol to Santiago along the Historic Route"
+                LanguageMode.FR -> "De Ferrol à Saint-Jacques par le Tracé Historique"
+                LanguageMode.IT -> "Da Ferrol a Santiago lungo il Tracciato Storico"
+                LanguageMode.DE -> "Von Ferrol nach Santiago über die Historische Route"
+                LanguageMode.NL -> "Van Ferrol naar Santiago via de Historische Route"
+                LanguageMode.PL -> "Z Ferrol do Santiago szlakiem historycznym"
+                LanguageMode.ZH -> "从费罗尔沿传统历史路线到圣地亚哥"
+                else -> subtitle
+            }
+            subtitle.contains("Sevilla a Astorga", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "The great Roman causeway from Seville to Astorga"
+                LanguageMode.FR -> "La grande voie romaine de Séville à Astorga"
+                LanguageMode.IT -> "La grande strada romana da Siviglia ad Astorga"
+                LanguageMode.DE -> "Die große römische Straße von Sevilla nach Astorga"
+                LanguageMode.NL -> "De grote Romeinse heirbaan van Sevilla naar Astorga"
+                LanguageMode.PL -> "Wielki rzymski trakt z Sewilli do Astorga"
+                LanguageMode.ZH -> "从塞维利亚到阿斯托尔加的古罗马大道"
+                else -> subtitle
+            }
+            subtitle.contains("Granja de Moreruela a Santiago", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From Granja de Moreruela to Santiago across the mountains of Zamora and Ourense"
+                LanguageMode.FR -> "De Granja de Moreruela à Saint-Jacques par les montagnes de Zamora et Ourense"
+                LanguageMode.IT -> "Da Granja de Moreruela a Santiago attraverso le montagne di Zamora e Ourense"
+                LanguageMode.DE -> "Von Granja de Moreruela nach Santiago über die Berge von Zamora und Ourense"
+                LanguageMode.NL -> "Van Granja de Moreruela naar Santiago over de bergen van Zamora en Ourense"
+                LanguageMode.PL -> "Z Granja de Moreruela do Santiago przez pasma górskie Zamora i Ourense"
+                LanguageMode.ZH -> "从莫雷鲁埃拉庄园越过萨莫拉和奥伦塞山区前往圣地亚哥"
+                else -> subtitle
+            }
+            subtitle.contains("San Adrián", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From Irun to Santo Domingo de la Calzada through the San Adrián tunnel"
+                LanguageMode.FR -> "D'Irun à Santo Domingo de la Calzada par le tunnel de San Adrián"
+                LanguageMode.IT -> "Da Irún a Santo Domingo de la Calzada attraverso il tunnel di San Adrián"
+                LanguageMode.DE -> "Von Irún nach Santo Domingo de la Calzada durch den San-Adrián-Tunnel"
+                LanguageMode.NL -> "Van Irún naar Santo Domingo de la Calzada via de San Adrián tunnel"
+                LanguageMode.PL -> "Z Irún do Santo Domingo de la Calzada przez tunel San Adrián"
+                LanguageMode.ZH -> "从伊伦穿过圣阿德里安隧道前往圣多明各-德拉卡尔萨达"
+                else -> subtitle
+            }
+            subtitle.contains("valle atlántico de Baztán", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From Bayonne to Pamplona across the Atlantic Baztán valley"
+                LanguageMode.FR -> "De Bayonne à Pampelune à travers la vallée atlantique du Baztán"
+                LanguageMode.IT -> "Da Bayonne a Pamplona attraverso la valle atlantica di Baztán"
+                LanguageMode.DE -> "Von Bayonne nach Pamplona durch das atlantische Baztán-Tal"
+                LanguageMode.NL -> "Van Bayonne naar Pamplona door de Atlantische Baztán-vallei"
+                LanguageMode.PL -> "Z Bajonny do Pampeluny przez atlantycką dolinę Baztán"
+                LanguageMode.ZH -> "从巴约讷穿过大西洋巴兹坦山谷前往潘普洛纳"
+                else -> subtitle
+            }
+            subtitle.contains("puerto de Pajares", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "From León to Oviedo across the Cantabrian range and Pajares pass"
+                LanguageMode.FR -> "De León à Oviedo par la cordillère cantabrique et le col de Pajares"
+                LanguageMode.IT -> "Da León a Oviedo attraverso la cordigliera cantabrica e il passo di Pajares"
+                LanguageMode.DE -> "Von León nach Oviedo über das Kantabrische Gebirge und den Pajares-Pass"
+                LanguageMode.NL -> "Van León naar Oviedo over het Cantabrisch gebergte en de Pajares-pas"
+                LanguageMode.PL -> "Z León do Oviedo przez Góry Kantabryjskie i przełęcz Pajares"
+                LanguageMode.ZH -> "从莱昂穿过坎塔布连山脉和帕哈雷斯山口前往奥维耶多"
+                else -> subtitle
+            }
+            subtitle.contains("Fin del Mundo y la Costa da Morte", ignoreCase = true) -> when (mode) {
+                LanguageMode.EN -> "The epilogue to the End of the World and the Death Coast"
+                LanguageMode.FR -> "L'épilogue vers le Bout du Monde et la Côte de la Mort"
+                LanguageMode.IT -> "L'epilogo verso la Fine del Mondo e la Costa da Morte"
+                LanguageMode.DE -> "Der Epilog zum Ende der Welt und der Todesküste"
+                LanguageMode.NL -> "Het epiloog naar het Einde van de Wereld en de Costa da Morte"
+                LanguageMode.PL -> "Epilog ku Końcowi Świata i Wybrzeżu Śmierci"
+                LanguageMode.ZH -> "通往世界尽头与死亡海岸的尾声"
+                else -> subtitle
+            }
+            else -> subtitle
+        }
+    }
+
+    private val stageTitleRegex = Regex("""^(?:Etapa|Stage|Étape|Tappa|Etappe|Etap|第)\s*(\d+)[:：\s]*(.*?)(?:\s+(?:a|to|à|nach|naar|do|至)\s+)(.*)$""", RegexOption.IGNORE_CASE)
+
+    fun getLocalizedStageTitle(stageTitle: String, mode: LanguageMode): String {
+        val match = stageTitleRegex.find(stageTitle) ?: return stageTitle
+        val num = match.groupValues[1]
+        val origin = match.groupValues[2].trim()
+        val dest = match.groupValues[3].trim()
+        return when (mode) {
+            LanguageMode.ES -> "Etapa $num: $origin a $dest"
+            LanguageMode.EN -> "Stage $num: $origin to $dest"
+            LanguageMode.FR -> "Étape $num : $origin à $dest"
+            LanguageMode.IT -> "Tappa $num: $origin a $dest"
+            LanguageMode.DE -> "Etappe $num: $origin nach $dest"
+            LanguageMode.NL -> "Etappe $num: $origin naar $dest"
+            LanguageMode.PL -> "Etap $num: $origin do $dest"
+            LanguageMode.ZH -> "第 $num 赛段：$origin 至 $dest"
+        }
+    }
+
+    fun getLocalizedDifficulty(diff: String, mode: LanguageMode): String {
+        val clean = diff.trim().lowercase()
+        return when {
+            clean.contains("muy") || clean.contains("very") || clean.contains("sehr") || clean.contains("très") || clean.contains("molto") || clean.contains("zeer") || clean.contains("bardzo") || clean.contains("极") -> when (mode) {
+                LanguageMode.ES -> "Muy exigente"
+                LanguageMode.EN -> "Very demanding"
+                LanguageMode.FR -> "Très exigeante"
+                LanguageMode.IT -> "Molto impegnativa"
+                LanguageMode.DE -> "Sehr anspruchsvoll"
+                LanguageMode.NL -> "Zeer veeleisend"
+                LanguageMode.PL -> "Bardzo wymagający"
+                LanguageMode.ZH -> "极具挑战性"
+            }
+            clean.contains("exig") || clean.contains("demand") || clean.contains("anspruch") || clean.contains("impeg") || clean.contains("veeleis") || clean.contains("wymag") || clean.contains("挑战") -> when (mode) {
+                LanguageMode.ES -> "Exigente"
+                LanguageMode.EN -> "Demanding"
+                LanguageMode.FR -> "Exigeante"
+                LanguageMode.IT -> "Impegnativa"
+                LanguageMode.DE -> "Anspruchsvoll"
+                LanguageMode.NL -> "Veeleisend"
+                LanguageMode.PL -> "Wymagający"
+                LanguageMode.ZH -> "具有挑战性"
+            }
+            clean.contains("mod") || clean.contains("mäßig") || clean.contains("gemid") || clean.contains("umiark") || clean.contains("中") -> when (mode) {
+                LanguageMode.ES -> "Moderada"
+                LanguageMode.EN -> "Moderate"
+                LanguageMode.FR -> "Modérée"
+                LanguageMode.IT -> "Moderata"
+                LanguageMode.DE -> "Mäßig"
+                LanguageMode.NL -> "Gemiddeld"
+                LanguageMode.PL -> "Umiarkowany"
+                LanguageMode.ZH -> "中等"
+            }
+            clean.contains("fác") || clean.contains("fac") || clean.contains("eas") || clean.contains("leich") || clean.contains("makk") || clean.contains("łatw") || clean.contains("简") -> when (mode) {
+                LanguageMode.ES -> "Fácil"
+                LanguageMode.EN -> "Easy"
+                LanguageMode.FR -> "Facile"
+                LanguageMode.IT -> "Facile"
+                LanguageMode.DE -> "Leicht"
+                LanguageMode.NL -> "Makkelijk"
+                LanguageMode.PL -> "Łatwy"
+                LanguageMode.ZH -> "简单"
+            }
+            else -> diff
+        }
+    }
+
+    fun getLocalizedNotes(notes: String, mode: LanguageMode): String {
+        val recHeader = when (mode) {
+            LanguageMode.ES -> "RECOMENDACIONES:"
+            LanguageMode.EN -> "RECOMMENDATIONS:"
+            LanguageMode.FR -> "RECOMMANDATIONS :"
+            LanguageMode.IT -> "RACCOMANDAZIONI:"
+            LanguageMode.DE -> "EMPFEHLUNGEN:"
+            LanguageMode.NL -> "AANBEVELINGEN:"
+            LanguageMode.PL -> "ZALECENIA:"
+            LanguageMode.ZH -> "建议："
+        }
+        val tipHeader = when (mode) {
+            LanguageMode.ES -> "CONSEJOS DE ÚLTIMA HORA:"
+            LanguageMode.EN -> "LAST-MINUTE TIPS:"
+            LanguageMode.FR -> "DERNIERS CONSEILS :"
+            LanguageMode.IT -> "CONSIGLI DELL'ULTIMO MINUTO:"
+            LanguageMode.DE -> "AKTUELLE TIPPS:"
+            LanguageMode.NL -> "LAATSTE TIPS:"
+            LanguageMode.PL -> "WSKAZÓWKI NA OSTATNIĄ CHWILĘ:"
+            LanguageMode.ZH -> "行前须知："
+        }
+
+        var res = notes
+        val recRegex = Regex("""^(?:RECOMENDACIONES|RECOMMENDATIONS|RECOMMANDATIONS|RACCOMANDAZIONI|EMPFEHLUNGEN|AANBEVELINGEN|ZALECENIA|建议)[:：]?""", RegexOption.MULTILINE)
+        val tipRegex = Regex("""^(?:CONSEJOS DE ÚLTIMA HORA|LAST-MINUTE TIPS|DERNIERS CONSEILS|CONSIGLI DELL'ULTIMO MINUTO|AKTUELLE TIPPS|LAATSTE TIPS|WSKAZÓWKI NA OSTATNIĄ CHWILĘ|行前须知)[:：]?""", RegexOption.MULTILINE)
+
+        res = recRegex.replace(res, recHeader)
+        res = tipRegex.replace(res, tipHeader)
+        return res
+    }
+
+    fun getLocalizedRouteInfo(route: PredefinedRouteInfo, mode: LanguageMode): PredefinedRouteInfo {
+        return route.copy(
+            title = getLocalizedTitle(route.title, mode),
+            subtitle = getLocalizedSubtitle(route.subtitle, mode),
+            note = route.note,
+            stages = route.stages.map { stage ->
+                stage.copy(
+                    title = getLocalizedStageTitle(stage.title, mode),
+                    difficulty = getLocalizedDifficulty(stage.difficulty, mode),
+                    notes = getLocalizedNotes(stage.notes, mode)
+                )
+            }
+        )
+    }
 }

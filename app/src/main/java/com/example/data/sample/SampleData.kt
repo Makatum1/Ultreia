@@ -56,8 +56,10 @@ object SampleData {
     suspend fun createPredefinedCamino(
         routeInfo: PredefinedRouteInfo,
         repository: CaminoRepository,
-        startDate: String = "15/05/2026"
+        startDate: String = "15/05/2026",
+        languageMode: com.example.ui.settings.LanguageMode = com.example.ui.settings.LanguageMode.ES
     ): Long {
+        val locRoute = PredefinedRoutesData.getLocalizedRouteInfo(routeInfo, languageMode)
         val isCaminoIngles = routeInfo.title.contains("Inglés", ignoreCase = true) || routeInfo.title.contains("Ingles", ignoreCase = true)
         val initialAttachedFilesJson = if (isCaminoIngles) {
             try {
@@ -81,18 +83,18 @@ object SampleData {
         }
 
         val camino = CaminoEntity(
-            title = routeInfo.title,
-            subtitle = routeInfo.subtitle,
+            title = locRoute.title,
+            subtitle = locRoute.subtitle,
             coverPhotoResName = "img_camino_hero",
-            pilgrimName = "Peregrino Ultreia",
+            pilgrimName = com.example.ui.settings.AppStrings.get("pilgrim_default_name", languageMode),
             startDate = startDate,
-            totalEstimatedKm = routeInfo.totalKm,
+            totalEstimatedKm = locRoute.totalKm,
             isTravelGuide = false,
             attachedFilesJson = initialAttachedFilesJson
         )
         val caminoId = repository.insertCamino(camino)
 
-        for (stage in routeInfo.stages) {
+        for (stage in locRoute.stages) {
             // Generate test GPX track points between start and end coordinates
             val startCoord = TownCoordinates.findCoordinates(stage.origin)
             val endCoord = TownCoordinates.findCoordinates(stage.destination)
