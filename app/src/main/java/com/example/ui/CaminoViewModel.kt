@@ -150,6 +150,19 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setLanguageMode(mode: LanguageMode) {
         _languageMode.value = mode
+        try {
+            val locale = when (mode) {
+                LanguageMode.ES -> Locale("es", "ES")
+                LanguageMode.EN -> Locale("en", "US")
+                LanguageMode.FR -> Locale("fr", "FR")
+                LanguageMode.IT -> Locale("it", "IT")
+                LanguageMode.DE -> Locale("de", "DE")
+                LanguageMode.NL -> Locale("nl", "NL")
+                LanguageMode.PL -> Locale("pl", "PL")
+                LanguageMode.ZH -> Locale("zh", "CN")
+            }
+            Locale.setDefault(locale)
+        } catch (_: Exception) {}
         val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit().putString("saved_language_mode", mode.name).apply()
     }
@@ -366,8 +379,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     fun localizeDifficulty(diff: String): String =
         com.example.data.sample.PredefinedRoutesData.getLocalizedDifficulty(diff, _languageMode.value)
 
-    fun localizeNotes(notes: String): String =
-        com.example.data.sample.PredefinedRoutesData.getLocalizedNotes(notes, _languageMode.value)
+    fun localizeNotes(notes: String?, origin: String = "", destination: String = ""): String =
+        com.example.data.sample.PredefinedRoutesData.getLocalizedNotes(notes ?: "", _languageMode.value, origin, destination)
 
     fun localizeRouteTitle(title: String): String =
         com.example.data.sample.PredefinedRoutesData.getLocalizedTitle(title, _languageMode.value)
@@ -1229,7 +1242,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     isTotal = isTotal,
                     camino = targetCamino,
                     stats = targetStats,
-                    stages = stageList
+                    stages = stageList,
+                    languageMode = _languageMode.value
                 )
                 if (file != null) {
                     _userMessage.value = "Estadística de viaje exportada con éxito"

@@ -124,7 +124,8 @@ object PdfExporter {
         isTotal: Boolean,
         camino: CaminoEntity?,
         stats: com.example.data.repository.CaminoStats,
-        stages: List<StageEntity> = emptyList()
+        stages: List<StageEntity> = emptyList(),
+        languageMode: LanguageMode = LanguageMode.ES
     ): File? = withContext(Dispatchers.IO) {
         val pdfDocument = PdfDocument()
         try {
@@ -134,11 +135,11 @@ object PdfExporter {
 
             val isTravel = camino?.isTravelGuide == true
             val titleText = if (isTotal) {
-                if (isTravel) "Estadísticas Totales de Viajes" else "Estadísticas Totales del Camino"
+                if (isTravel) tr("pdf_balance_trips", languageMode) else tr("pdf_balance_caminos", languageMode)
             } else {
-                "Estadísticas: ${camino?.title ?: (if (isTravel) "Viaje" else "Camino")}"
+                camino?.title ?: (if (isTravel) tr("new_trip", languageMode) else tr("new_camino", languageMode))
             }
-            drawStatsPage(context, canvas, isTotal, camino, stats, stages)
+            drawStatsPage(context, canvas, isTotal, camino, stats, stages, languageMode)
             pdfDocument.finishPage(page)
 
             val outputDir = File(context.cacheDir, "shared_docs")
@@ -775,16 +776,22 @@ object PdfExporter {
         }
 
         // 2. CONSEJOS DEL DÍA (Caminos) O RESUMEN EJECUTIVO (Viajes)
-        if (stage.stageNotes.isNotBlank()) {
-            val contentH = measureMultilineTextHeight(stage.stageNotes, PAGE_WIDTH - 2 * MARGIN - 28f, paint.apply { textSize = 9.5f })
+        val displayedNotes = com.example.data.sample.notes.PredefinedNotesRepository.getLocalizedNotes(
+            notes = stage.stageNotes,
+            origin = stage.origin,
+            destination = stage.destination,
+            mode = languageMode
+        )
+        if (displayedNotes.isNotBlank()) {
+            val contentH = measureMultilineTextHeight(displayedNotes, PAGE_WIDTH - 2 * MARGIN - 28f, paint.apply { textSize = 9.5f })
             val cardH = contentH + 24f
 
             if (currentY + cardH + 30f > PAGE_HEIGHT - MARGIN - 35f) {
-                nextSubPage(if (isTravel) "Resumen" else "Consejos")
+                nextSubPage(if (isTravel) tr("trip_tips", languageMode) else tr("stage_tips", languageMode))
                 currentY = 74f
             }
 
-            val secTitle = if (isTravel) "RESUMEN EJECUTIVO DE LA JORNADA" else "INFORMACIÓN Y CONSEJOS CLAVE DEL DÍA"
+            val secTitle = if (isTravel) tr("pdf_executive_summary", languageMode) else tr("pdf_key_tips_day", languageMode)
             val secAccent = if (isTravel) COLOR_NAVY else COLOR_AMBER
             val secIcon = if (isTravel) "📝" else "💡"
             currentY = drawSectionBanner(canvas, currentY, secTitle, secAccent, secIcon)
@@ -796,7 +803,7 @@ object PdfExporter {
             paint.color = COLOR_SLATE
             paint.textSize = 9.5f
             paint.typeface = Typeface.DEFAULT
-            drawMultilineText(canvas, stage.stageNotes, MARGIN + 14f, currentY + 16f, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
+            drawMultilineText(canvas, displayedNotes, MARGIN + 14f, currentY + 16f, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
 
             currentY += cardH + 16f
         }
@@ -1096,7 +1103,8 @@ object PdfExporter {
         isTotal: Boolean,
         camino: CaminoEntity?,
         stats: com.example.data.repository.CaminoStats,
-        stages: List<StageEntity>
+        stages: List<StageEntity>,
+        languageMode: LanguageMode = LanguageMode.ES
     ) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val isTravel = camino?.isTravelGuide == true
@@ -1113,8 +1121,6 @@ object PdfExporter {
         canvas.drawRect(0f, bannerH - 1.5f, PAGE_WIDTH.toFloat(), bannerH, paint)
 
         // Logo o imagen de cabecera:
-        // - En Caminos: icono de la aplicación (R.drawable.icono)
-        // - En Viajes: si no se cambia la imagen, no se pone icono; si se cambia, se pone esa imagen respetando el tamaño (sin círculo)
         val statsIcon: Bitmap? = if (!isTravel) {
             loadTitleIconBitmap(context)
         } else if (!camino?.coverPhotoUri.isNullOrBlank()) {
@@ -1143,15 +1149,15 @@ object PdfExporter {
         paint.textSize = 10f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
-        canvas.drawText("$brandPrefix  •  INFORME GENERAL DE RENDIMIENTO", textLeft, 48f, paint)
+        canvas.drawText("$brandPrefix  •  ${tr("pdf_general_performance_report", languageMode)}", textLeft, 48f, paint)
 
         paint.color = Color.WHITE
         paint.textSize = 19f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val subjectTitle = if (isTotal) {
-            if (isTravel) "Balance Acumulado de Viajes" else "Balance Total de Caminos Realizados"
+            if (isTravel) tr("pdf_balance_trips", languageMode) else tr("pdf_balance_caminos", languageMode)
         } else {
-            camino?.title ?: "Camino de Santiago"
+            camino?.title ?: (if (isTravel) tr("new_trip", languageMode) else tr("new_camino", languageMode))
         }
         canvas.drawText(subjectTitle, textLeft, 76f, paint)
 
@@ -1159,7 +1165,7 @@ object PdfExporter {
         paint.typeface = Typeface.DEFAULT
         paint.color = Color.WHITE
         val dateGenerated = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-        canvas.drawText("Documento emitido y validado el: $dateGenerated", textLeft, 98f, paint)
+        canvas.drawText("${tr("pdf_issued_validated", languageMode)} $dateGenerated", textLeft, 98f, paint)
 
         // 4 Tarjetas KPI Principales
         var startY = 198f
@@ -1174,9 +1180,9 @@ object PdfExporter {
             y = startY,
             w = cardWidth,
             h = cardHeight,
-            label = if (isTravel) "JORNADAS COMPLETADAS" else "ETAPAS COMPLETADAS",
+            label = if (isTravel) tr("pdf_days_completed", languageMode) else tr("pdf_stages_completed", languageMode),
             value = "${stats.completedStages} / ${stats.totalStages}",
-            sub = "${stats.totalStages - stats.completedStages} pendientes para culminar",
+            sub = "${stats.totalStages - stats.completedStages} ${tr("pdf_pending_to_finish", languageMode)}",
             accentColor = COLOR_BLUE,
             bgColor = COLOR_BLUE_BG,
             borderColor = COLOR_BLUE_BORDER
@@ -1189,9 +1195,9 @@ object PdfExporter {
             y = startY,
             w = cardWidth,
             h = cardHeight,
-            label = "DISTANCIA RECORRIDA",
+            label = tr("pdf_dist_covered", languageMode),
             value = "${String.format(java.util.Locale.US, "%.1f", stats.completedKm)} km",
-            sub = "de ${String.format(java.util.Locale.US, "%.1f", stats.totalKm)} km totales proyectados",
+            sub = "${tr("balance_total_dist", languageMode)} ${String.format(java.util.Locale.US, "%.1f", stats.totalKm)} km",
             accentColor = COLOR_EMERALD,
             bgColor = COLOR_EMERALD_BG,
             borderColor = COLOR_EMERALD_BORDER
@@ -1206,9 +1212,9 @@ object PdfExporter {
             y = startY,
             w = cardWidth,
             h = cardHeight,
-            label = "DESNIVEL POSITIVO SUPERADO",
+            label = tr("pdf_gain_overcome", languageMode),
             value = "+${stats.completedElevationGainM} m",
-            sub = "de +${stats.totalElevationGainM} m de desnivel total",
+            sub = "${tr("balance_gain", languageMode)} +${stats.totalElevationGainM} m",
             accentColor = COLOR_AMBER,
             bgColor = COLOR_AMBER_BG,
             borderColor = COLOR_AMBER_BORDER
@@ -1221,9 +1227,9 @@ object PdfExporter {
             y = startY,
             w = cardWidth,
             h = cardHeight,
-            label = "PROGRESO Y CUMPLIMIENTO",
+            label = tr("pdf_progress_compliance", languageMode),
             value = "${stats.progressPercent}%",
-            sub = if (stats.progressPercent >= 100) "¡Ruta culminada con éxito!" else "Itinerario en curso",
+            sub = if (stats.progressPercent >= 100) tr("pdf_route_completed", languageMode) else tr("pdf_itinerary_in_progress", languageMode),
             accentColor = COLOR_GOLD_DARK,
             bgColor = COLOR_WARM_BG,
             borderColor = COLOR_WARM_BORDER
@@ -1244,7 +1250,8 @@ object PdfExporter {
 
         // Sección de Desglose
         startY += 26f
-        startY = drawSectionBanner(canvas, startY, if (isTotal) "MÉTRICAS CONSOLIDADAS DE RENDIMIENTO" else "DETALLE DE JORNADAS REALIZADAS", COLOR_NAVY, "📈")
+        val sectionTitle = if (isTotal) tr("pdf_consolidated_metrics", languageMode) else tr("pdf_detail_stages", languageMode)
+        startY = drawSectionBanner(canvas, startY, sectionTitle, COLOR_NAVY, "📈")
 
         paint.textSize = 9.5f
         paint.typeface = Typeface.DEFAULT
@@ -1252,8 +1259,9 @@ object PdfExporter {
 
         if (stages.isNotEmpty() && !isTotal) {
             for (st in stages.take(14)) {
-                val statusBadge = if (st.isCompleted) "✓ Completada" else "⏳ Planificada"
-                val lineText = "Día ${st.dayNumber}: ${st.origin} → ${st.destination}  |  ${st.distanceKm} km  |  +${st.elevationGainM}m  |  $statusBadge"
+                val statusBadge = if (st.isCompleted) "✓ ${tr("completed", languageMode)}" else "⏳ ${tr("stage_pending", languageMode)}"
+                val dayPrefix = if (isTravel) tr("day", languageMode) else tr("stage_tips_tag", languageMode)
+                val lineText = "$dayPrefix ${st.dayNumber}: ${st.origin} → ${st.destination}  |  ${st.distanceKm} km  |  +${st.elevationGainM}m  |  $statusBadge"
                 canvas.drawText(lineText, MARGIN + 8f, startY, paint)
                 startY += 18f
             }

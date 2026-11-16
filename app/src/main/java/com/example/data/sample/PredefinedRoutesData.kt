@@ -1424,35 +1424,51 @@ object PredefinedRoutesData {
         }
     }
 
-    fun getLocalizedNotes(notes: String, mode: LanguageMode): String {
-        val recHeader = when (mode) {
-            LanguageMode.ES -> "RECOMENDACIONES:"
-            LanguageMode.EN -> "RECOMMENDATIONS:"
-            LanguageMode.FR -> "RECOMMANDATIONS :"
-            LanguageMode.IT -> "RACCOMANDAZIONI:"
-            LanguageMode.DE -> "EMPFEHLUNGEN:"
-            LanguageMode.NL -> "AANBEVELINGEN:"
-            LanguageMode.PL -> "ZALECENIA:"
-            LanguageMode.ZH -> "建议："
+    fun findNotesByOriginDest(origin: String, destination: String): String? {
+        val o = origin.trim().lowercase()
+        val d = destination.trim().lowercase()
+        for (route in ROUTES) {
+            for (stage in route.stages) {
+                if (stage.origin.trim().lowercase() == o && stage.destination.trim().lowercase() == d) {
+                    return stage.notes
+                }
+            }
         }
-        val tipHeader = when (mode) {
-            LanguageMode.ES -> "CONSEJOS DE ÚLTIMA HORA:"
-            LanguageMode.EN -> "LAST-MINUTE TIPS:"
-            LanguageMode.FR -> "DERNIERS CONSEILS :"
-            LanguageMode.IT -> "CONSIGLI DELL'ULTIMO MINUTO:"
-            LanguageMode.DE -> "AKTUELLE TIPPS:"
-            LanguageMode.NL -> "LAATSTE TIPS:"
-            LanguageMode.PL -> "WSKAZÓWKI NA OSTATNIĄ CHWILĘ:"
-            LanguageMode.ZH -> "行前须知："
+        return null
+    }
+
+    fun isAnyPredefinedNote(notes: String): Boolean {
+        val clean = notes.trim()
+        for (route in ROUTES) {
+            for (stage in route.stages) {
+                if (stage.notes.trim() == clean) return true
+            }
         }
+        return false
+    }
 
-        var res = notes
-        val recRegex = Regex("""^(?:RECOMENDACIONES|RECOMMENDATIONS|RECOMMANDATIONS|RACCOMANDAZIONI|EMPFEHLUNGEN|AANBEVELINGEN|ZALECENIA|建议)[:：]?""", RegexOption.MULTILINE)
-        val tipRegex = Regex("""^(?:CONSEJOS DE ÚLTIMA HORA|LAST-MINUTE TIPS|DERNIERS CONSEILS|CONSIGLI DELL'ULTIMO MINUTO|AKTUELLE TIPPS|LAATSTE TIPS|WSKAZÓWKI NA OSTATNIĄ CHWILĘ|行前须知)[:：]?""", RegexOption.MULTILINE)
+    fun findStageByNotes(notes: String): PredefinedStageInfo? {
+        val clean = notes.trim()
+        for (route in ROUTES) {
+            for (stage in route.stages) {
+                if (stage.notes.trim() == clean) return stage
+            }
+        }
+        return null
+    }
 
-        res = recRegex.replace(res, recHeader)
-        res = tipRegex.replace(res, tipHeader)
-        return res
+    fun getLocalizedNotes(
+        notes: String,
+        mode: LanguageMode,
+        origin: String = "",
+        destination: String = ""
+    ): String {
+        return com.example.data.sample.notes.PredefinedNotesRepository.getLocalizedNotes(
+            notes = notes,
+            origin = origin,
+            destination = destination,
+            mode = mode
+        )
     }
 
     fun getLocalizedRouteInfo(route: PredefinedRouteInfo, mode: LanguageMode): PredefinedRouteInfo {
@@ -1461,10 +1477,15 @@ object PredefinedRoutesData {
             subtitle = getLocalizedSubtitle(route.subtitle, mode),
             note = route.note,
             stages = route.stages.map { stage ->
+                val localizedNotes = com.example.data.sample.notes.PredefinedNotesRepository.getStageNotes(
+                    stage.origin,
+                    stage.destination,
+                    mode
+                ) ?: getLocalizedNotes(stage.notes, mode, stage.origin, stage.destination)
                 stage.copy(
                     title = getLocalizedStageTitle(stage.title, mode),
                     difficulty = getLocalizedDifficulty(stage.difficulty, mode),
-                    notes = getLocalizedNotes(stage.notes, mode)
+                    notes = localizedNotes
                 )
             }
         )

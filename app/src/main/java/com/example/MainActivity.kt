@@ -537,32 +537,38 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
     if (conflictDialogState != null) {
         val conflict = conflictDialogState!!.conflict
         val isTravel = conflict.existingCamino.isTravelGuide
-        val entityType = if (isTravel) "el Viaje" else "el Camino"
+        val entityType = if (isTravel) viewModel.string("this_trip") else viewModel.string("this_camino")
         val displayName = conflict.existingCamino.title
+        val rawTemplate = viewModel.string("camino_exists_overwrite")
+        val confirmMsg = try {
+            String.format(rawTemplate, entityType, displayName)
+        } catch (_: Exception) {
+            "El $entityType \"$displayName\" ya existe. ¿Quieres sobreescribirlo junto a todas las etapas?"
+        }
 
         AlertDialog(
             onDismissRequest = { viewModel.cancelAllConflicts() },
             title = {
                 Text(
-                    text = "Ruta ya existente",
+                    text = viewModel.string("camino_exists_title"),
                     fontWeight = FontWeight.Bold,
                     color = CaminoBlue
                 )
             },
             text = {
-                Text("El ${if (isTravel) "Viaje" else "Camino"} \"$displayName\" ya existe. ¿Quieres sobreescribirlo junto a todas las etapas?")
+                Text(confirmMsg)
             },
             confirmButton = {
                 Button(
                     onClick = { viewModel.resolveConflict(overwrite = true) },
                     colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
                 ) {
-                    Text("Sí, sobreescribir")
+                    Text(viewModel.string("overwrite_yes"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.resolveConflict(overwrite = false) }) {
-                    Text("No, omitir")
+                    Text(viewModel.string("overwrite_no"))
                 }
             }
         )
@@ -574,14 +580,14 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             onDismissRequest = { viewModel.dismissStageDateDialog() },
             title = {
                 Text(
-                    text = "Actualizar fechas",
+                    text = viewModel.string("date_cascade_title"),
                     fontWeight = FontWeight.Bold,
                     color = CaminoBlue
                 )
             },
             text = {
                 Text(
-                    text = "Has cambiado la fecha de esta etapa. ¿Quieres actualizar también las fechas de las etapas posteriores para mantener el orden?"
+                    text = viewModel.string("date_cascade_desc")
                 )
             },
             confirmButton = {
@@ -589,14 +595,14 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     onClick = { viewModel.confirmStageDateUpdate(cascadeDates = true) },
                     colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
                 ) {
-                    Text("Sí, actualizar todas")
+                    Text(viewModel.string("date_cascade_yes"))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { viewModel.confirmStageDateUpdate(cascadeDates = false) }
                 ) {
-                    Text("No, solo esta etapa")
+                    Text(viewModel.string("date_cascade_no"))
                 }
             }
         )
@@ -975,8 +981,8 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Caminos (Todos los caminos)", fontWeight = FontWeight.Bold, color = CaminoBlue)
-                            Text("Respalda únicamente las rutas del perfil de Caminos.", style = MaterialTheme.typography.labelSmall)
+                            Text(viewModel.string("backup_caminos_only"), fontWeight = FontWeight.Bold, color = CaminoBlue)
+                            Text(viewModel.string("backup_caminos_desc"), style = MaterialTheme.typography.labelSmall)
                         }
                     }
 
@@ -992,8 +998,8 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Viajes (Todos los viajes)", fontWeight = FontWeight.Bold, color = CaminoBlue)
-                            Text("Respalda únicamente los viajes del perfil de Viajes.", style = MaterialTheme.typography.labelSmall)
+                            Text(viewModel.string("backup_trips_only"), fontWeight = FontWeight.Bold, color = CaminoBlue)
+                            Text(viewModel.string("backup_trips_desc"), style = MaterialTheme.typography.labelSmall)
                         }
                     }
 
@@ -1009,8 +1015,8 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Completo (Todos los Caminos y Viajes)", fontWeight = FontWeight.Bold, color = CaminoBlueDark)
-                            Text("Copia de seguridad total con ambos perfiles.", style = MaterialTheme.typography.labelSmall)
+                            Text(viewModel.string("backup_all_both"), fontWeight = FontWeight.Bold, color = CaminoBlueDark)
+                            Text(viewModel.string("backup_all_desc"), style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
@@ -1031,7 +1037,7 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.FileDownload, contentDescription = null, tint = CaminoBlue)
                     Spacer(Modifier.width(8.dp))
-                    Text("Exportar a ZIP", fontWeight = FontWeight.Bold, color = CaminoBlue)
+                    Text(viewModel.string("export_zip_btn"), fontWeight = FontWeight.Bold, color = CaminoBlue)
                 }
             },
             text = {

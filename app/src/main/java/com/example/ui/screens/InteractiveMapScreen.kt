@@ -665,6 +665,8 @@ fun InteractiveMapScreen(
     var showScopeDropdown by remember { mutableStateOf(false) }
     var isTotalHidden by remember { mutableStateOf(false) }
 
+    fun tr(key: String, fallback: String): String = viewModel?.string(key) ?: fallback
+
     // Inicializar configuración de OSMDroid con User-Agent seguro
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(context, context.getSharedPreferences("${context.packageName}_osmdroid", Context.MODE_PRIVATE))
@@ -1375,7 +1377,7 @@ fun InteractiveMapScreen(
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Ver Detalles", fontSize = 12.sp)
+                                Text(tr("view_details", "Ver Detalles"), fontSize = 12.sp)
                             }
 
                             OutlinedButton(
@@ -1400,7 +1402,7 @@ fun InteractiveMapScreen(
                             ) {
                                 Icon(Icons.Default.CenterFocusStrong, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Centrar", fontSize = 12.sp)
+                                Text(tr("center_map", "Centrar"), fontSize = 12.sp)
                             }
                         }
                     }
@@ -1442,7 +1444,7 @@ fun InteractiveMapScreen(
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = if (isTravel) "Días" else "Etapas",
+                            text = if (isTravel) tr("tab_days", "Días") else tr("tab_stages", "Etapas"),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1
@@ -1479,7 +1481,7 @@ fun InteractiveMapScreen(
                                         Spacer(Modifier.width(8.dp))
                                         Column {
                                             Text(
-                                                text = if (isTravel) "Día ${stg.dayNumber}: ${stg.origin} → ${stg.destination}" else "Etapa ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
+                                                text = if (isTravel) "${tr("day", "Día")} ${stg.dayNumber}: ${stg.origin} → ${stg.destination}" else "${tr("stage_tips_tag", "Etapa")} ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
                                                 maxLines = 1,
@@ -1506,9 +1508,9 @@ fun InteractiveMapScreen(
                 // Botón 2: Menú Desplegable con opciones "Este Camino" / "Este Viaje" y "Total Caminos" / "Total Viajes"
                 Box(modifier = Modifier.weight(1.1f)) {
                     val currentScopeText = if (mapScopeMode == MapScopeMode.TOTAL) {
-                        if (isTravel) "Total Viajes" else "Total Caminos"
+                        if (isTravel) tr("total_trips_scope", "Total Viajes") else tr("total_caminos_scope", "Total Caminos")
                     } else {
-                        if (isTravel) "Este Viaje" else "Este Camino"
+                        if (isTravel) tr("this_trip", "Este Viaje") else tr("this_camino", "Este Camino")
                     }
 
                     Button(
@@ -1560,7 +1562,7 @@ fun InteractiveMapScreen(
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = if (isTravel) "Este Viaje" else "Este Camino",
+                                        text = if (isTravel) tr("this_trip", "Este Viaje") else tr("this_camino", "Este Camino"),
                                         fontWeight = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) FontWeight.Bold else FontWeight.Normal,
                                         color = if (mapScopeMode == MapScopeMode.CURRENT_CAMINO) CaminoBlue else MaterialTheme.colorScheme.onSurface
                                     )
@@ -1586,7 +1588,7 @@ fun InteractiveMapScreen(
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = if (isTravel) "Total Viajes" else "Total Caminos",
+                                        text = if (isTravel) tr("total_trips_scope", "Total Viajes") else tr("total_caminos_scope", "Total Caminos"),
                                         fontWeight = if (mapScopeMode == MapScopeMode.TOTAL) FontWeight.Bold else FontWeight.Normal,
                                         color = if (mapScopeMode == MapScopeMode.TOTAL) CaminoBlue else MaterialTheme.colorScheme.onSurface
                                     )
@@ -1621,7 +1623,7 @@ fun InteractiveMapScreen(
                     Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = if (isTravel) "Ocultar Días" else "Ocultar Etapas",
+                        text = if (isTravel) tr("hide_days", "Ocultar Días") else tr("hide_stages", "Ocultar Etapas"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1

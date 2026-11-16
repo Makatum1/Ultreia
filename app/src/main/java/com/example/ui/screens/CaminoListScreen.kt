@@ -395,6 +395,7 @@ fun CaminoListScreen(
         AddCaminoDialog(
             isFirstCamino = caminos.isEmpty(),
             initialIsTravelGuide = isTravelProfile,
+            viewModel = viewModel,
             onDismiss = { showAddCaminoDialog = false },
             onConfirm = { title, sub, date, isTravelGuide, photoUri ->
                 viewModel.addCamino(title, sub, date, isTravelGuide, photoUri)
@@ -614,6 +615,7 @@ fun CaminoItemCard(
 fun AddCaminoDialog(
     isFirstCamino: Boolean = false,
     initialIsTravelGuide: Boolean = false,
+    viewModel: CaminoViewModel? = null,
     onDismiss: () -> Unit,
     onConfirm: (title: String, subtitle: String, date: String, isTravelGuide: Boolean, photoUri: String?) -> Unit,
     onSeedSample: ((Boolean) -> Unit)? = null
@@ -632,6 +634,14 @@ fun AddCaminoDialog(
         }
     }
 
+    val dialogTitle = if (isFirstCamino) {
+        viewModel?.string("add_first_camino_title") ?: "Crear tu primer Camino o Viaje"
+    } else if (isTravelGuide) {
+        viewModel?.string("add_new_trip_title") ?: "Crear Nueva Guía de Viaje"
+    } else {
+        viewModel?.string("add_new_camino_title") ?: "Crear Nueva Guía de Camino"
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -643,7 +653,7 @@ fun AddCaminoDialog(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = if (isFirstCamino) "Crear tu primer Camino o Viaje" else if (isTravelGuide) "Crear Nueva Guía de Viaje" else "Crear Nueva Guía de Camino",
+                    text = dialogTitle,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -667,14 +677,14 @@ fun AddCaminoDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Guía de viaje",
+                                    text = viewModel?.string("travel_guide_label") ?: "Guía de viaje",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = CaminoBlue
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    text = "Si se activa, se transforma en una guía de viaje general y se eliminan las referencias al Camino de Santiago.",
+                                    text = viewModel?.string("travel_guide_desc") ?: "Si se activa, se transforma en una guía de viaje general y se eliminan las referencias al Camino de Santiago.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -701,7 +711,7 @@ fun AddCaminoDialog(
                             Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = if (isTravelGuide) "Crear un viaje de prueba" else "Crear un camino de prueba",
+                                text = if (isTravelGuide) viewModel?.string("create_sample_trip") ?: "Crear un viaje de prueba" else viewModel?.string("create_sample_camino") ?: "Crear un camino de prueba",
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -712,9 +722,9 @@ fun AddCaminoDialog(
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text(if (isTravelGuide) "Nombre del Viaje *" else "Nombre del Camino *") },
+                        label = { Text(if (isTravelGuide) viewModel?.string("trip_name_label") ?: "Nombre del Viaje *" else viewModel?.string("camino_name_label") ?: "Nombre del Camino *") },
                         placeholder = {
-                            Text(if (isTravelGuide) "Ej. Ruta de los Picos de Europa, Viaje a la Toscana..." else "Ej. Camino Francés, Vía de la Plata...")
+                            Text(if (isTravelGuide) viewModel?.string("trip_name_placeholder") ?: "Ej. Ruta de los Picos de Europa, Viaje a la Toscana..." else viewModel?.string("camino_name_placeholder") ?: "Ej. Camino Francés, Vía de la Plata...")
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -724,9 +734,9 @@ fun AddCaminoDialog(
                     OutlinedTextField(
                         value = subtitle,
                         onValueChange = { subtitle = it },
-                        label = { Text("Descripción o Itinerario") },
+                        label = { Text(viewModel?.string("desc_or_itinerary_label") ?: "Descripción o Itinerario") },
                         placeholder = {
-                            Text(if (isTravelGuide) "Ej. De Cangas de Onís a Bulnes" else "Ej. De Saint-Jean-Pied-de-Port a Santiago")
+                            Text(if (isTravelGuide) viewModel?.string("trip_desc_placeholder") ?: "Ej. De Cangas de Onís a Bulnes" else viewModel?.string("camino_desc_placeholder") ?: "Ej. De Saint-Jean-Pied-de-Port a Santiago")
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -736,14 +746,14 @@ fun AddCaminoDialog(
                     OutlinedTextField(
                         value = startDate,
                         onValueChange = { startDate = it },
-                        label = { Text("Fecha de inicio") },
+                        label = { Text(viewModel?.string("start_date_label") ?: "Fecha de inicio") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
                 item {
                     Text(
-                        text = if (isTravelGuide) "Foto de Portada del Viaje:" else "Foto de Portada del Camino:",
+                        text = if (isTravelGuide) viewModel?.string("cover_photo_trip") ?: "Foto de Portada del Viaje:" else viewModel?.string("cover_photo_camino") ?: "Foto de Portada del Camino:",
                         style = MaterialTheme.typography.labelSmall
                     )
                     if (selectedPhotoUri != null) {
@@ -768,7 +778,7 @@ fun AddCaminoDialog(
                     ) {
                         Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(if (selectedPhotoUri == null) "Elegir Foto de Portada" else "Cambiar Foto")
+                        Text(if (selectedPhotoUri == null) viewModel?.string("add_photo_btn") ?: "Elegir Foto de Portada" else viewModel?.string("change_photo_btn") ?: "Cambiar Foto")
                     }
                 }
             }
@@ -782,11 +792,11 @@ fun AddCaminoDialog(
                 },
                 modifier = Modifier.testTag("btn_confirm_create_camino")
             ) {
-                Text(if (isFirstCamino) "Comenzar" else if (isTravelGuide) "Crear Viaje" else "Crear Camino")
+                Text(if (isFirstCamino) viewModel?.string("create_guide_btn") ?: "Comenzar" else if (isTravelGuide) viewModel?.string("new_trip") ?: "Crear Viaje" else viewModel?.string("new_camino") ?: "Crear Camino")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text(viewModel?.string("cancel") ?: "Cancelar") }
         }
     )
 }

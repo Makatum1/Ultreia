@@ -473,7 +473,7 @@ fun StageDetailScreen(
 
                         Spacer(Modifier.height(6.dp))
 
-                        val tipsText = viewModel.localizeNotes(stage.stageNotes).ifBlank {
+                        val tipsText = viewModel.localizeNotes(stage.stageNotes, stage.origin, stage.destination).ifBlank {
                             if (isTravel) "No hay un resumen registrado para hoy. Toca en 'Editar' para escribir qué te espera en la jornada de hoy."
                             else "No hay consejos específicos registrados para hoy. Toca en 'Editar' para añadir recomendaciones de calzado, fuentes de agua o tramos técnicos."
                         }
@@ -814,8 +814,9 @@ fun StageDetailScreen(
 
     // Edit Tips Dialog
     if (showEditTipsDialog) {
+        val displayedTips = viewModel.localizeNotes(stage.stageNotes, stage.origin, stage.destination)
         EditTipsDialog(
-            currentTips = stage.stageNotes,
+            currentTips = displayedTips,
             isTravel = isTravel,
             viewModel = viewModel,
             onDismiss = { showEditTipsDialog = false },
@@ -830,6 +831,7 @@ fun StageDetailScreen(
     if (showAddAccommodationDialog) {
         AddAccommodationDialog(
             stageId = stage.id,
+            viewModel = viewModel,
             onDismiss = { showAddAccommodationDialog = false },
             onSave = { name, address, phone, options, notes ->
                 viewModel.addAccommodation(stage.id, name, address, phone, options, notes)
@@ -855,6 +857,7 @@ fun StageDetailScreen(
         AddEditVivenciaDialog(
             stageDate = formattedStageDate,
             initialVivencia = null,
+            viewModel = viewModel,
             onDismiss = { showAddVivenciaDialog = false },
             onSave = { note, photoUri, dateStr ->
                 viewModel.addVivenciaToStage(stage.id, note, photoUri, dateStr)
@@ -867,6 +870,7 @@ fun StageDetailScreen(
         AddEditVivenciaDialog(
             stageDate = formattedStageDate,
             initialVivencia = vivenciaToEdit,
+            viewModel = viewModel,
             onDismiss = { vivenciaToEdit = null },
             onSave = { note, photoUri, dateStr ->
                 viewModel.updateVivenciaInStage(
@@ -1386,6 +1390,7 @@ fun EditTipsDialog(
 @Composable
 fun AddAccommodationDialog(
     stageId: Long,
+    viewModel: CaminoViewModel? = null,
     onDismiss: () -> Unit,
     onSave: (name: String, address: String, phone: String, options: List<RoomPriceOption>, notes: String) -> Unit
 ) {
@@ -1405,17 +1410,26 @@ fun AddAccommodationDialog(
     var roomPriceStr by remember { mutableStateOf("15") }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
 
+    fun getRoomTypeLabel(typeKey: String): String = when (typeKey) {
+        "Litera" -> viewModel?.string("room_type_bunk") ?: "Litera"
+        "Individual" -> viewModel?.string("room_type_single") ?: "Individual"
+        "Doble" -> viewModel?.string("room_type_double") ?: "Doble"
+        "Triple" -> viewModel?.string("room_type_triple") ?: "Triple"
+        "Personalizable" -> viewModel?.string("room_type_custom") ?: "Personalizable"
+        else -> typeKey
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Añadir Alojamiento") },
+        title = { Text(viewModel?.string("add_accommodation") ?: "Añadir Alojamiento") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Nombre del Alojamiento *") },
-                        placeholder = { Text("Ej. Albergue u Hotel") },
+                        label = { Text(viewModel?.string("acc_name_label") ?: "Nombre del Alojamiento *") },
+                        placeholder = { Text(viewModel?.string("acc_name_placeholder") ?: "Ej. Albergue u Hotel") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1423,8 +1437,8 @@ fun AddAccommodationDialog(
                     OutlinedTextField(
                         value = address,
                         onValueChange = { address = it },
-                        label = { Text("Dirección") },
-                        placeholder = { Text("Calle, número o localidad") },
+                        label = { Text(viewModel?.string("address_label") ?: "Dirección") },
+                        placeholder = { Text(viewModel?.string("address_placeholder") ?: "Calle, número o localidad") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1432,7 +1446,7 @@ fun AddAccommodationDialog(
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { phone = it },
-                        label = { Text("Teléfono (para llamar)") },
+                        label = { Text(viewModel?.string("phone_call_label") ?: "Teléfono (para llamar)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1441,7 +1455,7 @@ fun AddAccommodationDialog(
                 item {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "Tipo de Habitación y Precios:",
+                        text = viewModel?.string("room_types_header") ?: "Tipo de Habitación y Precios:",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = CaminoBlue
@@ -1476,7 +1490,7 @@ fun AddAccommodationDialog(
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Añadir opción de habitación:", style = MaterialTheme.typography.labelSmall)
+                        Text(viewModel?.string("add_room_type_title") ?: "Añadir opción de habitación:", style = MaterialTheme.typography.labelSmall)
 
                         // Selector Button
                         Box {
@@ -1493,7 +1507,7 @@ fun AddAccommodationDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = "Tipo: $selectedTypeChoice",
+                                        text = "${viewModel?.string("room_type_label") ?: "Tipo"}: ${getRoomTypeLabel(selectedTypeChoice)}",
                                         fontWeight = FontWeight.Bold,
                                         color = CaminoBlue
                                     )
@@ -1507,7 +1521,7 @@ fun AddAccommodationDialog(
                             ) {
                                 standardTypes.forEach { typeOption ->
                                     DropdownMenuItem(
-                                        text = { Text(typeOption, fontWeight = if (selectedTypeChoice == typeOption) FontWeight.Bold else FontWeight.Normal) },
+                                        text = { Text(getRoomTypeLabel(typeOption), fontWeight = if (selectedTypeChoice == typeOption) FontWeight.Bold else FontWeight.Normal) },
                                         leadingIcon = {
                                             Icon(
                                                 imageVector = when (typeOption) {
@@ -1535,8 +1549,8 @@ fun AddAccommodationDialog(
                             OutlinedTextField(
                                 value = customTypeName,
                                 onValueChange = { customTypeName = it },
-                                label = { Text("Escribe el tipo personalizado") },
-                                placeholder = { Text("Ej. Suite con terraza / Habitación cuádruple") },
+                                label = { Text(viewModel?.string("custom_type_label") ?: "Escribe el tipo personalizado") },
+                                placeholder = { Text(viewModel?.string("custom_type_placeholder") ?: "Ej. Suite con terraza / Habitación cuádruple") },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("input_custom_room_type")
@@ -1551,7 +1565,7 @@ fun AddAccommodationDialog(
                             OutlinedTextField(
                                 value = roomPriceStr,
                                 onValueChange = { roomPriceStr = it },
-                                label = { Text("Precio (€)") },
+                                label = { Text(viewModel?.string("price_eur_label") ?: "Precio (€)") },
                                 placeholder = { Text("€") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.weight(1f)
@@ -1560,9 +1574,9 @@ fun AddAccommodationDialog(
                             Button(
                                 onClick = {
                                     val finalType = if (selectedTypeChoice == "Personalizable") {
-                                        customTypeName.ifBlank { "Personalizable" }
+                                        customTypeName.ifBlank { viewModel?.string("room_type_custom") ?: "Personalizable" }
                                     } else {
-                                        selectedTypeChoice
+                                        getRoomTypeLabel(selectedTypeChoice)
                                     }
                                     val price = roomPriceStr.toDoubleOrNull() ?: 15.0
                                     options.add(RoomPriceOption(finalType, price))
@@ -1577,7 +1591,7 @@ fun AddAccommodationDialog(
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Añadir")
+                                Text(viewModel?.string("add_btn") ?: "Añadir")
                             }
                         }
                     }
@@ -1587,7 +1601,7 @@ fun AddAccommodationDialog(
                     OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
-                        label = { Text("Observaciones (cocina, lavadora, etc.)") },
+                        label = { Text(viewModel?.string("observations_label") ?: "Observaciones (cocina, lavadora, etc.)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1601,11 +1615,11 @@ fun AddAccommodationDialog(
                     }
                 }
             ) {
-                Text("Guardar Alojamiento")
+                Text(viewModel?.string("save_accommodation") ?: "Guardar Alojamiento")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text(viewModel?.string("cancel") ?: "Cancelar") }
         }
     )
 }
@@ -1673,6 +1687,7 @@ fun GpxImportDialog(
 fun AddEditVivenciaDialog(
     stageDate: String,
     initialVivencia: VivenciaItem?,
+    viewModel: CaminoViewModel? = null,
     onDismiss: () -> Unit,
     onSave: (note: String, photoUri: String?, dateStr: String) -> Unit
 ) {
@@ -1695,7 +1710,7 @@ fun AddEditVivenciaDialog(
                 Icon(Icons.Default.AutoStories, contentDescription = null, tint = CaminoBlue)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = if (initialVivencia == null) "Añadir Nueva Vivencia" else "Editar Vivencia",
+                    text = if (initialVivencia == null) viewModel?.string("add_vivencia_title") ?: "Añadir Nueva Vivencia" else viewModel?.string("edit_vivencia_title") ?: "Editar Vivencia",
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -1704,7 +1719,7 @@ fun AddEditVivenciaDialog(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
                     Text(
-                        text = "Registra una anécdota, vivencia o recuerdo de la jornada junto con una fotografía.",
+                        text = viewModel?.string("vivencia_desc") ?: "Registra una anécdota, vivencia o recuerdo de la jornada junto con una fotografía.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1714,8 +1729,8 @@ fun AddEditVivenciaDialog(
                     OutlinedTextField(
                         value = dateStr,
                         onValueChange = { dateStr = it },
-                        label = { Text("Fecha / Momento") },
-                        placeholder = { Text("Ej. 12/05/2026 o Mañana en el alto") },
+                        label = { Text(viewModel?.string("date_moment_label") ?: "Fecha / Momento") },
+                        placeholder = { Text(viewModel?.string("date_moment_placeholder") ?: "Ej. 12/05/2026 o Mañana en el alto") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1724,8 +1739,8 @@ fun AddEditVivenciaDialog(
                     OutlinedTextField(
                         value = noteText,
                         onValueChange = { noteText = it },
-                        label = { Text("Anotación o recuerdo de la vivencia *") },
-                        placeholder = { Text("Escribe aquí lo vivido, anécdotas, sensaciones, compañeros...") },
+                        label = { Text(viewModel?.string("vivencia_note_label") ?: "Anotación o recuerdo de la vivencia *") },
+                        placeholder = { Text(viewModel?.string("vivencia_note_placeholder") ?: "Escribe aquí lo vivido, anécdotas, sensaciones, compañeros...") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 120.dp),
@@ -1734,7 +1749,7 @@ fun AddEditVivenciaDialog(
                 }
 
                 item {
-                    Text("Fotografía de la Vivencia:", style = MaterialTheme.typography.labelSmall)
+                    Text(viewModel?.string("vivencia_photo_title") ?: "Fotografía de la Vivencia:", style = MaterialTheme.typography.labelSmall)
                     if (!photoUri.isNullOrBlank()) {
                         Spacer(Modifier.height(4.dp))
                         Box(
@@ -1759,7 +1774,7 @@ fun AddEditVivenciaDialog(
                                     .background(Color.Black.copy(alpha = 0.6f), CircleShape)
                                     .size(28.dp)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Quitar foto", tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Close, contentDescription = viewModel?.string("remove_photo_desc") ?: "Quitar foto", tint = Color.White, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -1775,7 +1790,7 @@ fun AddEditVivenciaDialog(
                     ) {
                         Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(if (photoUri.isNullOrBlank()) "Adjuntar Foto" else "Cambiar Foto")
+                        Text(if (photoUri.isNullOrBlank()) viewModel?.string("attach_photo") ?: "Adjuntar Foto" else viewModel?.string("change_photo") ?: "Cambiar Foto")
                     }
                 }
             }
@@ -1789,11 +1804,11 @@ fun AddEditVivenciaDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue)
             ) {
-                Text("Guardar")
+                Text(viewModel?.string("save") ?: "Guardar")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text(viewModel?.string("cancel") ?: "Cancelar") }
         }
     )
 }
