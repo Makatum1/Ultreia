@@ -1,7 +1,8 @@
 <resources>
     <string name="app_name">Ultreia</string>
     <string name="app_subtitle">Travel Guide &amp; Memories for Camino and Trips</string>
-    <string name="tab_caminos">Caminos</string>
+    <string name="caminos">Ways</string>
+    <string name="tab_caminos">Ways</string>
     <string name="tab_trips">Trips</string>
     <string name="tab_stages">Stages</string>
     <string name="tab_days">Days</string>

@@ -19,6 +19,8 @@ object PredefinedNotesRepository {
             LanguageMode.NL -> notesNL[key] ?: PredefinedRoutesData.findNotesByOriginDest(origin, destination)
             LanguageMode.PL -> notesPL[key] ?: PredefinedRoutesData.findNotesByOriginDest(origin, destination)
             LanguageMode.ZH -> notesZH[key] ?: PredefinedRoutesData.findNotesByOriginDest(origin, destination)
+            LanguageMode.KO -> notesKO[key] ?: PredefinedRoutesData.findNotesByOriginDest(origin, destination)
+            LanguageMode.PT -> notesPT[key] ?: PredefinedRoutesData.findNotesByOriginDest(origin, destination)
         }
     }
 
@@ -34,6 +36,8 @@ object PredefinedNotesRepository {
         notesNL[key]?.let { list.add(it) }
         notesPL[key]?.let { list.add(it) }
         notesZH[key]?.let { list.add(it) }
+        notesKO[key]?.let { list.add(it) }
+        notesPT[key]?.let { list.add(it) }
         return list.map { it.trim() }.toSet()
     }
 
@@ -54,7 +58,9 @@ object PredefinedNotesRepository {
                 notesDE.values.any { it.trim() == trimmed } ||
                 notesNL.values.any { it.trim() == trimmed } ||
                 notesPL.values.any { it.trim() == trimmed } ||
-                notesZH.values.any { it.trim() == trimmed }
+                notesZH.values.any { it.trim() == trimmed } ||
+                notesKO.values.any { it.trim() == trimmed } ||
+                notesPT.values.any { it.trim() == trimmed }
     }
 
     fun getLocalizedNotes(notes: String?, origin: String = "", destination: String = "", mode: LanguageMode): String {

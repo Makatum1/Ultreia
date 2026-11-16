@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Ultreia</string>
     <string name="app_subtitle">Reisgids en Herinneringen voor Camino en Reizen</string>
+    <string name="caminos">Camino\'s</string>
     <string name="tab_caminos">Camino\'s</string>
     <string name="tab_trips">Reizen</string>
     <string name="tab_stages">Etappes</string>

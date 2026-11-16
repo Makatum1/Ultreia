@@ -160,6 +160,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 LanguageMode.NL -> Locale("nl", "NL")
                 LanguageMode.PL -> Locale("pl", "PL")
                 LanguageMode.ZH -> Locale("zh", "CN")
+                LanguageMode.KO -> Locale("ko", "KR")
+                LanguageMode.PT -> Locale("pt", "PT")
             }
             Locale.setDefault(locale)
         } catch (_: Exception) {}

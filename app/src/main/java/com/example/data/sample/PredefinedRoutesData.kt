@@ -1115,6 +1115,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Franse Weg (Laatste 100 km)"
                 LanguageMode.PL -> "Szlak Francuski (Ostatnie 100 km)"
                 LanguageMode.ZH -> "法国之路（最后 100 公里）"
+                LanguageMode.KO -> "프랑스 길 (마지막 100km)"
+                LanguageMode.PT -> "Caminho Francês (últimos 100 km)"
                 else -> title
             }
             "Camino Francés" -> when (mode) {
@@ -1125,6 +1127,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Volledige Franse Weg"
                 LanguageMode.PL -> "Szlak Francuski (Kompletny)"
                 LanguageMode.ZH -> "完整法国之路"
+                LanguageMode.KO -> "프랑스 길 (전체)"
+                LanguageMode.PT -> "Caminho Francês Completo"
                 else -> title
             }
             "Camino Primitivo" -> when (mode) {
@@ -1135,6 +1139,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Primitieve Weg"
                 LanguageMode.PL -> "Szlak Pierwotny"
                 LanguageMode.ZH -> "原始之路"
+                LanguageMode.KO -> "원시 길"
+                LanguageMode.PT -> "Caminho Primitivo"
                 else -> title
             }
             "Camino del Norte" -> when (mode) {
@@ -1145,6 +1151,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Noordelijke Weg"
                 LanguageMode.PL -> "Szlak Północny"
                 LanguageMode.ZH -> "北方之路"
+                LanguageMode.KO -> "북쪽 길"
+                LanguageMode.PT -> "Caminho do Norte"
                 else -> title
             }
             "Camino Portugués Central" -> when (mode) {
@@ -1155,6 +1163,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Portugese Weg (Centraal)"
                 LanguageMode.PL -> "Szlak Portugalski Centralny"
                 LanguageMode.ZH -> "葡萄牙中心之路"
+                LanguageMode.KO -> "포르투갈 길 (중앙)"
+                LanguageMode.PT -> "Caminho Português Central"
                 else -> title
             }
             "Camino Inglés" -> when (mode) {
@@ -1165,6 +1175,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Engelse Weg"
                 LanguageMode.PL -> "Szlak Angielski"
                 LanguageMode.ZH -> "英国之路"
+                LanguageMode.KO -> "영국 길"
+                LanguageMode.PT -> "Caminho Inglês"
                 else -> title
             }
             "Vía de la Plata" -> when (mode) {
@@ -1175,6 +1187,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Zilverweg"
                 LanguageMode.PL -> "Srebrny Szlak"
                 LanguageMode.ZH -> "白银之路"
+                LanguageMode.KO -> "은의 길"
+                LanguageMode.PT -> "Via de la Plata"
                 else -> title
             }
             "Camino Sanabrés" -> when (mode) {
@@ -1185,6 +1199,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Sanabrés Weg"
                 LanguageMode.PL -> "Szlak Sanabrés"
                 LanguageMode.ZH -> "萨纳夫雷斯之路"
+                LanguageMode.KO -> "사나브레스 길"
+                LanguageMode.PT -> "Caminho Sanabrês"
                 else -> title
             }
             "Camino Vasco del Interior" -> when (mode) {
@@ -1195,6 +1211,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Baskische Binnenlandse Weg"
                 LanguageMode.PL -> "Baskijski Szlak Wewnętrzny"
                 LanguageMode.ZH -> "巴斯克内陆之路"
+                LanguageMode.KO -> "바스크 내륙 길"
+                LanguageMode.PT -> "Caminho Basco do Interior"
                 else -> title
             }
             "Camino del Baztán" -> when (mode) {
@@ -1205,6 +1223,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Baztán Weg"
                 LanguageMode.PL -> "Szlak Baztán"
                 LanguageMode.ZH -> "巴兹坦之路"
+                LanguageMode.KO -> "바스탄 길"
+                LanguageMode.PT -> "Caminho do Baztán"
                 else -> title
             }
             "Camino de San Salvador" -> when (mode) {
@@ -1215,6 +1235,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "San Salvador Weg"
                 LanguageMode.PL -> "Szlak San Salvador"
                 LanguageMode.ZH -> "圣萨尔瓦多之路"
+                LanguageMode.KO -> "산 살바도르 길"
+                LanguageMode.PT -> "Caminho de San Salvador"
                 else -> title
             }
             "Finisterre y Muxía" -> when (mode) {
@@ -1225,6 +1247,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Finisterre en Muxía"
                 LanguageMode.PL -> "Finisterre i Muxía"
                 LanguageMode.ZH -> "菲尼斯特雷与穆希亚"
+                LanguageMode.KO -> "피니스테레 및 무시아"
+                LanguageMode.PT -> "Finisterra e Muxía"
                 else -> title
             }
             else -> title
@@ -1242,6 +1266,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "De laatste 100 km van Sarria naar Santiago de Compostela"
                 LanguageMode.PL -> "Ostatnie 100 km z Sarria do Santiago de Compostela"
                 LanguageMode.ZH -> "从萨里亚到圣地亚哥-德孔波斯特拉的最后 100 公里"
+                LanguageMode.KO -> "사리아에서 산티아고 데 콤포스텔라까지 마지막 100km"
+                LanguageMode.PT -> "Os últimos 100 km de Sarria a Santiago de Compostela"
                 else -> subtitle
             }
             subtitle.contains("Saint-Jean-Pied-de-Port a Santiago", ignoreCase = true) -> when (mode) {
@@ -1252,6 +1278,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van Saint-Jean-Pied-de-Port naar Santiago via de historische route"
                 LanguageMode.PL -> "Z Saint-Jean-Pied-de-Port do Santiago historycznym szlakiem"
                 LanguageMode.ZH -> "从圣让-皮耶德波尔沿历史朝圣路线到圣地亚哥"
+                LanguageMode.KO -> "생장피드포르에서 산티아고까지 역사적인 순례길을 따라"
+                LanguageMode.PT -> "De Saint-Jean-Pied-de-Port a Santiago pela rota jacobeia histórica"
                 else -> subtitle
             }
             subtitle.contains("primera ruta de peregrinación", ignoreCase = true) -> when (mode) {
@@ -1262,6 +1290,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "De eerste pelgrimsroute door de Asturisch-Galicische bergen"
                 LanguageMode.PL -> "Pierwszy szlak pielgrzymkowy przez góry asturyjsko-galicyjskie"
                 LanguageMode.ZH -> "穿越阿斯图里亚斯-加利西亚山区的首条朝圣路线"
+                LanguageMode.KO -> "아스투리아스-갈리시아 산맥을 가로지르는 최초의 순례 경로"
+                LanguageMode.PT -> "A primeira rota de peregrinação através das montanhas asturo-galegas"
                 else -> subtitle
             }
             subtitle.contains("Ribadeo a Santiago", ignoreCase = true) -> when (mode) {
@@ -1272,6 +1302,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van Ribadeo naar Santiago door het binnenland van Galicië"
                 LanguageMode.PL -> "Z Ribadeo do Santiago przez wnętrze Galicji"
                 LanguageMode.ZH -> "从里瓦德奥经加利西亚内陆到圣地亚哥"
+                LanguageMode.KO -> "리바데오에서 내륙 갈리시아를 거쳐 산티아고까지"
+                LanguageMode.PT -> "De Ribadeo a Santiago pelo interior da Galiza"
                 else -> subtitle
             }
             subtitle.contains("Tui a Santiago", ignoreCase = true) -> when (mode) {
@@ -1282,6 +1314,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van Tui naar Santiago tussen Albariño-wijngaarden en Galicische ría's"
                 LanguageMode.PL -> "Z Tui do Santiago wśród winnic albariño i galicyjskich zatok"
                 LanguageMode.ZH -> "从图伊穿行于阿尔巴利诺葡萄园和加利西亚海湾前往圣地亚哥"
+                LanguageMode.KO -> "투이에서 알바리뇨 포도밭과 갈리시아 만을 지나 산티아고까지"
+                LanguageMode.PT -> "De Tui a Santiago entre vinhedos de albariño e rias galegas"
                 else -> subtitle
             }
             subtitle.contains("Ferrol a Santiago", ignoreCase = true) -> when (mode) {
@@ -1292,6 +1326,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van Ferrol naar Santiago via de Historische Route"
                 LanguageMode.PL -> "Z Ferrol do Santiago szlakiem historycznym"
                 LanguageMode.ZH -> "从费罗尔沿传统历史路线到圣地亚哥"
+                LanguageMode.KO -> "페롤에서 산티아고까지 옛길을 따라"
+                LanguageMode.PT -> "De Ferrol a Santiago pelo Traçado Antigo"
                 else -> subtitle
             }
             subtitle.contains("Sevilla a Astorga", ignoreCase = true) -> when (mode) {
@@ -1302,6 +1338,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "De grote Romeinse heirbaan van Sevilla naar Astorga"
                 LanguageMode.PL -> "Wielki rzymski trakt z Sewilli do Astorga"
                 LanguageMode.ZH -> "从塞维利亚到阿斯托尔加的古罗马大道"
+                LanguageMode.KO -> "세비야에서 아스토르가까지 로마 가도"
+                LanguageMode.PT -> "A grande calçada romana de Sevilha a Astorga"
                 else -> subtitle
             }
             subtitle.contains("Granja de Moreruela a Santiago", ignoreCase = true) -> when (mode) {
@@ -1312,6 +1350,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van Granja de Moreruela naar Santiago over de bergen van Zamora en Ourense"
                 LanguageMode.PL -> "Z Granja de Moreruela do Santiago przez pasma górskie Zamora i Ourense"
                 LanguageMode.ZH -> "从莫雷鲁埃拉庄园越过萨莫拉和奥伦塞山区前往圣地亚哥"
+                LanguageMode.KO -> "그란하 데 모레루엘라에서 사모라와 오렌세 산악을 넘어 산티아고까지"
+                LanguageMode.PT -> "De Granja de Moreruela a Santiago pelas serras de Zamora e Ourense"
                 else -> subtitle
             }
             subtitle.contains("San Adrián", ignoreCase = true) -> when (mode) {
@@ -1322,6 +1362,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van Irún naar Santo Domingo de la Calzada via de San Adrián tunnel"
                 LanguageMode.PL -> "Z Irún do Santo Domingo de la Calzada przez tunel San Adrián"
                 LanguageMode.ZH -> "从伊伦穿过圣阿德里安隧道前往圣多明各-德拉卡尔萨达"
+                LanguageMode.KO -> "이룬에서 산 아드리안 터널을 거쳐 산토 도밍고 데 라 칼사다까지"
+                LanguageMode.PT -> "De Irún a Santo Domingo de la Calzada pelo túnel de San Adrián"
                 else -> subtitle
             }
             subtitle.contains("valle atlántico de Baztán", ignoreCase = true) -> when (mode) {
@@ -1332,6 +1374,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van Bayonne naar Pamplona door de Atlantische Baztán-vallei"
                 LanguageMode.PL -> "Z Bajonny do Pampeluny przez atlantycką dolinę Baztán"
                 LanguageMode.ZH -> "从巴约讷穿过大西洋巴兹坦山谷前往潘普洛纳"
+                LanguageMode.KO -> "바욘에서 바스탄 계곡을 거쳐 팜플로나까지"
+                LanguageMode.PT -> "De Baiona a Pamplona pelo vale atlântico de Baztán"
                 else -> subtitle
             }
             subtitle.contains("puerto de Pajares", ignoreCase = true) -> when (mode) {
@@ -1342,6 +1386,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Van León naar Oviedo over het Cantabrisch gebergte en de Pajares-pas"
                 LanguageMode.PL -> "Z León do Oviedo przez Góry Kantabryjskie i przełęcz Pajares"
                 LanguageMode.ZH -> "从莱昂穿过坎塔布连山脉和帕哈雷斯山口前往奥维耶多"
+                LanguageMode.KO -> "레온에서 파하레스 고개를 넘어 오비에도까지"
+                LanguageMode.PT -> "De León a Oviedo pela cordilheira cantábrica e pelo porto de Pajares"
                 else -> subtitle
             }
             subtitle.contains("Fin del Mundo y la Costa da Morte", ignoreCase = true) -> when (mode) {
@@ -1352,6 +1398,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Het epiloog naar het Einde van de Wereld en de Costa da Morte"
                 LanguageMode.PL -> "Epilog ku Końcowi Świata i Wybrzeżu Śmierci"
                 LanguageMode.ZH -> "通往世界尽头与死亡海岸的尾声"
+                LanguageMode.KO -> "세상의 끝과 죽음의 해안으로 향하는 에필로그"
+                LanguageMode.PT -> "O epílogo até ao Fim do Mundo e à Costa da Morte"
                 else -> subtitle
             }
             else -> subtitle
@@ -1374,6 +1422,8 @@ object PredefinedRoutesData {
             LanguageMode.NL -> "Etappe $num: $origin naar $dest"
             LanguageMode.PL -> "Etap $num: $origin do $dest"
             LanguageMode.ZH -> "第 $num 赛段：$origin 至 $dest"
+            LanguageMode.KO -> "제 $num 구간: $origin ~ $dest"
+            LanguageMode.PT -> "Etapa $num: $origin a $dest"
         }
     }
 
@@ -1389,8 +1439,10 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Zeer veeleisend"
                 LanguageMode.PL -> "Bardzo wymagający"
                 LanguageMode.ZH -> "极具挑战性"
+                LanguageMode.KO -> "매우 어려움"
+                LanguageMode.PT -> "Muito exigente"
             }
-            clean.contains("exig") || clean.contains("demand") || clean.contains("anspruch") || clean.contains("impeg") || clean.contains("veeleis") || clean.contains("wymag") || clean.contains("挑战") -> when (mode) {
+            clean.contains("exig") || clean.contains("demand") || clean.contains("anspruch") || clean.contains("impeg") || clean.contains("veeleis") || clean.contains("wymag") || clean.contains("挑战") || clean.contains("어려움") -> when (mode) {
                 LanguageMode.ES -> "Exigente"
                 LanguageMode.EN -> "Demanding"
                 LanguageMode.FR -> "Exigeante"
@@ -1399,8 +1451,10 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Veeleisend"
                 LanguageMode.PL -> "Wymagający"
                 LanguageMode.ZH -> "具有挑战性"
+                LanguageMode.KO -> "어려움"
+                LanguageMode.PT -> "Exigente"
             }
-            clean.contains("mod") || clean.contains("mäßig") || clean.contains("gemid") || clean.contains("umiark") || clean.contains("中") -> when (mode) {
+            clean.contains("mod") || clean.contains("mäßig") || clean.contains("gemid") || clean.contains("umiark") || clean.contains("中") || clean.contains("보통") -> when (mode) {
                 LanguageMode.ES -> "Moderada"
                 LanguageMode.EN -> "Moderate"
                 LanguageMode.FR -> "Modérée"
@@ -1409,8 +1463,10 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Gemiddeld"
                 LanguageMode.PL -> "Umiarkowany"
                 LanguageMode.ZH -> "中等"
+                LanguageMode.KO -> "보통"
+                LanguageMode.PT -> "Moderada"
             }
-            clean.contains("fác") || clean.contains("fac") || clean.contains("eas") || clean.contains("leich") || clean.contains("makk") || clean.contains("łatw") || clean.contains("简") -> when (mode) {
+            clean.contains("fác") || clean.contains("fac") || clean.contains("eas") || clean.contains("leich") || clean.contains("makk") || clean.contains("łatw") || clean.contains("简") || clean.contains("쉬움") -> when (mode) {
                 LanguageMode.ES -> "Fácil"
                 LanguageMode.EN -> "Easy"
                 LanguageMode.FR -> "Facile"
@@ -1419,6 +1475,8 @@ object PredefinedRoutesData {
                 LanguageMode.NL -> "Makkelijk"
                 LanguageMode.PL -> "Łatwy"
                 LanguageMode.ZH -> "简单"
+                LanguageMode.KO -> "쉬움"
+                LanguageMode.PT -> "Fácil"
             }
             else -> diff
         }

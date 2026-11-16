@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Ultreia</string>
     <string name="app_subtitle">Guide de Voyage et Mémoires du Chemin et des Itinéraires</string>
+    <string name="caminos">Chemins</string>
     <string name="tab_caminos">Chemins</string>
     <string name="tab_trips">Voyages</string>
     <string name="tab_stages">Étapes</string>

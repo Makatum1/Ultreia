@@ -761,10 +761,18 @@ fun SettingsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
-                            LanguageMode.entries.forEach { mode ->
+                            val sortedLanguages = remember(currentLang) {
+                                val collator = java.text.Collator.getInstance(java.util.Locale.forLanguageTag(currentLang.code))
+                                LanguageMode.entries.sortedWith { a, b ->
+                                    val nameA = viewModel.string("lang_${a.code.lowercase()}")
+                                    val nameB = viewModel.string("lang_${b.code.lowercase()}")
+                                    collator.compare(nameA, nameB)
+                                }
+                            }
+                            sortedLanguages.forEach { mode ->
                                 ThemeOptionRow(
-                                    title = mode.localizedName,
-                                    subtitle = mode.displayName,
+                                    title = viewModel.string("lang_${mode.code.lowercase()}"),
+                                    subtitle = mode.localizedName,
                                     isSelected = currentLang == mode,
                                     onClick = { viewModel.setLanguageMode(mode) }
                                 )

@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Ultreia</string>
+    <string name="app_subtitle">Guia de Viagem e Memórias do Caminho e Rotas</string>
+    <string name="caminos">Caminhos</string>
+    <string name="tab_caminos">Caminhos</string>
+    <string name="tab_trips">Viagens</string>
+    <string name="tab_stages">Etapas</string>
+    <string name="tab_days">Dias</string>
+    <string name="tab_map">Mapa</string>
+    <string name="tab_stats">Dados</string>
+    <string name="settings">Ajustes</string>
+    <string name="tab_help">Ajuda</string>
+    <string name="feedback_title">Sugestões e Erros</string>
+    <string name="feedback_desc">Tem alguma ideia para melhorar o Ultreia, encontrou algum problema ou simplesmente precisa de ajuda para organizar um Caminho? A sua opinião é muito valiosa para nós. Toque abaixo para nos escrever.</string>
+</resources>

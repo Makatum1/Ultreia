@@ -266,7 +266,7 @@ fun CaminoListScreen(
                             Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                text = if (isTravelProfile) "Viaje de prueba" else "Camino de prueba",
+                                text = if (isTravelProfile) viewModel.string("empty_add_sample_trip") else viewModel.string("empty_add_sample_camino"),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -303,20 +303,14 @@ fun CaminoListScreen(
                             }
                             Spacer(Modifier.height(14.dp))
                             Text(
-                                text = if (isTravelProfile)
-                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "You don't have any trips created" else "No tienes ningún viaje creado")
-                                else
-                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "You don't have any caminos created" else "No tienes ningún camino creado"),
+                                text = if (isTravelProfile) viewModel.string("empty_no_trips_title") else viewModel.string("empty_no_caminos_title"),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = CaminoBlue
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = if (isTravelProfile)
-                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "Start by importing a file or add a sample trip to see how it works." else "Comienza importando un archivo o añade un viaje de prueba para ver el funcionamiento.")
-                                else
-                                    (if (viewModel.languageMode.value == com.example.ui.settings.LanguageMode.EN) "Start by importing a file or add a sample camino to explore its stages." else "Comienza importando un archivo o añade un camino de prueba para explorar sus etapas."),
+                                text = if (isTravelProfile) viewModel.string("empty_no_trips_desc") else viewModel.string("empty_no_caminos_desc"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -368,6 +362,7 @@ fun CaminoListScreen(
                 items(filteredCaminos) { camino ->
                     CaminoItemCard(
                         camino = camino,
+                        viewModel = viewModel,
                         onClick = { onSelectCamino(camino.id) },
                         onDelete = { caminoToDelete = camino }
                     )
@@ -435,6 +430,7 @@ fun CaminoListScreen(
 @Composable
 fun CaminoItemCard(
     camino: CaminoEntity,
+    viewModel: CaminoViewModel? = null,
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -516,7 +512,7 @@ fun CaminoItemCard(
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = if (camino.isTravelGuide) "Guía de Viaje" else "Camino de Santiago",
+                            text = if (camino.isTravelGuide) (viewModel?.string("travel_guide_label") ?: "Guía de Viaje") else "Camino de Santiago",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (camino.isTravelGuide) CaminoBlueDark else Color.White

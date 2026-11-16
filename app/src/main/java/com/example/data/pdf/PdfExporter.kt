@@ -57,6 +57,9 @@ object PdfExporter {
 
     private fun tr(key: String, languageMode: LanguageMode): String = AppStrings.get(key, languageMode)
 
+    private fun pdfTypeface(bold: Boolean = false): Typeface =
+        Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
+
     suspend fun generateAndSharePdf(
         context: Context,
         camino: CaminoEntity,
@@ -274,7 +277,7 @@ object PdfExporter {
         // Título del Camino / Viaje con ajuste multilínea si es largo
         paint.color = Color.WHITE
         paint.textSize = 23f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         val titleMaxWidth = PAGE_WIDTH - textLeftOffset - MARGIN
         val titleWords = camino.title.split(" ")
         val line1 = StringBuilder()
@@ -324,14 +327,14 @@ object PdfExporter {
         // Marca en blanco puro para máximo contraste
         paint.color = Color.WHITE
         paint.textSize = 9.5f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         val brandLabel = if (isTravel) tr("app_subtitle_trip", languageMode) else tr("app_subtitle", languageMode)
         canvas.drawText(brandLabel, textLeftOffset, 32f, paint)
 
         // Título del Camino en blanco puro
         paint.color = Color.WHITE
         paint.textSize = 23f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         canvas.drawText(line1.toString(), textLeftOffset, titleLine1Y, paint)
         if (hasLine2) {
             canvas.drawText(line2.toString(), textLeftOffset, titleLine2Y, paint)
@@ -340,7 +343,7 @@ object PdfExporter {
         // Subtítulo en blanco puro
         if (hasSub) {
             paint.textSize = 10.5f
-            paint.typeface = Typeface.DEFAULT
+            paint.typeface = pdfTypeface(false)
             paint.color = Color.WHITE
             val truncatedSub = if (subText.length > 70) subText.take(67) + "..." else subText
             canvas.drawText(truncatedSub, textLeftOffset, subY, paint)
@@ -349,7 +352,7 @@ object PdfExporter {
         // Fecha en blanco puro
         paint.color = Color.WHITE
         paint.textSize = 10f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         val dateValue = camino.startDate.ifBlank { "2026" }
         canvas.drawText("📅 ${tr("date", languageMode)}: $dateValue", textLeftOffset, dateY, paint)
 
@@ -446,7 +449,7 @@ object PdfExporter {
 
         paint.color = Color.WHITE
         paint.textSize = 8.5f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         canvas.drawText(if (isTravel) tr("day", languageMode).uppercase() else tr("tab_stages", languageMode).uppercase(), MARGIN + 10f, tableY + 13.5f, paint)
         canvas.drawText(tr("pdf_itinerary_header", languageMode), MARGIN + 68f, tableY + 13.5f, paint)
         canvas.drawText(tr("pdf_metrics_header", languageMode), PAGE_WIDTH - MARGIN - 170f, tableY + 13.5f, paint)
@@ -472,14 +475,14 @@ object PdfExporter {
             canvas.drawRoundRect(dayBadgeRect, 4f, 4f, paint)
             paint.color = COLOR_NAVY
             paint.textSize = 8.5f
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.typeface = pdfTypeface(true)
             val dayPrefix = if (isTravel) tr("day", languageMode) else tr("tab_stages", languageMode).take(3)
             canvas.drawText("$dayPrefix ${stg.dayNumber}", MARGIN + 14f, tableY + 14.5f, paint)
 
             // Origen → Destino
             paint.color = COLOR_SLATE
             paint.textSize = 9.5f
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.typeface = pdfTypeface(true)
             val routeText = "${stg.origin} → ${stg.destination}"
             val truncatedRoute = if (paint.measureText(routeText) > 200f) routeText.take(28) + "..." else routeText
             canvas.drawText(truncatedRoute, MARGIN + 68f, tableY + 14.5f, paint)
@@ -487,7 +490,7 @@ object PdfExporter {
             // Métricas (Distancia, Desnivel, Tiempo)
             paint.color = COLOR_MUTED
             paint.textSize = 8.5f
-            paint.typeface = Typeface.DEFAULT
+            paint.typeface = pdfTypeface(false)
             val metricsText = "${stg.distanceKm} km  |  +${stg.elevationGainM}m  |  ${stg.estimatedTime}"
             canvas.drawText(metricsText, PAGE_WIDTH - MARGIN - 170f, tableY + 14.5f, paint)
 
@@ -498,7 +501,7 @@ object PdfExporter {
                 canvas.drawRoundRect(badgeRect, 3f, 3f, paint)
                 paint.color = COLOR_EMERALD
                 paint.textSize = 7.5f
-                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                paint.typeface = pdfTypeface(true)
                 canvas.drawText("✓ ${tr("pdf_completed", languageMode)}", PAGE_WIDTH - MARGIN - 48f, tableY + 14f, paint)
             } else {
                 val badgeRect = RectF(PAGE_WIDTH - MARGIN - 54f, tableY + 3.5f, PAGE_WIDTH - MARGIN - 6f, tableY + rowH - 3.5f)
@@ -506,7 +509,7 @@ object PdfExporter {
                 canvas.drawRoundRect(badgeRect, 3f, 3f, paint)
                 paint.color = COLOR_MUTED
                 paint.textSize = 7.5f
-                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                paint.typeface = pdfTypeface(false)
                 canvas.drawText(tr("pdf_planned", languageMode), PAGE_WIDTH - MARGIN - 44f, tableY + 14f, paint)
             }
 
@@ -557,7 +560,7 @@ object PdfExporter {
 
         paint.color = Color.WHITE
         paint.textSize = 9.5f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         val mapType = if (isTravel) tr("tab_trips", languageMode).uppercase() else tr("tab_caminos", languageMode).uppercase()
         canvas.drawText(
             "ULTREIA • ${tr("tab_map", languageMode).uppercase()} $mapType (2D)",
@@ -607,7 +610,7 @@ object PdfExporter {
             // Marca y Título del Viaje en blanco puro para máximo contraste
             paint.color = Color.WHITE
             paint.textSize = 9.5f
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.typeface = pdfTypeface(true)
             val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
             c.drawText("$brandPrefix  •  ${camino.title.uppercase()}", MARGIN, 22f, paint)
 
@@ -619,7 +622,7 @@ object PdfExporter {
 
             paint.color = Color.WHITE
             paint.textSize = 14f
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            paint.typeface = pdfTypeface(true)
             val dateLabel = if (stageDate.isNotBlank()) "  •  $stageDate" else ""
             val contLabel = if (isContinuation) " (${subtitleText})" else ""
             val dayWord = if (isTravel) tr("day", languageMode) else tr("tab_stages", languageMode).dropLast(1)
@@ -632,7 +635,7 @@ object PdfExporter {
                 c.drawRoundRect(badgeRect, 5f, 5f, paint)
                 paint.color = Color.WHITE
                 paint.textSize = 9.5f
-                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                paint.typeface = pdfTypeface(true)
                 c.drawText("✓ ${tr("pdf_completed", languageMode)}", PAGE_WIDTH - MARGIN - 88f, 32f, paint)
             }
         }
@@ -764,7 +767,7 @@ object PdfExporter {
 
                     paint.color = COLOR_SLATE
                     paint.textSize = 9f
-                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    paint.typeface = pdfTypeface(true)
                     canvas.drawText("Origen: ${stage.origin.ifBlank { "Inicio" }}", chartBox.left + 48f, chartBox.bottom - 41f, paint)
                     val destText = "Destino: ${stage.destination.ifBlank { "Fin" }}"
                     val destW = paint.measureText(destText)
@@ -802,7 +805,7 @@ object PdfExporter {
 
             paint.color = COLOR_SLATE
             paint.textSize = 9.5f
-            paint.typeface = Typeface.DEFAULT
+            paint.typeface = pdfTypeface(false)
             drawMultilineText(canvas, displayedNotes, MARGIN + 14f, currentY + 16f, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
 
             currentY += cardH + 16f
@@ -842,13 +845,13 @@ object PdfExporter {
                     canvas.drawRoundRect(timePillRect, 4f, 4f, paint)
                     paint.color = Color.WHITE
                     paint.textSize = 9f
-                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    paint.typeface = pdfTypeface(true)
                     canvas.drawText("⏰ ${event.time}", MARGIN + 18f, eventCardTop + 20.5f, paint)
 
                     // Título de la Actividad
                     paint.color = COLOR_SLATE
                     paint.textSize = 10.5f
-                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    paint.typeface = pdfTypeface(true)
                     canvas.drawText(event.title, MARGIN + 76f, eventCardTop + 20.5f, paint)
 
                     var innerY = eventCardTop + 36f
@@ -857,7 +860,7 @@ object PdfExporter {
                     if (event.description.isNotBlank()) {
                         paint.color = Color.rgb(55, 65, 81)
                         paint.textSize = 9f
-                        paint.typeface = Typeface.DEFAULT
+                        paint.typeface = pdfTypeface(false)
                         innerY = drawMultilineText(canvas, event.description, MARGIN + 14f, innerY, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
                         innerY += 4f
                     }
@@ -903,7 +906,7 @@ object PdfExporter {
                 drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, emptyH, COLOR_CARD_BG, COLOR_CARD_BORDER, null, 0f, 6f)
                 paint.color = COLOR_MUTED
                 paint.textSize = 9f
-                paint.typeface = Typeface.DEFAULT
+                paint.typeface = pdfTypeface(false)
                 canvas.drawText(tr("pdf_no_accommodations", languageMode), MARGIN + 14f, currentY + 21f, paint)
                 currentY += emptyH + 12f
             } else {
@@ -921,7 +924,7 @@ object PdfExporter {
                     // Nombre y Teléfono
                     paint.color = COLOR_SLATE
                     paint.textSize = 10f
-                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    paint.typeface = pdfTypeface(true)
                     val phoneTag = if (acc.phone.isNotBlank()) "  •  📞 ${acc.phone}" else ""
                     canvas.drawText("${acc.name}$phoneTag", MARGIN + 14f, currentY + 18f, paint)
 
@@ -932,7 +935,7 @@ object PdfExporter {
                         canvas.drawRoundRect(bookRect, 3f, 3f, paint)
                         paint.color = COLOR_EMERALD
                         paint.textSize = 7.5f
-                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                        paint.typeface = pdfTypeface(true)
                         canvas.drawText(tr("pdf_reserved", languageMode), PAGE_WIDTH - MARGIN - 66f, currentY + 17f, paint)
                     }
 
@@ -942,7 +945,7 @@ object PdfExporter {
                     if (acc.address.isNotBlank()) {
                         paint.color = COLOR_MUTED
                         paint.textSize = 8.5f
-                        paint.typeface = Typeface.DEFAULT
+                        paint.typeface = pdfTypeface(false)
                         canvas.drawText("📍 ${acc.address}", MARGIN + 14f, innerAccY, paint)
                         innerAccY += 14f
                     }
@@ -953,7 +956,7 @@ object PdfExporter {
                         for (opt in roomOptions) {
                             val pillText = "${opt.roomType}: ${opt.priceEur}€"
                             paint.textSize = 8f
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            paint.typeface = pdfTypeface(true)
                             val pillW = paint.measureText(pillText) + 12f
                             val pillRect = RectF(chipX, innerAccY - 9f, chipX + pillW, innerAccY + 7f)
                             paint.color = COLOR_EMERALD_BG
@@ -986,7 +989,7 @@ object PdfExporter {
                 drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, emptyH, COLOR_WARM_BG, COLOR_WARM_BORDER, null, 0f, 6f)
                 paint.color = Color.rgb(130, 115, 90)
                 paint.textSize = 9f
-                paint.typeface = Typeface.DEFAULT
+                paint.typeface = pdfTypeface(false)
                 canvas.drawText("Sin notas de vivencias registradas aún para este día.", MARGIN + 14f, currentY + 21f, paint)
                 currentY += emptyH + 12f
             } else {
@@ -1013,7 +1016,7 @@ object PdfExporter {
                     if (vivencia.dateStr.isNotBlank()) {
                         paint.color = COLOR_GOLD_DARK
                         paint.textSize = 8.5f
-                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                        paint.typeface = pdfTypeface(true)
                         canvas.drawText("📅 ${vivencia.dateStr}", MARGIN + 14f, innerY, paint)
                         innerY += 14f
                     }
@@ -1022,7 +1025,7 @@ object PdfExporter {
                     if (vivencia.note.isNotBlank()) {
                         paint.color = COLOR_SLATE
                         paint.textSize = 9.5f
-                        paint.typeface = Typeface.DEFAULT
+                        paint.typeface = pdfTypeface(false)
                         innerY = drawMultilineText(canvas, vivencia.note, MARGIN + 14f, innerY, PAGE_WIDTH - 2 * MARGIN - 28f, paint)
                         innerY += 4f
                     }
@@ -1147,13 +1150,13 @@ object PdfExporter {
         // Títulos de Cabecera en blanco puro para máximo contraste
         paint.color = Color.WHITE
         paint.textSize = 10f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         val brandPrefix = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
         canvas.drawText("$brandPrefix  •  ${tr("pdf_general_performance_report", languageMode)}", textLeft, 48f, paint)
 
         paint.color = Color.WHITE
         paint.textSize = 19f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         val subjectTitle = if (isTotal) {
             if (isTravel) tr("pdf_balance_trips", languageMode) else tr("pdf_balance_caminos", languageMode)
         } else {
@@ -1162,7 +1165,7 @@ object PdfExporter {
         canvas.drawText(subjectTitle, textLeft, 76f, paint)
 
         paint.textSize = 9.5f
-        paint.typeface = Typeface.DEFAULT
+        paint.typeface = pdfTypeface(false)
         paint.color = Color.WHITE
         val dateGenerated = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
         canvas.drawText("${tr("pdf_issued_validated", languageMode)} $dateGenerated", textLeft, 98f, paint)
@@ -1254,7 +1257,7 @@ object PdfExporter {
         startY = drawSectionBanner(canvas, startY, sectionTitle, COLOR_NAVY, "📈")
 
         paint.textSize = 9.5f
-        paint.typeface = Typeface.DEFAULT
+        paint.typeface = pdfTypeface(false)
         paint.color = COLOR_SLATE
 
         if (stages.isNotEmpty() && !isTotal) {
@@ -1290,11 +1293,11 @@ object PdfExporter {
 
         paint.color = COLOR_GOLD_DARK
         paint.textSize = 8.5f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         canvas.drawText("SELLO Y VALIDACIÓN", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 100f, paint)
         paint.color = COLOR_MUTED
         paint.textSize = 7.5f
-        paint.typeface = Typeface.DEFAULT
+        paint.typeface = pdfTypeface(false)
         val certSub = if (isTravel) "CUADERNO DE VIAJE" else "CREDENCIAL DEL PEREGRINO"
         canvas.drawText(certSub, PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 86f, paint)
         canvas.drawText("ULTREIA ET SUSEIA", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 74f, paint)
@@ -1322,7 +1325,7 @@ object PdfExporter {
         // Título de la sección
         paint.color = COLOR_SLATE
         paint.textSize = 11.5f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         val text = if (iconLabel.isNotBlank()) "$iconLabel  $title" else title
         canvas.drawText(text, MARGIN + 10f, y + 12f, paint)
 
@@ -1389,20 +1392,20 @@ object PdfExporter {
         // Etiqueta
         paint.color = COLOR_MUTED
         paint.textSize = 8f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         canvas.drawText(label.uppercase(), x + 10f, y + 16f, paint)
 
         // Valor principal
         paint.color = COLOR_SLATE
         paint.textSize = 14f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.typeface = pdfTypeface(true)
         canvas.drawText(value, x + 10f, y + 34f, paint)
 
         // Subtítulo
         if (sub.isNotBlank()) {
             paint.color = COLOR_MUTED
             paint.textSize = 7.5f
-            paint.typeface = Typeface.DEFAULT
+            paint.typeface = pdfTypeface(false)
             canvas.drawText(sub, x + 10f, y + 46f, paint)
         }
     }
@@ -1418,7 +1421,7 @@ object PdfExporter {
         val chipH = 22f
         val text = "📎  Archivo adjunto: $fileName"
         paint.textSize = 8.5f
-        paint.typeface = Typeface.DEFAULT
+        paint.typeface = pdfTypeface(false)
 
         val textWidth = paint.measureText(text)
         val chipW = minOf(textWidth + 20f, maxWidth)
@@ -1458,7 +1461,7 @@ object PdfExporter {
         // Marca de la guía (solo el nombre del Camino sin Ultreia Memorias)
         paint.color = COLOR_MUTED
         paint.textSize = 8.5f
-        paint.typeface = Typeface.DEFAULT
+        paint.typeface = pdfTypeface(false)
         val guideBrand = if (caminoTitle.isNotBlank()) caminoTitle else if (isTravel) tr("app_subtitle_trip", languageMode) else tr("app_subtitle", languageMode)
         canvas.drawText(guideBrand, MARGIN, PAGE_HEIGHT - 20f, paint)
 
@@ -1472,8 +1475,14 @@ object PdfExporter {
             LanguageMode.NL -> "Pagina"
             LanguageMode.DE -> "Seite"
             LanguageMode.PL -> "Strona"
+            LanguageMode.KO -> "페이지"
+            LanguageMode.PT -> "Página"
         }
-        val pageText = if (languageMode == LanguageMode.ZH) "第 $pageNumber 页" else "$pageWord $pageNumber"
+        val pageText = when (languageMode) {
+            LanguageMode.ZH -> "第 $pageNumber 页"
+            LanguageMode.KO -> "$pageNumber 페이지"
+            else -> "$pageWord $pageNumber"
+        }
         val pageW = paint.measureText(pageText)
         val pillRect = RectF(PAGE_WIDTH - MARGIN - pageW - 12f, PAGE_HEIGHT - 29f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 13f)
         paint.color = COLOR_CARD_BG
@@ -1865,7 +1874,7 @@ object PdfExporter {
         p.style = Paint.Style.FILL
         p.color = Color.argb(120, 71, 85, 105)
         p.textSize = 8f
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.typeface = pdfTypeface(true)
         c.drawText("↑ N", safeW - 24f, 16f, p)
 
         return bitmap
@@ -1935,7 +1944,7 @@ object PdfExporter {
         canvas.drawCircle(x, y, 3.8f, p)
 
         p.textSize = 7.5f
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.typeface = pdfTypeface(true)
         val textW = p.measureText(label)
         val badgeRect = RectF(x - textW / 2 - 4f, y - 16f, x + textW / 2 + 4f, y - 5f)
         p.color = Color.argb(230, 15, 23, 42)
@@ -1956,7 +1965,7 @@ object PdfExporter {
 
         // Etiqueta de la localidad con pastilla protectora blanca
         p.textSize = 7f
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.typeface = pdfTypeface(true)
         val textW = p.measureText(label)
         val pillRect = RectF(x + 5f, y - 7f, x + textW + 11f, y + 5f)
 
@@ -1976,7 +1985,7 @@ object PdfExporter {
     private fun drawMountainPassMarker(canvas: Canvas, x: Float, y: Float, label: String) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.textSize = 6.5f
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.typeface = pdfTypeface(true)
         val textW = p.measureText(label)
         val pill = RectF(x - textW / 2 - 4f, y - 14f, x + textW / 2 + 4f, y - 2f)
 
@@ -2016,7 +2025,7 @@ object PdfExporter {
 
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.textSize = 6.5f
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.typeface = pdfTypeface(true)
         val textW = p.measureText(label)
 
         val boxW = maxOf(barW, textW) + 12f
@@ -2080,7 +2089,7 @@ object PdfExporter {
         canvas.drawPath(pathS, p)
 
         p.textSize = 6f
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.typeface = pdfTypeface(true)
         p.color = Color.rgb(220, 38, 38)
         canvas.drawText("N", cx - 2.5f, cy - 9f, p)
     }
@@ -2088,7 +2097,7 @@ object PdfExporter {
     private fun drawPrintBadge(canvas: Canvas, bounds: RectF) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.textSize = 6.5f
-        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        p.typeface = pdfTypeface(true)
         val label = "🗺️ Google Roadmap • Cartografía 2D"
         val textW = p.measureText(label)
         val badge = RectF(bounds.right - textW - 10f, bounds.bottom - 13f, bounds.right - 4f, bounds.bottom - 3f)

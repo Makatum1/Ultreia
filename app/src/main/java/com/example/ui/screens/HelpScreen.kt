@@ -58,7 +58,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "GPX 与地图",
         LanguageMode.NL to "GPX en Kaarten",
         LanguageMode.DE to "GPX & Karten",
-        LanguageMode.PL to "GPX i Mapy"
+        LanguageMode.PL to "GPX i Mapy",
+        LanguageMode.KO to "GPX 및 지도",
+        LanguageMode.PT to "GPX e Mapas"
     )),
     FaqCategory("stages", mapOf(
         LanguageMode.ES to "Etapas y Rutas",
@@ -68,7 +70,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "赛段与路线",
         LanguageMode.NL to "Etappes en Routes",
         LanguageMode.DE to "Etappen & Routen",
-        LanguageMode.PL to "Etapy i Szlaki"
+        LanguageMode.PL to "Etapy i Szlaki",
+        LanguageMode.KO to "구간 및 경로",
+        LanguageMode.PT to "Etapas e Rotas"
     )),
     FaqCategory("accommodations", mapOf(
         LanguageMode.ES to "Alojamientos",
@@ -78,7 +82,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "住宿预订",
         LanguageMode.NL to "Accommodaties",
         LanguageMode.DE to "Unterkünfte",
-        LanguageMode.PL to "Noclegi"
+        LanguageMode.PL to "Noclegi",
+        LanguageMode.KO to "숙소",
+        LanguageMode.PT to "Alojamentos"
     )),
     FaqCategory("journal", mapOf(
         LanguageMode.ES to "Vivencias y Fotos",
@@ -88,7 +94,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "回忆与照片",
         LanguageMode.NL to "Herinneringen & Foto's",
         LanguageMode.DE to "Erlebnisse & Fotos",
-        LanguageMode.PL to "Wspomnienia i Zdjęcia"
+        LanguageMode.PL to "Wspomnienia i Zdjęcia",
+        LanguageMode.KO to "추억 및 사진",
+        LanguageMode.PT to "Memórias e Fotos"
     )),
     FaqCategory("agenda", mapOf(
         LanguageMode.ES to "Viajes y Agenda",
@@ -98,7 +106,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "旅程与日程",
         LanguageMode.NL to "Reizen en Agenda",
         LanguageMode.DE to "Reisen & Programm",
-        LanguageMode.PL to "Wyprawy i Harmonogram"
+        LanguageMode.PL to "Wyprawy i Harmonogram",
+        LanguageMode.KO to "여행 및 일정",
+        LanguageMode.PT to "Viagens e Agenda"
     )),
     FaqCategory("stats", mapOf(
         LanguageMode.ES to "Estadísticas",
@@ -108,7 +118,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "数据统计",
         LanguageMode.NL to "Statistieken",
         LanguageMode.DE to "Statistiken",
-        LanguageMode.PL to "Statystyki"
+        LanguageMode.PL to "Statystyki",
+        LanguageMode.KO to "통계",
+        LanguageMode.PT to "Estatísticas"
     )),
     FaqCategory("rewards", mapOf(
         LanguageMode.ES to "Recompensas",
@@ -118,7 +130,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "奖励与成就",
         LanguageMode.NL to "Beloningen",
         LanguageMode.DE to "Belohnungen",
-        LanguageMode.PL to "Nagrody"
+        LanguageMode.PL to "Nagrody",
+        LanguageMode.KO to "보상 및 성취",
+        LanguageMode.PT to "Recompensas"
     )),
     FaqCategory("pdf", mapOf(
         LanguageMode.ES to "Exportación y PDF",
@@ -128,7 +142,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "导出与 PDF",
         LanguageMode.NL to "Export & PDF",
         LanguageMode.DE to "Export & PDF",
-        LanguageMode.PL to "Eksport i PDF"
+        LanguageMode.PL to "Eksport i PDF",
+        LanguageMode.KO to "내보내기 및 PDF",
+        LanguageMode.PT to "Exportação e PDF"
     )),
     FaqCategory("backup", mapOf(
         LanguageMode.ES to "Copias y Datos",
@@ -138,7 +154,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "备份与数据",
         LanguageMode.NL to "Back-ups & Gegevens",
         LanguageMode.DE to "Backups & Daten",
-        LanguageMode.PL to "Kopie i Dane"
+        LanguageMode.PL to "Kopie i Dane",
+        LanguageMode.KO to "백업 및 데이터",
+        LanguageMode.PT to "Cópias e Dados"
     )),
     FaqCategory("profiles", mapOf(
         LanguageMode.ES to "Perfiles y Portada",
@@ -148,7 +166,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "资料与封面",
         LanguageMode.NL to "Profielen & Omslag",
         LanguageMode.DE to "Profile & Titelbild",
-        LanguageMode.PL to "Profile i Okładka"
+        LanguageMode.PL to "Profile i Okładka",
+        LanguageMode.KO to "프로필 및 대표 사진",
+        LanguageMode.PT to "Perfis e Capa"
     )),
     FaqCategory("settings", mapOf(
         LanguageMode.ES to "Ajustes y Consejos",
@@ -158,7 +178,9 @@ val FAQ_CATEGORIES = listOf(
         LanguageMode.ZH to "设置与贴士",
         LanguageMode.NL to "Instellingen & Tips",
         LanguageMode.DE to "Einstellungen & Tipps",
-        LanguageMode.PL to "Ustawienia i Wskazówki"
+        LanguageMode.PL to "Ustawienia i Wskazówki",
+        LanguageMode.KO to "설정 및 팁",
+        LanguageMode.PT to "Ajustes e Conselhos"
     ))
 )
 
@@ -723,17 +745,21 @@ val INITIAL_FAQS = listOf(
             LanguageMode.ZH to "如何切换应用显示语言与深色/浅色视觉主题？",
             LanguageMode.NL to "Hoe verander je de taal en het visuele thema (Donker / Licht)?",
             LanguageMode.DE to "Wie ändert man Sprache und Design (Dunkel- / Hellmodus)?",
-            LanguageMode.PL to "Jak zmienić język i motyw wizualny (Ciemny / Jasny)?"
+            LanguageMode.PL to "Jak zmienić język i motyw wizualny (Ciemny / Jasny)?",
+            LanguageMode.KO to "언어 및 화면 테마(다크/라이트 모드)를 변경하는 방법은 무엇인가요?",
+            LanguageMode.PT to "Como alterar o idioma e o tema visual (Modo Claro / Escuro)?"
         ),
         answers = mapOf(
-            LanguageMode.ES to "En 'Ajustes' puedes alternar entre los 8 idiomas soportados y elegir entre Modo Claro, Oscuro o Sistema con efecto inmediato.",
-            LanguageMode.EN to "In 'Settings' you can switch among 8 supported languages and choose Light, Dark, or System theme with instant effect.",
-            LanguageMode.FR to "Dans 'Paramètres', basculez entre 8 langues et choisissez le mode Sombre, Clair ou Système instantanément.",
-            LanguageMode.IT to "In 'Impostazioni' puoi scegliere tra 8 lingue supportate e impostare la modalità Chiara, Scura o Sistema con effetto immediato.",
-            LanguageMode.ZH to "在“设置”中可在 8 种支持的语言之间实时切换，并可在深色模式、浅色模式或跟随系统间自由设定，无需重启应用。",
-            LanguageMode.NL to "Onder 'Instellingen' wissel je direct tussen 8 ondersteunde talen en kies je voor het lichte, donkere of systeemthema.",
-            LanguageMode.DE to "Unter 'Einstellungen' können Sie sofort zwischen 8 Sprachen wechseln und das helle, dunkle oder System-Design aktivieren.",
-            LanguageMode.PL to "W 'Ustawieniach' możesz natychmiast przełączać między 8 językami oraz wybrać tryb Jasny, Ciemny lub Systemowy."
+            LanguageMode.ES to "En 'Ajustes' puedes alternar entre los 10 idiomas soportados y elegir entre Modo Claro, Oscuro o Sistema con efecto inmediato.",
+            LanguageMode.EN to "In 'Settings' you can switch among 10 supported languages and choose Light, Dark, or System theme with instant effect.",
+            LanguageMode.FR to "Dans 'Paramètres', basculez entre 10 langues et choisissez le mode Sombre, Clair ou Système instantanément.",
+            LanguageMode.IT to "In 'Impostazioni' puoi scegliere tra 10 lingue supportate e impostare la modalità Chiara, Scura o Sistema con effetto immediato.",
+            LanguageMode.ZH to "在“设置”中可在 10 种支持的语言之间实时切换，并可在深色模式、浅色模式或跟随系统间自由设定，无需重启应用。",
+            LanguageMode.NL to "Onder 'Instellingen' wissel je direct tussen 10 ondersteunde talen en kies je voor het lichte, donkere of systeemthema.",
+            LanguageMode.DE to "Unter 'Einstellungen' können Sie sofort zwischen 10 Sprachen wechseln und das helle, dunkle oder System-Design aktivieren.",
+            LanguageMode.PL to "W 'Ustawieniach' możesz natychmiast przełączać między 10 językami oraz wybrać tryb Jasny, Ciemny lub Systemowy.",
+            LanguageMode.KO to "'설정'에서 지원되는 10개 언어 간에 즉시 전환할 수 있으며, 라이트, 다크 또는 시스템 테마를 바로 적용할 수 있습니다.",
+            LanguageMode.PT to "Em 'Ajustes' pode alternar entre os 10 idiomas suportados e escolher entre Modo Claro, Escuro ou Sistema com efeito imediato."
         )
     ),
     FaqItem(

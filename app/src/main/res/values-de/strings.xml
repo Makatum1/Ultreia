@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Ultreia</string>
     <string name="app_subtitle">Reiseführer &amp; Erinnerungen für Jakobsweg und Touren</string>
+    <string name="caminos">Wege</string>
     <string name="tab_caminos">Wege</string>
     <string name="tab_trips">Reisen</string>
     <string name="tab_stages">Etappen</string>
