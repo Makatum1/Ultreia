@@ -493,12 +493,17 @@ fun CaminoItemCard(
 
                 // Badge top-left for travel guide vs camino
                 Surface(
-                    color = if (camino.isTravelGuide) PilgrimYellow else Color.White.copy(alpha = 0.25f),
+                    color = if (camino.isTravelGuide) PilgrimYellow else Color.Transparent,
                     shape = RoundedCornerShape(bottomEnd = 8.dp),
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(
+                            start = if (camino.isTravelGuide) 8.dp else 12.dp,
+                            top = if (camino.isTravelGuide) 4.dp else 8.dp,
+                            end = 8.dp,
+                            bottom = 4.dp
+                        ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
