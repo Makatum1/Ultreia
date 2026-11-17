@@ -189,6 +189,8 @@ val koStrings: Map<String, String> = mapOf(
     "destination" to "도착지",
     "notes_label" to "참고 및 안내 사항",
     "stage_tips_tag" to "구간 팁",
+    "camino_stats_tab" to "순례길 데이터",
+    "trip_stats_tab" to "여행 데이터",
     "total_stats_tab" to "종합 통계",
     "camino_created_msg" to "경로가 성공적으로 생성되었습니다.",
     "pilgrim_default_name" to "순례자",

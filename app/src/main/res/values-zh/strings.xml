@@ -8,6 +8,8 @@
     <string name="tab_days">日程</string>
     <string name="tab_map">地图</string>
     <string name="tab_stats">数据</string>
+    <string name="camino_stats_tab">朝圣之路数据</string>
+    <string name="trip_stats_tab">旅程数据</string>
     <string name="settings">设置</string>
     <string name="tab_help">帮助</string>
     <string name="feedback_title">建议与问题</string>

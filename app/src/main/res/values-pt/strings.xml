@@ -8,6 +8,8 @@
     <string name="tab_days">Dias</string>
     <string name="tab_map">Mapa</string>
     <string name="tab_stats">Dados</string>
+    <string name="camino_stats_tab">Dados do Caminho</string>
+    <string name="trip_stats_tab">Dados da Viagem</string>
     <string name="settings">Ajustes</string>
     <string name="tab_help">Ajuda</string>
     <string name="feedback_title">Sugestões e Erros</string>

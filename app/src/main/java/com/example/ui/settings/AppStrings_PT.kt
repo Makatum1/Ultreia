@@ -189,6 +189,8 @@ val ptStrings: Map<String, String> = mapOf(
     "destination" to "Destino",
     "notes_label" to "Notas e Avisos",
     "stage_tips_tag" to "Conselhos",
+    "camino_stats_tab" to "Dados do Caminho",
+    "trip_stats_tab" to "Dados da Viagem",
     "total_stats_tab" to "Estatísticas Gerais",
     "camino_created_msg" to "Guia criado com sucesso.",
     "pilgrim_default_name" to "Peregrino",

@@ -224,7 +224,7 @@ fun StatsScreen(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = "${viewModel.string("tab_stats")} ($routeTerm)",
+                                    text = if (isTravel) viewModel.string("trip_stats_tab") else viewModel.string("camino_stats_tab"),
                                     fontWeight = if (selectedSubTab == 0) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp
                                 )

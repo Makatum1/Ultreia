@@ -8,6 +8,8 @@
     <string name="tab_days">Dagen</string>
     <string name="tab_map">Kaart</string>
     <string name="tab_stats">Gegevens</string>
+    <string name="camino_stats_tab">Gegevens van de Camino</string>
+    <string name="trip_stats_tab">Gegevens van de Reis</string>
     <string name="settings">Instellingen</string>
     <string name="tab_help">Hulp</string>
     <string name="feedback_title">Suggesties en Fouten</string>

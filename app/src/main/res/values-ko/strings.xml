@@ -8,6 +8,8 @@
     <string name="tab_days">일정</string>
     <string name="tab_map">지도</string>
     <string name="tab_stats">통계</string>
+    <string name="camino_stats_tab">순례길 데이터</string>
+    <string name="trip_stats_tab">여행 데이터</string>
     <string name="settings">설정</string>
     <string name="tab_help">도움말</string>
     <string name="feedback_title">제안 및 오류 보고</string>
