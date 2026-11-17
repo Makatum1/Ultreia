@@ -102,6 +102,10 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     fun selectTab(tab: MainTab) {
         _currentTab.value = tab
         _selectedStageId.value = null
+        if (_currentDestination.value is NavigationDestination.StageDetail) {
+            val cid = _selectedCaminoId.value
+            _currentDestination.value = if (cid != null) NavigationDestination.CaminoDetail(cid) else NavigationDestination.CaminoList
+        }
         if ((tab == MainTab.STAGES || tab == MainTab.MAP || tab == MainTab.STATS) && _selectedCaminoId.value == null) {
             restoreLastSelectedForProfile(_isTravelProfile.value)
         }
@@ -121,6 +125,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         _isTravelProfile.value = isTravel
         _selectedCaminoId.value = caminoId
         _selectedStageId.value = null
+        _currentDestination.value = NavigationDestination.CaminoDetail(caminoId)
         _currentTab.value = MainTab.STAGES
     }
 
@@ -870,7 +875,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
-            _userMessage.value = "Etapa del día $finalTargetDay añadida correctamente"
+            val addedFmt = AppStrings.get("stage_added_msg", _languageMode.value)
+            _userMessage.value = if (addedFmt.contains("%d")) addedFmt.replace("%d", finalTargetDay.toString()) else "$addedFmt $finalTargetDay"
         }
     }
 
@@ -962,7 +968,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
 
-                _userMessage.value = "Etapa movida a la posición $targetPos correctamente"
+                val movedFmt = AppStrings.get("stage_moved_msg", _languageMode.value)
+                _userMessage.value = if (movedFmt.contains("%d")) movedFmt.replace("%d", targetPos.toString()) else "$movedFmt $targetPos"
                 return@launch
             }
 
@@ -1047,7 +1054,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 val newTitle = updateStageTitleNumber(stg.title, newNum)
                 repository.updateStage(stg.copy(dayNumber = newNum, title = newTitle))
             }
-            _userMessage.value = "Etapa eliminada"
+            _userMessage.value = AppStrings.get("stage_deleted_msg", _languageMode.value)
             if (shouldNavigateBack) {
                 navigateBack()
             }

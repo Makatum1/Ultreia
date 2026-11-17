@@ -14,4 +14,7 @@
     <string name="tab_help">Hulp</string>
     <string name="feedback_title">Suggesties en Fouten</string>
     <string name="feedback_desc">Heb je een idee om Ultreia te verbeteren, een probleem opgemerkt of gewoon hulp nodig bij het organiseren van een Camino? Jouw mening is erg waardevol voor ons. Tik hieronder om ons te schrijven.</string>
+    <string name="number_abbr">Nr.</string>
+    <string name="stage_number_label">Etappenummer</string>
+    <string name="day_number_label">Dagnummer</string>
 </resources>

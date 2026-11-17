@@ -14,4 +14,7 @@
     <string name="tab_help">Pomoc</string>
     <string name="feedback_title">Sugestie i Błędy</string>
     <string name="feedback_desc">Masz pomysł na ulepszenie Ultreia, zauważyłeś błąd lub po prostu potrzebujesz pomocy w organizacji szlaku? Twoja opinia jest dla nas bardzo cenna. Dotknij poniżej, aby do nas napisać.</string>
+    <string name="number_abbr">Nr</string>
+    <string name="stage_number_label">Numer Etapu</string>
+    <string name="day_number_label">Numer Dnia</string>
 </resources>

@@ -14,4 +14,7 @@
     <string name="tab_help">도움말</string>
     <string name="feedback_title">제안 및 오류 보고</string>
     <string name="feedback_desc">Ultreia를 개선할 아이디어가 있거나, 문제를 발견했거나, 순례길을 계획하는 데 도움이 필요하신가요? 여러분의 의견은 저희에게 소중합니다. 아래를 눌러 메시지를 보내주세요.</string>
+    <string name="number_abbr">번호</string>
+    <string name="stage_number_label">구간 번호</string>
+    <string name="day_number_label">일정 번호</string>
 </resources>

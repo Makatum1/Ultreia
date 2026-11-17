@@ -14,4 +14,7 @@
     <string name="tab_help">Hilfe</string>
     <string name="feedback_title">Vorschläge und Fehler</string>
     <string name="feedback_desc">Haben Sie eine Idee zur Verbesserung von Ultreia, einen Fehler entdeckt oder benötigen Sie einfach Hilfe bei der Organisation eines Weges? Ihre Meinung ist uns sehr wichtig. Tippen Sie unten, um uns zu schreiben.</string>
+    <string name="number_abbr">Nr.</string>
+    <string name="stage_number_label">Etappennummer</string>
+    <string name="day_number_label">Tagesnummer</string>
 </resources>

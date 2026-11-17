@@ -395,7 +395,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
         floatingActionButton = {
             val activeList = caminos.filter { it.isTravelGuide == isTravelProfile }
             val targetCamino = selectedCamino ?: activeList.firstOrNull()
-            if (currentTab == MainTab.STAGES && destination !is NavigationDestination.StageDetail && targetCamino != null) {
+            val isViewingStageDetail = destination is NavigationDestination.StageDetail && selectedStage != null
+            if (currentTab == MainTab.STAGES && !isViewingStageDetail && targetCamino != null) {
                 FloatingActionButton(
                     onClick = {
                         viewModel.resetExportingState()

@@ -1139,24 +1139,30 @@ fun EditStageDialog(
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
-                    OutlinedTextField(
-                        value = stageNumberStr,
-                        onValueChange = { input ->
-                            stageNumberStr = input.filter { it.isDigit() }
-                        },
-                        label = { Text("$stageNumberLabel *") },
-                        placeholder = { Text(stage.dayNumber.toString()) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                        value = origin,
-                        onValueChange = { origin = it },
-                        label = { Text("${viewModel?.string("origin") ?: "Origen"} *") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = stageNumberStr,
+                            onValueChange = { input ->
+                                stageNumberStr = input.filter { it.isDigit() }.take(3)
+                            },
+                            label = { Text(viewModel?.string("number_abbr") ?: "Nº", maxLines = 1) },
+                            placeholder = { Text(stage.dayNumber.toString()) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.width(76.dp)
+                        )
+                        OutlinedTextField(
+                            value = origin,
+                            onValueChange = { origin = it },
+                            label = { Text("${viewModel?.string("origin") ?: "Origen"} *") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
                 item {
                     OutlinedTextField(

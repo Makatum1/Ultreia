@@ -939,30 +939,36 @@ fun AddStageDialog(
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
-                    OutlinedTextField(
-                        value = stageNumberStr,
-                        onValueChange = { input ->
-                            val filtered = input.filter { it.isDigit() }
-                            stageNumberStr = filtered
-                            val parsed = filtered.toIntOrNull()
-                            if (parsed != null && parsed > 0 && caminoStartDate.isNotBlank()) {
-                                dateStr = AppStrings.calculateStageDate(caminoStartDate, parsed - 1)
-                            }
-                        },
-                        label = { Text("$stageNumberLabel *") },
-                        placeholder = { Text(nextDay.toString()) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                        value = origin,
-                        onValueChange = { origin = it },
-                        label = { Text("${viewModel?.string("origin") ?: "Origen"} *") },
-                        placeholder = { Text("Ej. Roncesvalles") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = stageNumberStr,
+                            onValueChange = { input ->
+                                val filtered = input.filter { it.isDigit() }.take(3)
+                                stageNumberStr = filtered
+                                val parsed = filtered.toIntOrNull()
+                                if (parsed != null && parsed > 0 && caminoStartDate.isNotBlank()) {
+                                    dateStr = AppStrings.calculateStageDate(caminoStartDate, parsed - 1)
+                                }
+                            },
+                            label = { Text(viewModel?.string("number_abbr") ?: "Nº", maxLines = 1) },
+                            placeholder = { Text(nextDay.toString()) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.width(76.dp)
+                        )
+                        OutlinedTextField(
+                            value = origin,
+                            onValueChange = { origin = it },
+                            label = { Text("${viewModel?.string("origin") ?: "Origen"} *") },
+                            placeholder = { Text("Ej. Roncesvalles") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
                 item {
                     OutlinedTextField(
