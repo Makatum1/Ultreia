@@ -80,13 +80,17 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         if (targetId != null) {
             _selectedCaminoId.value = targetId
             _selectedStageId.value = null
+            val editor = prefs.edit()
+            editor.putLong("last_active_item_id", targetId)
+            editor.putBoolean("last_active_is_travel", isTravel)
             if (isTravel) {
                 _lastSelectedTripId = targetId
-                prefs.edit().putLong("last_active_trip_id", targetId).apply()
+                editor.putLong("last_active_trip_id", targetId)
             } else {
                 _lastSelectedCaminoId = targetId
-                prefs.edit().putLong("last_active_camino_id", targetId).apply()
+                editor.putLong("last_active_camino_id", targetId)
             }
+            editor.apply()
         } else {
             _selectedCaminoId.value = null
             _selectedStageId.value = null
@@ -96,6 +100,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleTravelProfile() {
         val newProfile = !_isTravelProfile.value
         _isTravelProfile.value = newProfile
+        val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("last_active_is_travel", newProfile).apply()
         restoreLastSelectedForProfile(newProfile)
     }
 
@@ -115,13 +121,18 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         val target = caminos.value.firstOrNull { it.id == caminoId }
         val isTravel = target?.isTravelGuide ?: _isTravelProfile.value
         val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        editor.putLong("last_active_item_id", caminoId)
+        editor.putBoolean("last_active_is_travel", isTravel)
         if (isTravel) {
             _lastSelectedTripId = caminoId
-            prefs.edit().putLong("last_active_trip_id", caminoId).apply()
+            editor.putLong("last_active_trip_id", caminoId)
         } else {
             _lastSelectedCaminoId = caminoId
-            prefs.edit().putLong("last_active_camino_id", caminoId).apply()
+            editor.putLong("last_active_camino_id", caminoId)
         }
+        editor.apply()
+
         _isTravelProfile.value = isTravel
         _selectedCaminoId.value = caminoId
         _selectedStageId.value = null
@@ -204,12 +215,43 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 _languageMode.value = detectSystemLanguage()
             }
 
+            val savedIsTravel = prefs.getBoolean("last_active_is_travel", false)
+            _isTravelProfile.value = savedIsTravel
+
             // Auto-migración / actualización de nombre "Camino baztanes" / "Camino Baztanés" -> "Camino del Baztán"
             try {
                 val allCams = repository.getAllCaminosOnce()
                 allCams.forEach { c ->
                     if (c.title.equals("Camino Baztanés", ignoreCase = true) || c.title.equals("Camino baztanes", ignoreCase = true)) {
                         repository.updateCamino(c.copy(title = "Camino del Baztán"))
+                    }
+                }
+
+                // Restaurar el último camino o viaje utilizado al iniciar la app
+                if (allCams.isNotEmpty() && _selectedCaminoId.value == null) {
+                    val savedItemId = prefs.getLong("last_active_item_id", -1L)
+                    val savedTripId = prefs.getLong("last_active_trip_id", -1L)
+                    val savedCaminoId = prefs.getLong("last_active_camino_id", -1L)
+
+                    val target = (if (savedItemId != -1L) allCams.firstOrNull { it.id == savedItemId } else null)
+                        ?: (if (savedIsTravel) {
+                            allCams.firstOrNull { it.id == savedTripId } ?: allCams.firstOrNull { it.isTravelGuide }
+                        } else {
+                            allCams.firstOrNull { it.id == savedCaminoId } ?: allCams.firstOrNull { !it.isTravelGuide }
+                        })
+                        ?: allCams.firstOrNull()
+
+                    if (target != null) {
+                        _isTravelProfile.value = target.isTravelGuide
+                        _selectedCaminoId.value = target.id
+                        _selectedStageId.value = null
+                        _currentDestination.value = NavigationDestination.CaminoDetail(target.id)
+                        _currentTab.value = MainTab.STAGES
+                        if (target.isTravelGuide) {
+                            _lastSelectedTripId = target.id
+                        } else {
+                            _lastSelectedCaminoId = target.id
+                        }
                     }
                 }
             } catch (_: Exception) {}
@@ -515,13 +557,17 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         val target = caminos.value.firstOrNull { it.id == caminoId }
         val isTravel = target?.isTravelGuide ?: _isTravelProfile.value
         val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        editor.putLong("last_active_item_id", caminoId)
+        editor.putBoolean("last_active_is_travel", isTravel)
         if (isTravel) {
             _lastSelectedTripId = caminoId
-            prefs.edit().putLong("last_active_trip_id", caminoId).apply()
+            editor.putLong("last_active_trip_id", caminoId)
         } else {
             _lastSelectedCaminoId = caminoId
-            prefs.edit().putLong("last_active_camino_id", caminoId).apply()
+            editor.putLong("last_active_camino_id", caminoId)
         }
+        editor.apply()
         _isTravelProfile.value = isTravel
         _selectedCaminoId.value = caminoId
         _currentDestination.value = NavigationDestination.CaminoDetail(caminoId, initialTab)
@@ -608,7 +654,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 StageEntity(
                     caminoId = tripId,
                     dayNumber = 1,
-                    title = "Etapa 1: Cangas de Onís a Lagos de Covadonga",
+                    title = "Día 1: Cangas de Onís a Lagos de Covadonga",
                     origin = "Cangas de Onís",
                     destination = "Lagos de Covadonga",
                     distanceKm = 21.5,
@@ -627,7 +673,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 StageEntity(
                     caminoId = tripId,
                     dayNumber = 2,
-                    title = "Etapa 2: Poncebos a Caín (Ruta del Cares)",
+                    title = "Día 2: Poncebos a Caín (Ruta del Cares)",
                     origin = "Poncebos",
                     destination = "Caín (Ruta del Cares)",
                     distanceKm = 12.0,
@@ -646,7 +692,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 StageEntity(
                     caminoId = tripId,
                     dayNumber = 3,
-                    title = "Etapa 3: Arenas de Cabrales a Bulnes y Urriellu",
+                    title = "Día 3: Arenas de Cabrales a Bulnes y Urriellu",
                     origin = "Arenas de Cabrales",
                     destination = "Bulnes y Naranjo de Bulnes",
                     distanceKm = 15.2,
@@ -772,7 +818,28 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteCamino(camino: CaminoEntity) {
         viewModelScope.launch {
             repository.deleteCamino(camino)
-            _userMessage.value = "Camino eliminado"
+            val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            if (prefs.getLong("last_active_item_id", -1L) == camino.id) {
+                editor.remove("last_active_item_id")
+            }
+            if (camino.isTravelGuide) {
+                if (prefs.getLong("last_active_trip_id", -1L) == camino.id) {
+                    editor.remove("last_active_trip_id")
+                }
+                if (_lastSelectedTripId == camino.id) _lastSelectedTripId = null
+            } else {
+                if (prefs.getLong("last_active_camino_id", -1L) == camino.id) {
+                    editor.remove("last_active_camino_id")
+                }
+                if (_lastSelectedCaminoId == camino.id) _lastSelectedCaminoId = null
+            }
+            editor.apply()
+            if (_selectedCaminoId.value == camino.id) {
+                _selectedCaminoId.value = null
+                _selectedStageId.value = null
+            }
+            _userMessage.value = if (camino.isTravelGuide) "Viaje eliminado" else "Camino eliminado"
             navigateBack()
         }
     }
@@ -780,6 +847,14 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     fun clearAllCaminos() {
         viewModelScope.launch {
             repository.clearAllData()
+            val prefs = getApplication<Application>().getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+            prefs.edit()
+                .remove("last_active_item_id")
+                .remove("last_active_camino_id")
+                .remove("last_active_trip_id")
+                .apply()
+            _lastSelectedCaminoId = null
+            _lastSelectedTripId = null
             _selectedCaminoId.value = null
             _selectedStageId.value = null
             _currentDestination.value = NavigationDestination.CaminoList
@@ -875,7 +950,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
-            val addedFmt = AppStrings.get("stage_added_msg", _languageMode.value)
+            val addedFmt = if (isTravel) AppStrings.get("day_added_msg", _languageMode.value) else AppStrings.get("stage_added_msg", _languageMode.value)
             _userMessage.value = if (addedFmt.contains("%d")) addedFmt.replace("%d", finalTargetDay.toString()) else "$addedFmt $finalTargetDay"
         }
     }
@@ -884,7 +959,10 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val updated = stage.copy(isCompleted = !stage.isCompleted)
             repository.updateStage(updated)
-            _userMessage.value = if (updated.isCompleted) "¡Etapa ${stage.dayNumber} marcada como completada! 🎉" else "Etapa ${stage.dayNumber} desmarcada"
+            val currentCamino = repository.getCaminoByIdOnce(stage.caminoId)
+            val isTravel = currentCamino?.isTravelGuide == true
+            val prefix = if (isTravel) AppStrings.get("day", _languageMode.value) else AppStrings.get("stage_prefix", _languageMode.value)
+            _userMessage.value = if (updated.isCompleted) "¡$prefix ${stage.dayNumber} marcada como completada! 🎉" else "$prefix ${stage.dayNumber} desmarcada"
         }
     }
 
@@ -968,7 +1046,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
 
-                val movedFmt = AppStrings.get("stage_moved_msg", _languageMode.value)
+                val isTravel = currentCamino?.isTravelGuide == true
+                val movedFmt = if (isTravel) AppStrings.get("day_moved_msg", _languageMode.value) else AppStrings.get("stage_moved_msg", _languageMode.value)
                 _userMessage.value = if (movedFmt.contains("%d")) movedFmt.replace("%d", targetPos.toString()) else "$movedFmt $targetPos"
                 return@launch
             }
@@ -1054,7 +1133,9 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                 val newTitle = updateStageTitleNumber(stg.title, newNum)
                 repository.updateStage(stg.copy(dayNumber = newNum, title = newTitle))
             }
-            _userMessage.value = AppStrings.get("stage_deleted_msg", _languageMode.value)
+            val currentCamino = repository.getCaminoByIdOnce(stage.caminoId)
+            val isTravel = currentCamino?.isTravelGuide == true
+            _userMessage.value = if (isTravel) AppStrings.get("day_deleted_msg", _languageMode.value) else AppStrings.get("stage_deleted_msg", _languageMode.value)
             if (shouldNavigateBack) {
                 navigateBack()
             }

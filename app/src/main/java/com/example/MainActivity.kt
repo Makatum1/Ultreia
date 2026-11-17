@@ -42,6 +42,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.backup.GlobalBackupType
 import com.example.ui.CaminoViewModel
@@ -209,14 +212,43 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
     LaunchedEffect(caminos, selectedCamino, isTravelProfile) {
         if (selectedCamino == null && caminos.isNotEmpty()) {
             val prefs = context.getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
-            val filtered = caminos.filter { it.isTravelGuide == isTravelProfile }
-            val key = if (isTravelProfile) "last_active_trip_id" else "last_active_camino_id"
-            val lastId = prefs.getLong(key, -1L)
-            if (lastId != -1L && filtered.any { it.id == lastId }) {
-                viewModel.selectCamino(lastId)
+            val lastItemId = prefs.getLong("last_active_item_id", -1L)
+            val item = if (lastItemId != -1L) caminos.firstOrNull { it.id == lastItemId } else null
+            if (item != null) {
+                viewModel.selectCamino(item.id)
             } else {
-                filtered.firstOrNull()?.let { viewModel.selectCamino(it.id) }
+                val filtered = caminos.filter { it.isTravelGuide == isTravelProfile }
+                val key = if (isTravelProfile) "last_active_trip_id" else "last_active_camino_id"
+                val lastId = prefs.getLong(key, -1L)
+                if (lastId != -1L && filtered.any { it.id == lastId }) {
+                    viewModel.selectCamino(lastId)
+                } else {
+                    filtered.firstOrNull()?.let { viewModel.selectCamino(it.id) }
+                }
             }
+        }
+    }
+
+    // Persist current active Camino/Trip when leaving app (pause/stop lifecycle)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, selectedCamino, isTravelProfile) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                val cid = selectedCamino?.id
+                if (cid != null) {
+                    val p = context.getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
+                    val isTravel = selectedCamino?.isTravelGuide ?: isTravelProfile
+                    p.edit()
+                        .putLong("last_active_item_id", cid)
+                        .putBoolean("last_active_is_travel", isTravel)
+                        .putLong(if (isTravel) "last_active_trip_id" else "last_active_camino_id", cid)
+                        .apply()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
