@@ -66,16 +66,17 @@ fun StatsScreen(
     val allStages by viewModel.allStages.collectAsStateWithLifecycle()
     val allAccommodations by viewModel.allAccommodations.collectAsStateWithLifecycle()
 
-    // --- SEPARACIÓN DE ESTADOS: DATOS DEL CAMINO ACTIVO (Basados en etapas completadas) ---
-    val completedStagesList = remember(stages) { stages.filter { it.isCompleted } }
-    val totalCaminoKm = remember(stages) {
-        stages.sumOf { it.distanceKm }
+    // --- SEPARACIÓN DE ESTADOS: DATOS DEL CAMINO ACTIVO (Basados en etapas completadas, excluyendo etapas con 0 km) ---
+    val countableStages = remember(stages) { stages.filter { it.distanceKm > 0.0 } }
+    val completedStagesList = remember(countableStages) { countableStages.filter { it.isCompleted } }
+    val totalCaminoKm = remember(countableStages) {
+        countableStages.sumOf { it.distanceKm }
     }
     val completedCaminoKm = remember(completedStagesList) {
         completedStagesList.sumOf { it.distanceKm }
     }
-    val totalCaminoElevationGain = remember(stages) {
-        stages.sumOf { it.elevationGainM }
+    val totalCaminoElevationGain = remember(countableStages) {
+        countableStages.sumOf { it.elevationGainM }
     }
     val completedCaminoElevationGain = remember(completedStagesList) {
         completedStagesList.sumOf { it.elevationGainM }
@@ -83,8 +84,8 @@ fun StatsScreen(
     val completedCaminoElevationLoss = remember(completedStagesList) {
         completedStagesList.sumOf { it.elevationLossM }
     }
-    val totalCaminoStagesCount = remember(stages) {
-        stages.size
+    val totalCaminoStagesCount = remember(countableStages) {
+        countableStages.size
     }
     val completedCaminoStagesCount = remember(completedStagesList) {
         completedStagesList.size
@@ -108,22 +109,23 @@ fun StatsScreen(
         }
     }
 
-    // --- SEPARACIÓN DE ESTADOS: DATOS TOTALES GLOBALES (Basados en etapas completadas de todos los caminos) ---
-    val completedGlobalStagesList = remember(allStages) { allStages.filter { it.isCompleted } }
-    val totalGlobalCaminosRealizados = remember(allCaminos, allStages) {
+    // --- SEPARACIÓN DE ESTADOS: DATOS TOTALES GLOBALES (Basados en etapas completadas > 0 km de todos los caminos) ---
+    val countableGlobalStages = remember(allStages) { allStages.filter { it.distanceKm > 0.0 } }
+    val completedGlobalStagesList = remember(countableGlobalStages) { countableGlobalStages.filter { it.isCompleted } }
+    val totalGlobalCaminosRealizados = remember(allCaminos, countableGlobalStages) {
         allCaminos.count { c ->
-            val cStages = allStages.filter { it.caminoId == c.id }
+            val cStages = countableGlobalStages.filter { it.caminoId == c.id }
             cStages.isNotEmpty() && cStages.all { it.isCompleted }
         }
     }
-    val totalGlobalKm = remember(allStages) {
-        allStages.sumOf { it.distanceKm }
+    val totalGlobalKm = remember(countableGlobalStages) {
+        countableGlobalStages.sumOf { it.distanceKm }
     }
     val completedGlobalKm = remember(completedGlobalStagesList) {
         completedGlobalStagesList.sumOf { it.distanceKm }
     }
-    val totalGlobalElevationGain = remember(allStages) {
-        allStages.sumOf { it.elevationGainM }
+    val totalGlobalElevationGain = remember(countableGlobalStages) {
+        countableGlobalStages.sumOf { it.elevationGainM }
     }
     val completedGlobalElevationGain = remember(completedGlobalStagesList) {
         completedGlobalStagesList.sumOf { it.elevationGainM }
@@ -131,8 +133,8 @@ fun StatsScreen(
     val completedGlobalElevationLoss = remember(completedGlobalStagesList) {
         completedGlobalStagesList.sumOf { it.elevationLossM }
     }
-    val totalGlobalStagesCount = remember(allStages) {
-        allStages.size
+    val totalGlobalStagesCount = remember(countableGlobalStages) {
+        countableGlobalStages.size
     }
     val completedGlobalStagesCount = remember(completedGlobalStagesList) {
         completedGlobalStagesList.size

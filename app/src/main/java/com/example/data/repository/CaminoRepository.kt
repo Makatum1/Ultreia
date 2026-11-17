@@ -187,12 +187,13 @@ class CaminoRepository(val context: Context) {
     }
 
     fun calculateStats(stages: List<StageEntity>): CaminoStats {
-        val totalStages = stages.size
-        val completedStages = stages.count { it.isCompleted }
-        val totalKm = stages.sumOf { it.distanceKm }
-        val completedKm = stages.filter { it.isCompleted }.sumOf { it.distanceKm }
-        val totalElevationGain = stages.sumOf { it.elevationGainM }
-        val completedElevationGain = stages.filter { it.isCompleted }.sumOf { it.elevationGainM }
+        val countableStages = stages.filter { it.distanceKm > 0.0 }
+        val totalStages = countableStages.size
+        val completedStages = countableStages.count { it.isCompleted }
+        val totalKm = countableStages.sumOf { it.distanceKm }
+        val completedKm = countableStages.filter { it.isCompleted }.sumOf { it.distanceKm }
+        val totalElevationGain = countableStages.sumOf { it.elevationGainM }
+        val completedElevationGain = countableStages.filter { it.isCompleted }.sumOf { it.elevationGainM }
         val percent = if (totalKm > 0) ((completedKm / totalKm) * 100).toInt() else 0
 
         return CaminoStats(

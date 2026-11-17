@@ -318,7 +318,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val totalAllStagesCount: StateFlow<Int> = repository.allStages
-        .map { it.size }
+        .map { list -> list.count { it.distanceKm > 0.0 } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val allStages: StateFlow<List<StageEntity>> = repository.allStages

@@ -490,12 +490,84 @@ object TownCoordinates {
         "la baneza" to Pair(42.2986, -5.8986)
     )
 
-    fun findCoordinates(name: String): Pair<Double, Double>? {
+    val geocodedCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Double, Double>>()
+
+    fun searchTowns(query: String, context: Context? = null): List<String> {
+        val q = query.trim().lowercase()
+        if (q.length < 2) return emptyList()
+
+        val results = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+
+        for (k in COORDINATES.keys) {
+            if (k.contains(q)) {
+                val formatted = k.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                if (seen.add(formatted.lowercase())) {
+                    results.add(formatted)
+                    if (results.size >= 8) break
+                }
+            }
+        }
+
+        if (context != null && results.size < 5) {
+            try {
+                if (android.location.Geocoder.isPresent()) {
+                    val geocoder = android.location.Geocoder(context, Locale.getDefault())
+                    @Suppress("DEPRECATION")
+                    val list = geocoder.getFromLocationName(query, 5)
+                    if (!list.isNullOrEmpty()) {
+                        for (addr in list) {
+                            val name = addr.locality
+                                ?: addr.subAdminArea
+                                ?: addr.featureName
+                                ?: addr.adminArea
+                            if (!name.isNullOrBlank()) {
+                                val fullName = if (!addr.adminArea.isNullOrBlank() && addr.adminArea != name) {
+                                    "$name, ${addr.adminArea}"
+                                } else {
+                                    name
+                                }
+                                if (seen.add(fullName.lowercase())) {
+                                    results.add(fullName)
+                                    geocodedCache[name.lowercase()] = Pair(addr.latitude, addr.longitude)
+                                    geocodedCache[fullName.lowercase()] = Pair(addr.latitude, addr.longitude)
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        return results
+    }
+
+    fun findCoordinates(name: String, context: Context? = null): Pair<Double, Double>? {
         val clean = name.trim().lowercase()
             .replace(Regex("[^a-záéíóúñü0-9\\s]"), "")
+        if (clean.isBlank()) return null
         if (COORDINATES.containsKey(clean)) return COORDINATES[clean]
         for ((k, v) in COORDINATES) {
-            if (clean.contains(k) || k.contains(clean)) return v
+            if (clean == k || clean.contains(k) || k.contains(clean)) return v
+        }
+        if (geocodedCache.containsKey(clean)) return geocodedCache[clean]
+        if (geocodedCache.containsKey(name.trim().lowercase())) return geocodedCache[name.trim().lowercase()]
+
+        if (context != null) {
+            try {
+                if (android.location.Geocoder.isPresent()) {
+                    val geocoder = android.location.Geocoder(context, Locale.getDefault())
+                    @Suppress("DEPRECATION")
+                    val list = geocoder.getFromLocationName(name, 1)
+                    if (!list.isNullOrEmpty()) {
+                        val addr = list[0]
+                        val pair = Pair(addr.latitude, addr.longitude)
+                        geocodedCache[clean] = pair
+                        geocodedCache[name.trim().lowercase()] = pair
+                        return pair
+                    }
+                }
+            } catch (_: Exception) {}
         }
         return null
     }
@@ -769,8 +841,8 @@ fun InteractiveMapScreen(
                 val stagePoints: List<GeoPoint> = if (hasGpx) {
                     gpxPoints.map { GeoPoint(it.lat, it.lon) }
                 } else {
-                    val startCoord = TownCoordinates.findCoordinates(stg.origin)
-                    val endCoord = TownCoordinates.findCoordinates(stg.destination)
+                    val startCoord = TownCoordinates.findCoordinates(stg.origin, context)
+                    val endCoord = TownCoordinates.findCoordinates(stg.destination, context)
 
                     val (sLat, sLon) = when {
                         startCoord != null -> startCoord
@@ -811,8 +883,9 @@ fun InteractiveMapScreen(
                         position = startPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        title = "Día ${stg.dayNumber}: ${stg.origin}"
-                        snippet = "${stg.distanceKm} km"
+                        val prefix = if (hasGpx) "Inicio etapa (GPX)" else (if (isTravel) "Día ${stg.dayNumber}" else "Etapa ${stg.dayNumber}")
+                        title = "$prefix: ${stg.origin}"
+                        snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Sin desplazamiento)"
                         setOnMarkerClickListener { _, _ ->
                             selectedDetailStage = stg
                             true
@@ -825,8 +898,9 @@ fun InteractiveMapScreen(
                         position = endPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        title = "Llegada: ${stg.destination}"
-                        snippet = "Fin de etapa ${stg.dayNumber}"
+                        val endPrefix = if (hasGpx) "Fin etapa (GPX)" else "Llegada"
+                        title = "$endPrefix: ${stg.destination}"
+                        snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Fin de jornada)"
                         setOnMarkerClickListener { _, _ ->
                             selectedDetailStage = stg
                             true
@@ -866,8 +940,8 @@ fun InteractiveMapScreen(
                 val stagePoints: List<GeoPoint> = if (hasGpx) {
                     gpxPoints.map { GeoPoint(it.lat, it.lon) }
                 } else {
-                    val startCoord = TownCoordinates.findCoordinates(stg.origin)
-                    val endCoord = TownCoordinates.findCoordinates(stg.destination)
+                    val startCoord = TownCoordinates.findCoordinates(stg.origin, context)
+                    val endCoord = TownCoordinates.findCoordinates(stg.destination, context)
 
                     val (sLat, sLon) = when {
                         startCoord != null -> startCoord
@@ -910,8 +984,9 @@ fun InteractiveMapScreen(
                         position = startPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        title = "$cName - Día ${stg.dayNumber}: ${stg.origin}"
-                        snippet = "${stg.distanceKm} km"
+                        val prefix = if (hasGpx) "Inicio etapa (GPX)" else (if (isTravel) "Día ${stg.dayNumber}" else "Etapa ${stg.dayNumber}")
+                        title = "$cName - $prefix: ${stg.origin}"
+                        snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Sin desplazamiento)"
                         setOnMarkerClickListener { _, _ ->
                             selectedDetailStage = stg
                             true
@@ -924,8 +999,9 @@ fun InteractiveMapScreen(
                         position = endPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        title = "$cName - Llegada: ${stg.destination}"
-                        snippet = "Fin de etapa ${stg.dayNumber}"
+                        val endPrefix = if (hasGpx) "Fin etapa (GPX)" else "Llegada"
+                        title = "$cName - $endPrefix: ${stg.destination}"
+                        snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Fin de jornada)"
                         setOnMarkerClickListener { _, _ ->
                             selectedDetailStage = stg
                             true
