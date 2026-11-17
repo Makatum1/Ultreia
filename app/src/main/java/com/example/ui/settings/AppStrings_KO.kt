@@ -159,6 +159,8 @@ val koStrings: Map<String, String> = mapOf(
     "main_routes_dialog_desc" to "전문 순례자 포럼 및 사이트의 데이터로 검증된 주요 순례길 중 하나를 선택하세요.",
     "create_camino_btn" to "가이드 생성",
     "export_import_desc" to "안전한 백업을 위해 데이터를 내보내거나 기존 백업 파일을 복원하세요.",
+    "stage_number_label" to "구간 번호",
+    "day_number_label" to "일정 번호",
     "stage_prefix" to "구간",
     "to_connector" to "→",
     "elevation_gain_short" to "상승",

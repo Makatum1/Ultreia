@@ -804,6 +804,7 @@ fun StageDetailScreen(
         EditStageDialog(
             stage = stage,
             viewModel = viewModel,
+            isTravel = isTravel,
             onDismiss = { showEditStageDialog = false },
             onSave = { updated ->
                 viewModel.updateStage(updated)
@@ -1110,9 +1111,11 @@ fun AccommodationCard(
 fun EditStageDialog(
     stage: StageEntity,
     viewModel: CaminoViewModel? = null,
+    isTravel: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (StageEntity) -> Unit
 ) {
+    var stageNumberStr by remember { mutableStateOf(stage.dayNumber.toString()) }
     var origin by remember { mutableStateOf(stage.origin) }
     var destination by remember { mutableStateOf(stage.destination) }
     var dateStr by remember { mutableStateOf(stage.date) }
@@ -1125,14 +1128,28 @@ fun EditStageDialog(
 
     val difficulties = listOf("Fácil", "Moderada", "Difícil", "Muy exigente")
     val editTerm = viewModel?.string("edit_btn") ?: "Modificar"
-    val stageTerm = viewModel?.string("stage_prefix") ?: "Etapa"
-    val dayTerm = viewModel?.string("day") ?: "Día"
+    val titleTerm = if (isTravel) viewModel?.string("day") ?: "Día" else viewModel?.string("stage_prefix") ?: "Etapa"
+    val stageNumberLabel = viewModel?.string(if (isTravel) "day_number_label" else "stage_number_label")
+        ?: if (isTravel) "Número de Día" else "Número de Etapa"
+    val currentDayNum = stageNumberStr.toIntOrNull() ?: stage.dayNumber
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("$editTerm $stageTerm $dayTerm ${stage.dayNumber}") },
+        title = { Text("$editTerm $titleTerm $currentDayNum") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    OutlinedTextField(
+                        value = stageNumberStr,
+                        onValueChange = { input ->
+                            stageNumberStr = input.filter { it.isDigit() }
+                        },
+                        label = { Text("$stageNumberLabel *") },
+                        placeholder = { Text(stage.dayNumber.toString()) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 item {
                     OutlinedTextField(
                         value = origin,
@@ -1305,13 +1322,16 @@ fun EditStageDialog(
             Button(
                 onClick = {
                     val toConn = viewModel?.string("to_connector") ?: "a"
-                    val stagePfx = viewModel?.string("stage_prefix") ?: "Etapa"
+                    val stagePfx = if (isTravel) viewModel?.string("day") ?: "Día" else viewModel?.string("stage_prefix") ?: "Etapa"
+                    val parsed = stageNumberStr.toIntOrNull() ?: stage.dayNumber
+                    val targetDay = if (parsed > 0) parsed else stage.dayNumber
                     onSave(
                         stage.copy(
+                            dayNumber = targetDay,
                             origin = origin,
                             destination = destination,
                             date = dateStr,
-                            title = "$stagePfx ${stage.dayNumber}: $origin $toConn $destination",
+                            title = "$stagePfx $targetDay: $origin $toConn $destination",
                             distanceKm = distanceStr.toDoubleOrNull() ?: stage.distanceKm,
                             elevationGainM = gainStr.toIntOrNull() ?: stage.elevationGainM,
                             elevationLossM = lossStr.toIntOrNull() ?: stage.elevationLossM,

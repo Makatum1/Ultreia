@@ -159,6 +159,8 @@ val ptStrings: Map<String, String> = mapOf(
     "main_routes_dialog_desc" to "Selecione uma das principais rotas documentadas em fóruns e fontes especializadas.",
     "create_camino_btn" to "Criar Guia",
     "export_import_desc" to "Guarde uma cópia de segurança dos seus dados ou restaure um ficheiro anterior.",
+    "stage_number_label" to "Número da Etapa",
+    "day_number_label" to "Número do Dia",
     "stage_prefix" to "Etapa",
     "to_connector" to "a",
     "elevation_gain_short" to "subida",

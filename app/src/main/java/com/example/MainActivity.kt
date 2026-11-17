@@ -620,14 +620,15 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
             nextDay = nextDay,
             initialDate = defaultDate,
             isTravel = isTravel,
+            caminoStartDate = activeCaminoForAdd.startDate,
             viewModel = viewModel,
             onDismiss = { showAddStageDialog = false },
-            onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes ->
+            onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes, targetDay ->
                 val stagePrefix = if (isTravel) viewModel.string("day") else viewModel.string("stage_prefix")
                 val toConnector = viewModel.string("to_connector")
                 viewModel.addStage(
                     caminoId = activeCaminoForAdd.id,
-                    title = "$stagePrefix $nextDay: $origin $toConnector $dest",
+                    title = "$stagePrefix $targetDay: $origin $toConnector $dest",
                     origin = origin,
                     destination = dest,
                     distanceKm = km,
@@ -636,7 +637,8 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                     estimatedTime = time,
                     difficulty = diff,
                     date = date,
-                    stageNotes = notes
+                    stageNotes = notes,
+                    targetDay = targetDay
                 )
                 showAddStageDialog = false
             }

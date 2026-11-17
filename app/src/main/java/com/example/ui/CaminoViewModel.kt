@@ -783,6 +783,23 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun updateStageTitleNumber(title: String, newNumber: Int): String {
+        val regex = Regex("""^([^\d]*?\b(?:Etapa|Stage|Étape|Tappa|Etappe|Etap|Día|Day|Jour|Giorno|Tag|Dag|Dzień|第)?\s*)\d+([:：\s\-].*|$)""", RegexOption.IGNORE_CASE)
+        val match = regex.find(title.trim())
+        return if (match != null) {
+            val prefix = match.groupValues[1]
+            val suffix = match.groupValues[2]
+            "$prefix$newNumber$suffix"
+        } else {
+            val digitMatch = Regex("""^([^\d]*)\d+(.*)$""").find(title.trim())
+            if (digitMatch != null) {
+                "${digitMatch.groupValues[1]}$newNumber${digitMatch.groupValues[2]}"
+            } else {
+                title
+            }
+        }
+    }
+
     fun addStage(
         caminoId: Long,
         title: String,
@@ -794,23 +811,48 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         estimatedTime: String,
         difficulty: String,
         date: String = "",
-        stageNotes: String = ""
+        stageNotes: String = "",
+        targetDay: Int? = null
     ) {
         viewModelScope.launch {
-            val currentStages = repository.getStagesForCaminoOnce(caminoId)
+            val currentStages = repository.getStagesForCaminoOnce(caminoId).sortedBy { it.dayNumber }
             val nextDay = currentStages.size + 1
+            val finalTargetDay = (targetDay ?: nextDay).coerceIn(1, nextDay)
             val currentCamino = repository.getCaminoByIdOnce(caminoId)
             val finalDate = if (date.isNotBlank()) date
             else if (currentCamino != null && currentCamino.startDate.isNotBlank()) {
-                AppStrings.calculateStageDate(currentCamino.startDate, nextDay - 1)
+                AppStrings.calculateStageDate(currentCamino.startDate, finalTargetDay - 1)
             } else ""
+
+            val isTravel = currentCamino?.isTravelGuide == true
+            val stagePrefix = if (isTravel) AppStrings.get("day", _languageMode.value) else AppStrings.get("stage_prefix", _languageMode.value)
+            val toConnector = AppStrings.get("to_connector", _languageMode.value)
+            val finalTitle = title.ifBlank { "$stagePrefix $finalTargetDay: $origin $toConnector $destination" }
+
+            if (finalTargetDay < nextDay) {
+                // Desplazar etapas existentes con dayNumber >= finalTargetDay en orden descendente
+                val stagesToShift = currentStages.filter { it.dayNumber >= finalTargetDay }.sortedByDescending { it.dayNumber }
+                val parsedFinalDate = parseLocalDate(finalDate)
+                for (stg in stagesToShift) {
+                    val shiftedNum = stg.dayNumber + 1
+                    val shiftedTitle = updateStageTitleNumber(stg.title, shiftedNum)
+                    var shiftedDate = stg.date
+                    if (parsedFinalDate != null && stg.date.isNotBlank()) {
+                        val parsedExisting = parseLocalDate(stg.date)
+                        if (parsedExisting != null && !parsedExisting.isBefore(parsedFinalDate)) {
+                            shiftedDate = parsedExisting.plusDays(1).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                        }
+                    }
+                    repository.updateStage(stg.copy(dayNumber = shiftedNum, title = shiftedTitle, date = shiftedDate))
+                }
+            }
 
             repository.insertStage(
                 StageEntity(
                     caminoId = caminoId,
-                    dayNumber = nextDay,
+                    dayNumber = finalTargetDay,
                     date = finalDate,
-                    title = title.ifBlank { "Etapa $nextDay: $origin a $destination" },
+                    title = finalTitle,
                     origin = origin.ifBlank { "Inicio" },
                     destination = destination.ifBlank { "Fin" },
                     distanceKm = distanceKm,
@@ -821,7 +863,14 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     stageNotes = stageNotes
                 )
             )
-            _userMessage.value = "Etapa del día $nextDay añadida correctamente"
+
+            if (finalTargetDay == 1 && finalDate.isNotBlank() && currentCamino != null) {
+                if (currentCamino.startDate != finalDate) {
+                    repository.updateCamino(currentCamino.copy(startDate = finalDate))
+                }
+            }
+
+            _userMessage.value = "Etapa del día $finalTargetDay añadida correctamente"
         }
     }
 
@@ -884,6 +933,39 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val existing = repository.getStageByIdOnce(stage.id)
             val allStages = repository.getStagesForCaminoOnce(stage.caminoId).sortedBy { it.dayNumber }
+            val oldDayNumber = existing?.dayNumber ?: stage.dayNumber
+            val newDayNumber = stage.dayNumber
+
+            if (oldDayNumber != newDayNumber && allStages.isNotEmpty()) {
+                val targetPos = newDayNumber.coerceIn(1, allStages.size)
+                val others = allStages.filter { it.id != stage.id }
+                val reordered = others.toMutableList()
+                val insertIndex = (targetPos - 1).coerceIn(0, reordered.size)
+                reordered.add(insertIndex, stage)
+
+                val currentCamino = repository.getCaminoByIdOnce(stage.caminoId)
+                for ((index, s) in reordered.withIndex()) {
+                    val assignedNum = index + 1
+                    val newTitle = updateStageTitleNumber(s.title, assignedNum)
+                    val toUpdate = if (s.id == stage.id) {
+                        stage.copy(dayNumber = assignedNum, title = newTitle)
+                    } else {
+                        s.copy(dayNumber = assignedNum, title = newTitle)
+                    }
+                    repository.updateStage(toUpdate)
+                }
+
+                val firstStage = reordered.firstOrNull()
+                if (firstStage != null && firstStage.date.isNotBlank() && currentCamino != null) {
+                    if (currentCamino.startDate != firstStage.date) {
+                        repository.updateCamino(currentCamino.copy(startDate = firstStage.date))
+                    }
+                }
+
+                _userMessage.value = "Etapa movida a la posición $targetPos correctamente"
+                return@launch
+            }
+
             val subsequentStages = allStages.filter { it.dayNumber > stage.dayNumber }
 
             val oldDate = existing?.date?.trim() ?: ""
@@ -958,6 +1040,13 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteStage(stage: StageEntity, shouldNavigateBack: Boolean = false) {
         viewModelScope.launch {
             repository.deleteStage(stage)
+            val remaining = repository.getStagesForCaminoOnce(stage.caminoId).sortedBy { it.dayNumber }
+            val subsequent = remaining.filter { it.dayNumber > stage.dayNumber }.sortedBy { it.dayNumber }
+            for (stg in subsequent) {
+                val newNum = stg.dayNumber - 1
+                val newTitle = updateStageTitleNumber(stg.title, newNum)
+                repository.updateStage(stg.copy(dayNumber = newNum, title = newTitle))
+            }
             _userMessage.value = "Etapa eliminada"
             if (shouldNavigateBack) {
                 navigateBack()

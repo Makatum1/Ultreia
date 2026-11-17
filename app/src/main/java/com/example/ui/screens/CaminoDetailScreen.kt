@@ -242,14 +242,15 @@ fun CaminoDetailScreen(
             nextDay = nextDay,
             initialDate = defaultDate,
             isTravel = camino.isTravelGuide,
+            caminoStartDate = camino.startDate,
             viewModel = viewModel,
             onDismiss = { showAddStageDialog = false },
-            onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes ->
+            onConfirm = { origin, dest, km, gain, loss, time, diff, date, notes, targetDay ->
                 val stagePrefix = if (camino.isTravelGuide) viewModel.string("day") else viewModel.string("stage_prefix")
                 val toConnector = viewModel.string("to_connector")
                 viewModel.addStage(
                     caminoId = camino.id,
-                    title = "$stagePrefix $nextDay: $origin $toConnector $dest",
+                    title = "$stagePrefix $targetDay: $origin $toConnector $dest",
                     origin = origin,
                     destination = dest,
                     distanceKm = km,
@@ -258,7 +259,8 @@ fun CaminoDetailScreen(
                     estimatedTime = time,
                     difficulty = diff,
                     date = date,
-                    stageNotes = notes
+                    stageNotes = notes,
+                    targetDay = targetDay
                 )
                 showAddStageDialog = false
             }
@@ -270,6 +272,7 @@ fun CaminoDetailScreen(
         EditStageDialog(
             stage = stageToEdit!!,
             viewModel = viewModel,
+            isTravel = camino.isTravelGuide,
             onDismiss = { stageToEdit = null },
             onSave = { updated ->
                 viewModel.updateStage(updated)
@@ -907,10 +910,12 @@ fun AddStageDialog(
     nextDay: Int,
     initialDate: String,
     isTravel: Boolean = false,
+    caminoStartDate: String = "",
     viewModel: CaminoViewModel? = null,
     onDismiss: () -> Unit,
-    onConfirm: (origin: String, dest: String, km: Double, gain: Int, loss: Int, time: String, diff: String, date: String, notes: String) -> Unit
+    onConfirm: (origin: String, dest: String, km: Double, gain: Int, loss: Int, time: String, diff: String, date: String, notes: String, targetDay: Int) -> Unit
 ) {
+    var stageNumberStr by remember { mutableStateOf(nextDay.toString()) }
     var origin by remember { mutableStateOf("") }
     var destination by remember { mutableStateOf("") }
     var dateStr by remember { mutableStateOf(initialDate) }
@@ -924,12 +929,32 @@ fun AddStageDialog(
     val difficulties = listOf("Fácil", "Moderada", "Difícil", "Muy exigente")
     val titleTerm = if (isTravel) viewModel?.string("day") ?: "Día" else viewModel?.string("stage_prefix") ?: "Etapa"
     val addTerm = viewModel?.string("add_btn") ?: "Añadir"
+    val stageNumberLabel = viewModel?.string(if (isTravel) "day_number_label" else "stage_number_label")
+        ?: if (isTravel) "Número de Día" else "Número de Etapa"
+    val currentDayNum = stageNumberStr.toIntOrNull() ?: nextDay
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("$addTerm $titleTerm $nextDay") },
+        title = { Text("$addTerm $titleTerm $currentDayNum") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    OutlinedTextField(
+                        value = stageNumberStr,
+                        onValueChange = { input ->
+                            val filtered = input.filter { it.isDigit() }
+                            stageNumberStr = filtered
+                            val parsed = filtered.toIntOrNull()
+                            if (parsed != null && parsed > 0 && caminoStartDate.isNotBlank()) {
+                                dateStr = AppStrings.calculateStageDate(caminoStartDate, parsed - 1)
+                            }
+                        },
+                        label = { Text("$stageNumberLabel *") },
+                        placeholder = { Text(nextDay.toString()) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 item {
                     OutlinedTextField(
                         value = origin,
@@ -1056,6 +1081,8 @@ fun AddStageDialog(
             Button(
                 onClick = {
                     if (origin.isNotBlank() && destination.isNotBlank()) {
+                        val parsed = stageNumberStr.toIntOrNull() ?: nextDay
+                        val targetDay = if (parsed > 0) parsed else nextDay
                         onConfirm(
                             origin,
                             destination,
@@ -1065,7 +1092,8 @@ fun AddStageDialog(
                             timeStr,
                             difficulty,
                             dateStr,
-                            notes
+                            notes,
+                            targetDay
                         )
                     }
                 }
