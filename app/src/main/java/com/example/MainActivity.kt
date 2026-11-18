@@ -917,7 +917,7 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(Icons.Default.Archive, contentDescription = null, tint = CaminoBlue)
+                                Icon(Icons.Default.FileUpload, contentDescription = null, tint = CaminoBlue)
                                 Spacer(Modifier.width(8.dp))
                                 Text(viewModel.string("export_complete_backup"), fontWeight = FontWeight.Bold)
                             }
@@ -937,7 +937,7 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(Icons.Default.Unarchive, contentDescription = null)
+                                Icon(Icons.Default.FileDownload, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
                                 Text(viewModel.string("import_complete_backup"), fontWeight = FontWeight.Bold)
                             }
@@ -997,7 +997,7 @@ fun SettingsScreen(
             onDismissRequest = { showGlobalExportDialog = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Archive, contentDescription = null, tint = CaminoBlue)
+                    Icon(Icons.Default.FileUpload, contentDescription = null, tint = CaminoBlue)
                     Spacer(Modifier.width(8.dp))
                     Text("Copia de Seguridad Global", fontWeight = FontWeight.Bold, color = CaminoBlue)
                 }
