@@ -297,7 +297,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             CaminoStats(0, 0, 0.0, 0.0, 0, 0, 0)
         )
 
-    // Contador independiente para la vista de Itinerario por fechas (incluye etapas completadas y etapas con 0 km)
+    // Contador independiente para la vista de Itinerario por fechas (cuenta todas las etapas marcadas como completadas, incluyendo las de 0 km cuando están hechas, y descontándolas cuando no lo están)
     val itineraryStageCount: StateFlow<Pair<Int, Int>> = stages
         .map { stageList -> calculateItineraryProgress(stageList) }
         .stateIn(
@@ -307,8 +307,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         )
 
     fun calculateItineraryProgress(stageList: List<StageEntity>): Pair<Int, Int> {
-        val completedOrZero = stageList.count { it.isCompleted || it.distanceKm == 0.0 }
-        return Pair(completedOrZero, stageList.size)
+        val completed = stageList.count { it.isCompleted }
+        return Pair(completed, stageList.size)
     }
 
     val totalGlobalStats: StateFlow<CaminoStats> = repository.allStages
