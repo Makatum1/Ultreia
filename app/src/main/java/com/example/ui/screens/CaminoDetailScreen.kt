@@ -126,7 +126,7 @@ fun CaminoDetailScreen(
                         modifier = Modifier.testTag("camino_export_json_button")
                     ) {
                         Icon(
-                            Icons.Default.FileDownload,
+                            Icons.Default.FileUpload,
                             contentDescription = "Exportar ${camino.title}",
                             tint = CaminoBlue
                         )
@@ -345,7 +345,7 @@ fun StagesListTab(
                         .weight(1f)
                         .testTag("btn_export_json_camino")
                 ) {
-                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = "Exportar",

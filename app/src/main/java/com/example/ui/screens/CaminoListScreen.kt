@@ -328,7 +328,7 @@ fun CaminoListScreen(
                                     .fillMaxWidth()
                                     .testTag("btn_empty_import")
                             ) {
-                                Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = if (isTravelProfile) viewModel.string("empty_import_trip") else viewModel.string("empty_import_camino"),

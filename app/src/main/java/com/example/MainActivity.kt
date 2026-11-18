@@ -880,7 +880,7 @@ fun SettingsScreen(
                                         .weight(1f)
                                         .testTag("btn_main_export")
                                 ) {
-                                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text(viewModel.string("export_btn"), fontWeight = FontWeight.Bold)
                                 }
@@ -895,7 +895,7 @@ fun SettingsScreen(
                                         .weight(1f)
                                         .testTag("btn_main_import")
                                 ) {
-                                    Icon(Icons.Default.FileUpload, contentDescription = null, tint = CaminoBlueDark, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.FileDownload, contentDescription = null, tint = CaminoBlueDark, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text(viewModel.string("import_btn"), color = CaminoBlueDark, fontWeight = FontWeight.Bold)
                                 }
@@ -1078,7 +1078,7 @@ fun SettingsScreen(
             onDismissRequest = { showExportSelectionDialog = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.FileDownload, contentDescription = null, tint = CaminoBlue)
+                    Icon(Icons.Default.FileUpload, contentDescription = null, tint = CaminoBlue)
                     Spacer(Modifier.width(8.dp))
                     Text(viewModel.string("export_zip_btn"), fontWeight = FontWeight.Bold, color = CaminoBlue)
                 }
