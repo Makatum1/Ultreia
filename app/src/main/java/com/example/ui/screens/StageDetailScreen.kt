@@ -148,19 +148,13 @@ fun StageDetailScreen(
             TopAppBar(
                 title = {
                     Column {
-                        val caminoName = activeCamino?.let { viewModel.localizeRouteTitle(it.title) } ?: "Ruta"
-                        val inPrefix = if (activeCamino?.isTravelGuide == true || isTravel) viewModel.string("you_are_in_trip") else viewModel.string("you_are_in")
-                        Text(
-                            text = "$inPrefix: $caminoName",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = CaminoBlue
-                        )
+                        val stagePrefix = if (activeCamino?.isTravelGuide == true || isTravel) viewModel.string("day") else viewModel.string("stage_prefix")
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "${viewModel.string("day")} ${stage.dayNumber}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                text = "$stagePrefix ${stage.dayNumber}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = CaminoBlue
                             )
                             if (formattedStageDate.isNotBlank()) {
                                 Spacer(Modifier.width(8.dp))
@@ -170,19 +164,47 @@ fun StageDetailScreen(
                                 ) {
                                     Text(
                                         text = formattedStageDate,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = PilgrimYellowDark,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                     )
                                 }
                             }
                         }
-                        Text(
-                            text = "${stage.origin} → ${stage.destination}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+                        val originClean = stage.origin.trim()
+                        val destClean = stage.destination.trim()
+                        val combinedText = if (destClean.isNotBlank()) "$originClean - $destClean" else originClean
+                        val isLong = (originClean.length + destClean.length > 22) || originClean.length > 15 || destClean.length > 15
+
+                        if (isLong && destClean.isNotBlank()) {
+                            Column {
+                                Text(
+                                    text = originClean,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = destClean,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = combinedText,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -191,16 +213,6 @@ fun StageDetailScreen(
                         modifier = Modifier.testTag("stage_edit_button")
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Editar etapa", tint = CaminoBlue)
-                    }
-                    IconButton(
-                        onClick = { showGpxImportDialog = true },
-                        modifier = Modifier.testTag("stage_gpx_button")
-                    ) {
-                        Icon(
-                            if (hasGpx) Icons.Default.Sync else Icons.Default.FileUpload,
-                            contentDescription = if (hasGpx) "Sustituir GPX" else "Subir GPX",
-                            tint = CaminoBlue
-                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -1761,11 +1773,58 @@ fun AddEditVivenciaDialog(
                 }
 
                 item {
+                    val context = LocalContext.current
+                    var showDatePicker by remember { mutableStateOf(false) }
+
+                    if (showDatePicker) {
+                        val parsed = try {
+                            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                            LocalDate.parse(dateStr.trim(), formatter)
+                        } catch (_: Exception) {
+                            try {
+                                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                                val cal = java.util.Calendar.getInstance()
+                                val p = sdf.parse(dateStr.trim())
+                                if (p != null) {
+                                    cal.time = p
+                                    LocalDate.of(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+                                } else LocalDate.now()
+                            } catch (_: Exception) {
+                                LocalDate.now()
+                            }
+                        }
+                        DisposableEffect(Unit) {
+                            val dialog = android.app.DatePickerDialog(
+                                context,
+                                { _, year, month, dayOfMonth ->
+                                    val selected = LocalDate.of(year, month + 1, dayOfMonth)
+                                    dateStr = selected.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                                    showDatePicker = false
+                                },
+                                parsed.year,
+                                parsed.monthValue - 1,
+                                parsed.dayOfMonth
+                            )
+                            dialog.setOnCancelListener { showDatePicker = false }
+                            dialog.setOnDismissListener { showDatePicker = false }
+                            dialog.show()
+                            onDispose { dialog.dismiss() }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = dateStr,
                         onValueChange = { dateStr = it },
                         label = { Text(viewModel?.string("date_moment_label") ?: "Fecha / Momento") },
                         placeholder = { Text(viewModel?.string("date_moment_placeholder") ?: "Ej. 12/05/2026 o Mañana en el alto") },
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = "Seleccionar fecha en calendario"
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
