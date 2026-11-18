@@ -173,34 +173,23 @@ fun StageDetailScreen(
                             }
                         }
 
-                        val originClean = stage.origin.trim()
-                        val destClean = stage.destination.trim()
-                        val combinedText = if (destClean.isNotBlank()) "$originClean - $destClean" else originClean
-                        val isLong = (originClean.length + destClean.length > 22) || originClean.length > 15 || destClean.length > 15
+                        val originClean = stage.origin.trim().ifBlank { "—" }
+                        val destClean = stage.destination.trim().ifBlank { "—" }
 
-                        if (isLong && destClean.isNotBlank()) {
-                            Column {
-                                Text(
-                                    text = originClean,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = destClean,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
-                                text = combinedText,
-                                style = MaterialTheme.typography.titleMedium,
+                                text = originClean,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = destClean,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
