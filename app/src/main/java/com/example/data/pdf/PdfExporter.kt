@@ -131,8 +131,15 @@ object PdfExporter {
             pdfFile
         } catch (e: Exception) {
             e.printStackTrace()
-            try { pdfDocument.close() } catch (_: Exception) {}
             null
+        } finally {
+            try { pdfDocument.close() } catch (_: Exception) {}
+            tileMemoryCache.values.forEach { bmp ->
+                if (!bmp.isRecycled) {
+                    try { bmp.recycle() } catch (_: Exception) {}
+                }
+            }
+            tileMemoryCache.clear()
         }
     }
 
@@ -191,8 +198,15 @@ object PdfExporter {
             pdfFile
         } catch (e: Exception) {
             e.printStackTrace()
-            try { pdfDocument.close() } catch (_: Exception) {}
             null
+        } finally {
+            try { pdfDocument.close() } catch (_: Exception) {}
+            tileMemoryCache.values.forEach { bmp ->
+                if (!bmp.isRecycled) {
+                    try { bmp.recycle() } catch (_: Exception) {}
+                }
+            }
+            tileMemoryCache.clear()
         }
     }
 
