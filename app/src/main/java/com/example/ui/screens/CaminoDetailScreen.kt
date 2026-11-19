@@ -647,8 +647,8 @@ fun CaminoHeaderBanner(
                     )
             )
 
-            // Fecha en la esquina superior derecha: SOLO mostrar si NO hay portada
-            if (!hasCover && camino.startDate.isNotBlank()) {
+            // Fecha en la esquina superior derecha (alineada a la derecha, solo texto sin icono ni recuadro)
+            if (camino.startDate.isNotBlank()) {
                 Text(
                     text = camino.startDate,
                     fontSize = 12.sp,
@@ -660,69 +660,59 @@ fun CaminoHeaderBanner(
                 )
             }
 
-            // Header Texts (centro e izquierda limpios para el título)
+            // Header Texts (diseño del título unificado con o sin portada)
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
-                    .padding(end = if (onUpdateCoverPhoto != null) 115.dp else 16.dp)
+                    .padding(end = if (onUpdateCoverPhoto != null) 125.dp else 16.dp)
             ) {
-                if (hasCover) {
-                    // Con portada: SOLO el título abajo a la izquierda, nada más
+                Surface(
+                    color = PilgrimYellow,
+                    shape = RoundedCornerShape(6.dp)
+                ) {
                     Text(
-                        text = camino.title,
-                        style = MaterialTheme.typography.titleLarge,
+                        text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = CaminoBlueDark,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
-                } else {
-                    Surface(
+                }
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    text = camino.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+
+                if (camino.subtitle.isNotBlank()) {
+                    Text(
+                        text = camino.subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+
+                Spacer(Modifier.height(5.dp))
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "${stats.completedKm} / ${stats.totalKm} km",
+                        style = MaterialTheme.typography.labelSmall,
                         color = PilgrimYellow,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CaminoBlueDark,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-
-                    Spacer(Modifier.height(4.dp))
-
+                        fontWeight = FontWeight.Bold
+                    )
                     Text(
-                        text = camino.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        text = "${stats.progressPercent}% completado",
+                        style = MaterialTheme.typography.labelSmall,
                         color = Color.White
                     )
-
-                    if (camino.subtitle.isNotBlank()) {
-                        Text(
-                            text = camino.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f)
-                        )
-                    }
-
-                    Spacer(Modifier.height(5.dp))
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = "${stats.completedKm} / ${stats.totalKm} km",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PilgrimYellow,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${stats.progressPercent}% completado",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
-                        )
-                    }
                 }
             }
 
@@ -744,12 +734,12 @@ fun CaminoHeaderBanner(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Image,
-                            contentDescription = "Portada",
+                            contentDescription = if (hasCover) "1 Portada" else "Portada",
                             tint = Color.White,
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
-                            text = "Portada",
+                            text = if (hasCover) "1 Portada" else "Portada",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.White
