@@ -575,7 +575,7 @@ fun CaminoHeaderBanner(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
-                    .padding(end = if (camino.isTravelGuide && onUpdateCoverPhoto != null) 120.dp else 16.dp)
+                    .padding(end = if (onUpdateCoverPhoto != null) 120.dp else 16.dp)
             ) {
                 Surface(
                     color = PilgrimYellow,
