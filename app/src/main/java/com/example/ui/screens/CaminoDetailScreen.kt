@@ -311,6 +311,7 @@ fun StagesListTab(
             CaminoHeaderBanner(
                 camino = camino,
                 stats = stats,
+                viewModel = viewModel,
                 onUpdateCoverPhoto = { newUri ->
                     viewModel.updateCamino(camino.copy(coverPhotoUri = newUri))
                 }
@@ -334,7 +335,7 @@ fun StagesListTab(
                     Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "Exportar PDF",
+                        text = viewModel.string("export_pdf"),
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
                     )
@@ -350,7 +351,7 @@ fun StagesListTab(
                     Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "Exportar",
+                        text = viewModel.string("export_json"),
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
                     )
@@ -375,14 +376,15 @@ fun StagesListTab(
             ) {
                 Column {
                     Text(
-                        text = "Itinerario por Fechas",
+                        text = viewModel.string("itinerary_by_dates"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = CaminoBlue
                     )
                     if (camino.startDate.isNotBlank()) {
+                        val startLabel = if (camino.isTravelGuide) viewModel.string("trip_start_date") else viewModel.string("camino_start_date")
                         Text(
-                            text = "Inicio del Camino: ${camino.startDate}",
+                            text = "$startLabel: ${camino.startDate}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -397,7 +399,7 @@ fun StagesListTab(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "$itineraryDone/$itineraryTotal hechas",
+                        text = "$itineraryDone/$itineraryTotal ${viewModel.string("stages_completed_short")}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = CaminoBlueDark,
@@ -494,6 +496,7 @@ fun StagesListTab(
 fun CaminoHeaderBanner(
     camino: CaminoEntity,
     stats: CaminoStats,
+    viewModel: CaminoViewModel? = null,
     onUpdateCoverPhoto: ((String?) -> Unit)? = null
 ) {
     val bannerBg = if (camino.isTravelGuide) Color(0xFF1C4B64) else CaminoBlue
@@ -508,6 +511,24 @@ fun CaminoHeaderBanner(
     val hasCover = !camino.coverPhotoUri.isNullOrBlank()
 
     if (showCoverPhotoDialog) {
+        val coverTitle = if (camino.isTravelGuide) {
+            viewModel?.string("cover_photo_trip_title") ?: "Portada del Viaje"
+        } else {
+            viewModel?.string("cover_photo_camino_title") ?: "Portada del Camino"
+        }
+
+        val coverDesc = if (hasCover) {
+            viewModel?.string("manage_cover_desc_has_cover") ?: "Puedes cambiar la foto de portada actual o eliminarla para volver al diseño estándar."
+        } else {
+            viewModel?.string("manage_cover_desc_no_cover") ?: "Selecciona una foto de tu galería para establecerla como portada de tu guía y de la exportación a PDF."
+        }
+
+        val changeOrSelectText = if (hasCover) {
+            viewModel?.string("change_cover_btn") ?: "Cambiar foto de portada"
+        } else {
+            viewModel?.string("select_cover_btn") ?: "Seleccionar foto de portada"
+        }
+
         AlertDialog(
             onDismissRequest = { showCoverPhotoDialog = false },
             icon = {
@@ -520,7 +541,7 @@ fun CaminoHeaderBanner(
             },
             title = {
                 Text(
-                    text = if (camino.isTravelGuide) "Portada del Viaje" else "Portada del Camino",
+                    text = coverTitle,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
@@ -531,11 +552,7 @@ fun CaminoHeaderBanner(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = if (hasCover) {
-                            "Puedes cambiar la foto de portada actual o eliminarla para volver al diseño estándar."
-                        } else {
-                            "Selecciona una foto de tu galería para establecerla como portada de tu guía y de la exportación a PDF."
-                        },
+                        text = coverDesc,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -557,7 +574,7 @@ fun CaminoHeaderBanner(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text(if (hasCover) "Cambiar foto de portada" else "Seleccionar foto de portada")
+                        Text(changeOrSelectText)
                     }
 
                     if (hasCover) {
@@ -579,7 +596,7 @@ fun CaminoHeaderBanner(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("Eliminar portada")
+                            Text(viewModel?.string("delete_cover_btn") ?: "Eliminar portada")
                         }
                     }
                 }
@@ -587,7 +604,7 @@ fun CaminoHeaderBanner(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showCoverPhotoDialog = false }) {
-                    Text("Cancelar")
+                    Text(viewModel?.string("cancel") ?: "Cancelar")
                 }
             }
         )
@@ -656,12 +673,18 @@ fun CaminoHeaderBanner(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val badgeText = if (camino.isTravelGuide) {
+                        viewModel?.string("badge_trip_guide") ?: "ULTREIA VIAJE"
+                    } else {
+                        viewModel?.string("badge_camino_guide") ?: "ULTREIA GUÍA"
+                    }
+
                     Surface(
                         color = PilgrimYellow,
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
+                            text = badgeText,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = CaminoBlueDark,
@@ -719,7 +742,7 @@ fun CaminoHeaderBanner(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "${stats.progressPercent}% completado",
+                            text = "${stats.progressPercent}% ${viewModel?.string("completed_lower") ?: "completado"}",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White
                         )
@@ -727,6 +750,9 @@ fun CaminoHeaderBanner(
 
                     // Botón abajo a la derecha para gestionar portada (añadir, cambiar o eliminar)
                     if (onUpdateCoverPhoto != null) {
+                        val baseCoverLabel = viewModel?.string("cover_btn") ?: "Portada"
+                        val coverButtonLabel = if (hasCover) "1 $baseCoverLabel" else baseCoverLabel
+
                         Surface(
                             onClick = { showCoverPhotoDialog = true },
                             shape = RoundedCornerShape(8.dp),
@@ -740,12 +766,12 @@ fun CaminoHeaderBanner(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Image,
-                                    contentDescription = if (hasCover) "1 Portada" else "Portada",
+                                    contentDescription = coverButtonLabel,
                                     tint = Color.White,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Text(
-                                    text = if (hasCover) "1 Portada" else "Portada",
+                                    text = coverButtonLabel,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = Color.White
@@ -1135,7 +1161,7 @@ fun AddStageDialog(
                             IconButton(onClick = { showDatePicker = true }) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarToday,
-                                    contentDescription = "Seleccionar fecha en calendario"
+                                    contentDescription = viewModel?.string("date") ?: "Fecha"
                                 )
                             }
                         },

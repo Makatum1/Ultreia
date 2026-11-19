@@ -902,8 +902,8 @@ fun StageDetailScreen(
     if (vivenciaToDelete != null) {
         AlertDialog(
             onDismissRequest = { vivenciaToDelete = null },
-            title = { Text("¿Eliminar vivencia?") },
-            text = { Text("¿Deseas eliminar esta anotación y foto de la etapa? Esta acción no se puede deshacer.") },
+            title = { Text(viewModel.string("delete_vivencia_title")) },
+            text = { Text(viewModel.string("delete_vivencia_confirm")) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -912,12 +912,12 @@ fun StageDetailScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Eliminar")
+                    Text(viewModel.string("delete"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { vivenciaToDelete = null }) {
-                    Text("Cancelar")
+                    Text(viewModel.string("cancel"))
                 }
             }
         )
@@ -1245,7 +1245,7 @@ fun EditStageDialog(
                             IconButton(onClick = { showDatePicker = true }) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarToday,
-                                    contentDescription = "Seleccionar fecha en calendario"
+                                    contentDescription = viewModel?.string("date") ?: "Fecha"
                                 )
                             }
                         },
@@ -1824,7 +1824,7 @@ fun AddEditVivenciaDialog(
                             IconButton(onClick = { showDatePicker = true }) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarToday,
-                                    contentDescription = "Seleccionar fecha en calendario"
+                                    contentDescription = viewModel?.string("date") ?: "Fecha"
                                 )
                             }
                         },

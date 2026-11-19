@@ -355,7 +355,24 @@ object AppStrings {
         "pdf_destination_end" to "Destino: Fin",
         "pdf_executive_summary" to "RESUMEN EJECUTIVO DE LA JORNADA",
         "pdf_key_tips_day" to "INFORMACIÓN Y CONSEJOS CLAVE DEL DÍA",
-        "pdf_agenda_activities" to "AGENDA Y ACTIVIDADES PROGRAMADAS"
+        "pdf_agenda_activities" to "AGENDA Y ACTIVIDADES PROGRAMADAS",
+        "itinerary_by_dates" to "Itinerario por Fechas",
+        "camino_start_date" to "Inicio del Camino",
+        "trip_start_date" to "Inicio del Viaje",
+        "stages_completed_short" to "hechas",
+        "cover_photo_camino_title" to "Portada del Camino",
+        "cover_photo_trip_title" to "Portada del Viaje",
+        "manage_cover_desc_has_cover" to "Puedes cambiar la foto de portada actual o eliminarla para volver al diseño estándar.",
+        "manage_cover_desc_no_cover" to "Selecciona una foto de tu galería para establecerla como portada de tu guía y de la exportación a PDF.",
+        "change_cover_btn" to "Cambiar foto de portada",
+        "select_cover_btn" to "Seleccionar foto de portada",
+        "delete_cover_btn" to "Eliminar portada",
+        "cover_btn" to "Portada",
+        "badge_camino_guide" to "ULTREIA GUÍA",
+        "badge_trip_guide" to "ULTREIA VIAJE",
+        "completed_lower" to "completado",
+        "delete_vivencia_title" to "¿Eliminar vivencia?",
+        "delete_vivencia_confirm" to "¿Deseas eliminar esta anotación y foto de la etapa? Esta acción no se puede deshacer."
     )
 
     private val enStrings = mapOf(
@@ -665,7 +682,24 @@ object AppStrings {
         "pdf_destination_end" to "Destination: End",
         "pdf_executive_summary" to "DAILY EXECUTIVE SUMMARY",
         "pdf_key_tips_day" to "KEY DAILY TIPS & INFORMATION",
-        "pdf_agenda_activities" to "SCHEDULED ACTIVITIES & AGENDA"
+        "pdf_agenda_activities" to "SCHEDULED ACTIVITIES & AGENDA",
+        "itinerary_by_dates" to "Itinerary by Dates",
+        "camino_start_date" to "Camino Start",
+        "trip_start_date" to "Trip Start",
+        "stages_completed_short" to "done",
+        "cover_photo_camino_title" to "Camino Cover",
+        "cover_photo_trip_title" to "Trip Cover",
+        "manage_cover_desc_has_cover" to "You can change the current cover photo or remove it to return to the standard design.",
+        "manage_cover_desc_no_cover" to "Select a photo from your gallery to set it as cover for your guide and PDF export.",
+        "change_cover_btn" to "Change cover photo",
+        "select_cover_btn" to "Select cover photo",
+        "delete_cover_btn" to "Remove cover",
+        "cover_btn" to "Cover",
+        "badge_camino_guide" to "ULTREIA GUIDE",
+        "badge_trip_guide" to "ULTREIA TRIP",
+        "completed_lower" to "completed",
+        "delete_vivencia_title" to "Delete journal entry?",
+        "delete_vivencia_confirm" to "Do you want to delete this note and photo? This action cannot be undone."
     )
 
     private val frStrings = mapOf(
@@ -975,7 +1009,24 @@ object AppStrings {
         "pdf_destination_end" to "Destination : Arrivée",
         "pdf_executive_summary" to "RÉSUMÉ EXÉCUTIF DU JOUR",
         "pdf_key_tips_day" to "CONSEILS ET INFORMATIONS CLÉS DU JOUR",
-        "pdf_agenda_activities" to "ACTIVITÉS ET AGENDA DU JOUR"
+        "pdf_agenda_activities" to "ACTIVITÉS ET AGENDA DU JOUR",
+        "itinerary_by_dates" to "Itinéraire par Dates",
+        "camino_start_date" to "Début du Chemin",
+        "trip_start_date" to "Début du Voyage",
+        "stages_completed_short" to "faites",
+        "cover_photo_camino_title" to "Couverture du Chemin",
+        "cover_photo_trip_title" to "Couverture du Voyage",
+        "manage_cover_desc_has_cover" to "Vous pouvez changer la photo de couverture actuelle ou la supprimer pour revenir au design standard.",
+        "manage_cover_desc_no_cover" to "Sélectionnez une photo de votre galerie comme couverture de votre guide et export PDF.",
+        "change_cover_btn" to "Changer la photo de couverture",
+        "select_cover_btn" to "Sélectionner la photo de couverture",
+        "delete_cover_btn" to "Supprimer la couverture",
+        "cover_btn" to "Couverture",
+        "badge_camino_guide" to "ULTREIA GUIDE",
+        "badge_trip_guide" to "ULTREIA VOYAGE",
+        "completed_lower" to "terminé",
+        "delete_vivencia_title" to "Supprimer l'anecdote ?",
+        "delete_vivencia_confirm" to "Voulez-vous supprimer cette note et photo ? Cette action est irréversible."
     )
 
     private val itStrings = mapOf(
@@ -1285,7 +1336,24 @@ object AppStrings {
         "pdf_destination_end" to "Destinazione: Arrivo",
         "pdf_executive_summary" to "RIEPILOGO DELLA GIORNATA",
         "pdf_key_tips_day" to "CONSIGLI E INFORMAZIONI CHIAVE DEL GIORNO",
-        "pdf_agenda_activities" to "ATTIVITÀ E AGENDA PROGRAMMATA"
+        "pdf_agenda_activities" to "ATTIVITÀ E AGENDA PROGRAMMATA",
+        "itinerary_by_dates" to "Itinerario per Date",
+        "camino_start_date" to "Inizio del Cammino",
+        "trip_start_date" to "Inizio del Viaggio",
+        "stages_completed_short" to "completate",
+        "cover_photo_camino_title" to "Copertina del Cammino",
+        "cover_photo_trip_title" to "Copertina del Viaggio",
+        "manage_cover_desc_has_cover" to "Puoi cambiare la foto di copertina attuale o rimuoverla per tornare al design standard.",
+        "manage_cover_desc_no_cover" to "Seleziona una foto dalla galleria per impostarla come copertina della guida e del PDF.",
+        "change_cover_btn" to "Cambia foto di copertina",
+        "select_cover_btn" to "Seleziona foto di copertina",
+        "delete_cover_btn" to "Rimuovi copertina",
+        "cover_btn" to "Copertina",
+        "badge_camino_guide" to "ULTREIA GUIDA",
+        "badge_trip_guide" to "ULTREIA VIAGGIO",
+        "completed_lower" to "completato",
+        "delete_vivencia_title" to "Eliminare ricordo?",
+        "delete_vivencia_confirm" to "Vuoi eliminare questa nota e foto? Questa azione non può essere annullata."
     )
 
     private val zhStrings = mapOf(
@@ -1595,7 +1663,24 @@ object AppStrings {
         "pdf_destination_end" to "终点：抵达",
         "pdf_executive_summary" to "今日行程提要",
         "pdf_key_tips_day" to "今日关键贴士与建议",
-        "pdf_agenda_activities" to "排定活动与日程"
+        "pdf_agenda_activities" to "排定活动与日程",
+        "itinerary_by_dates" to "按日期排列行程",
+        "camino_start_date" to "朝圣之路出发日期",
+        "trip_start_date" to "旅行出发日期",
+        "stages_completed_short" to "已完成",
+        "cover_photo_camino_title" to "朝圣之路封面",
+        "cover_photo_trip_title" to "旅行封面",
+        "manage_cover_desc_has_cover" to "您可以更换当前封面照片，或将其删除以恢复默认标准设计。",
+        "manage_cover_desc_no_cover" to "从相册中选择一张照片，设为指南及PDF导出的封面。",
+        "change_cover_btn" to "更换封面照片",
+        "select_cover_btn" to "选择封面照片",
+        "delete_cover_btn" to "删除封面",
+        "cover_btn" to "封面",
+        "badge_camino_guide" to "ULTREIA 指南",
+        "badge_trip_guide" to "ULTREIA 旅行",
+        "completed_lower" to "已完成",
+        "delete_vivencia_title" to "删除旅行感悟？",
+        "delete_vivencia_confirm" to "您确定要删除此条记录及照片吗？此操作无法撤销。"
     )
 
     private val nlStrings = mapOf(
@@ -1905,7 +1990,24 @@ object AppStrings {
         "pdf_destination_end" to "Bestemming: Einde",
         "pdf_executive_summary" to "DAGELIJKS OVERZICHT",
         "pdf_key_tips_day" to "BELANGRIJKE DAGELIJKSE TIPS & INFO",
-        "pdf_agenda_activities" to "GEPLANDE ACTIVITEITEN & AGENDA"
+        "pdf_agenda_activities" to "GEPLANDE ACTIVITEITEN & AGENDA",
+        "itinerary_by_dates" to "Reisschema op Datum",
+        "camino_start_date" to "Start van de Camino",
+        "trip_start_date" to "Start van de Reis",
+        "stages_completed_short" to "voltooid",
+        "cover_photo_camino_title" to "Omslag van de Camino",
+        "cover_photo_trip_title" to "Omslag van de Reis",
+        "manage_cover_desc_has_cover" to "U kunt de huidige omslagfoto wijzigen of verwijderen om terug te keren naar het standaardontwerp.",
+        "manage_cover_desc_no_cover" to "Kies een foto uit uw galerij om in te stellen als omslag voor uw gids en PDF-export.",
+        "change_cover_btn" to "Omslagfoto wijzigen",
+        "select_cover_btn" to "Omslagfoto selecteren",
+        "delete_cover_btn" to "Omslag verwijderen",
+        "cover_btn" to "Omslag",
+        "badge_camino_guide" to "ULTREIA GIDS",
+        "badge_trip_guide" to "ULTREIA REIS",
+        "completed_lower" to "voltooid",
+        "delete_vivencia_title" to "Herinnering verwijderen?",
+        "delete_vivencia_confirm" to "Wilt u deze notitie en foto verwijderen? Dit kan niet ongedaan worden gemaakt."
     )
 
     private val deStrings = mapOf(
@@ -2215,7 +2317,24 @@ object AppStrings {
         "pdf_destination_end" to "Ziel: Ankunft",
         "pdf_executive_summary" to "TAGESÜBERSICHT",
         "pdf_key_tips_day" to "WICHTIGE TIPPS & INFOS DES TAGES",
-        "pdf_agenda_activities" to "GEPLANTE AKTIVITÄTEN & AGENDA"
+        "pdf_agenda_activities" to "GEPLANTE AKTIVITÄTEN & AGENDA",
+        "itinerary_by_dates" to "Reiseroute nach Datum",
+        "camino_start_date" to "Start des Camino",
+        "trip_start_date" to "Start der Reise",
+        "stages_completed_short" to "erledigt",
+        "cover_photo_camino_title" to "Camino-Titelbild",
+        "cover_photo_trip_title" to "Reise-Titelbild",
+        "manage_cover_desc_has_cover" to "Sie können das aktuelle Titelbild ändern oder entfernen, um zum Standarddesign zurückzukehren.",
+        "manage_cover_desc_no_cover" to "Wählen Sie ein Foto aus Ihrer Galerie als Titelbild für Ihren Reiseführer und den PDF-Export.",
+        "change_cover_btn" to "Titelbild ändern",
+        "select_cover_btn" to "Titelbild auswählen",
+        "delete_cover_btn" to "Titelbild entfernen",
+        "cover_btn" to "Titelbild",
+        "badge_camino_guide" to "ULTREIA FÜHRER",
+        "badge_trip_guide" to "ULTREIA REISE",
+        "completed_lower" to "abgeschlossen",
+        "delete_vivencia_title" to "Erlebnis löschen?",
+        "delete_vivencia_confirm" to "Möchten Sie diese Notiz und das Foto löschen? Diese Aktion kann nicht rückgängig gemacht werden."
     )
 
     private val plStrings = mapOf(
@@ -2525,7 +2644,24 @@ object AppStrings {
         "pdf_destination_end" to "Przyjazd: Koniec",
         "pdf_executive_summary" to "PODSUMOWANIE DNIA",
         "pdf_key_tips_day" to "KLUCZOWE WSKAZÓWKI I INFORMACJE DNIA",
-        "pdf_agenda_activities" to "ZAPLANOWANE AKTYWNOŚCI I AGENDA"
+        "pdf_agenda_activities" to "ZAPLANOWANE AKTYWNOŚCI I AGENDA",
+        "itinerary_by_dates" to "Plan Podróży według Dat",
+        "camino_start_date" to "Start Szlaku",
+        "trip_start_date" to "Start Podróży",
+        "stages_completed_short" to "ukończone",
+        "cover_photo_camino_title" to "Okładka Szlaku",
+        "cover_photo_trip_title" to "Okładka Podróży",
+        "manage_cover_desc_has_cover" to "Możesz zmienić aktualne zdjęcie okładkowe lub usunąć je, aby powrócić do standardowego wyglądu.",
+        "manage_cover_desc_no_cover" to "Wybierz zdjęcie z galerii, aby ustawić je jako okładkę przewodnika i eksportu PDF.",
+        "change_cover_btn" to "Zmień zdjęcie okładki",
+        "select_cover_btn" to "Wybierz zdjęcie okładki",
+        "delete_cover_btn" to "Usuń okładkę",
+        "cover_btn" to "Okładka",
+        "badge_camino_guide" to "ULTREIA PRZEWODNIK",
+        "badge_trip_guide" to "ULTREIA PODRÓŻ",
+        "completed_lower" to "ukończono",
+        "delete_vivencia_title" to "Usunąć wspomnienie?",
+        "delete_vivencia_confirm" to "Czy chcesz usunąć tę notatkę i zdjęcie? Tej czynności nie można cofnąć."
     )
 
     private val stringsByLang: Map<LanguageMode, Map<String, String>> = mapOf(

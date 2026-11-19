@@ -306,5 +306,22 @@ val ptStrings: Map<String, String> = mapOf(
     "pdf_destination_end" to "Fim:",
     "pdf_executive_summary" to "RESUMO DO DIA E ITINERÁRIO",
     "pdf_key_tips_day" to "CONSELHOS CHAVE DO DIA",
-    "pdf_agenda_activities" to "ATIVIDADES PLANEADAS E AGENDA"
+    "pdf_agenda_activities" to "ATIVIDADES PLANEADAS E AGENDA",
+    "itinerary_by_dates" to "Itinerário por Datas",
+    "camino_start_date" to "Início do Caminho",
+    "trip_start_date" to "Início da Viagem",
+    "stages_completed_short" to "feitas",
+    "cover_photo_camino_title" to "Capa do Caminho",
+    "cover_photo_trip_title" to "Capa da Viagem",
+    "manage_cover_desc_has_cover" to "Pode alterar a foto de capa atual ou removê-la para regressar ao design padrão.",
+    "manage_cover_desc_no_cover" to "Selecione uma foto da sua galeria para definir como capa do seu guia e da exportação para PDF.",
+    "change_cover_btn" to "Alterar foto de capa",
+    "select_cover_btn" to "Selecionar foto de capa",
+    "delete_cover_btn" to "Remover capa",
+    "cover_btn" to "Capa",
+    "badge_camino_guide" to "ULTREIA GUIA",
+    "badge_trip_guide" to "ULTREIA VIAGEM",
+    "completed_lower" to "concluído",
+    "delete_vivencia_title" to "Eliminar vivência?",
+    "delete_vivencia_confirm" to "Deseja eliminar esta anotação e foto? Esta ação não pode ser desfeita."
 )

@@ -306,5 +306,22 @@ val koStrings: Map<String, String> = mapOf(
     "pdf_destination_end" to "도착:",
     "pdf_executive_summary" to "여정 요약",
     "pdf_key_tips_day" to "오늘의 주요 팁",
-    "pdf_agenda_activities" to "예정된 활동 및 일정"
+    "pdf_agenda_activities" to "예정된 활동 및 일정",
+    "itinerary_by_dates" to "날짜별 일정",
+    "camino_start_date" to "순례길 출발일",
+    "trip_start_date" to "여행 출발일",
+    "stages_completed_short" to "완료",
+    "cover_photo_camino_title" to "순례길 표지",
+    "cover_photo_trip_title" to "여행 표지",
+    "manage_cover_desc_has_cover" to "현재 표지 사진을 변경하거나 삭제하여 기본 디자인으로 되돌릴 수 있습니다.",
+    "manage_cover_desc_no_cover" to "갤러리에서 사진을 선택하여 가이드 및 PDF 내보내기 표지로 설정하세요.",
+    "change_cover_btn" to "표지 사진 변경",
+    "select_cover_btn" to "표지 사진 선택",
+    "delete_cover_btn" to "표지 삭제",
+    "cover_btn" to "표지",
+    "badge_camino_guide" to "ULTREIA 가이드",
+    "badge_trip_guide" to "ULTREIA 여행",
+    "completed_lower" to "완료됨",
+    "delete_vivencia_title" to "기록을 삭제하시겠습니까?",
+    "delete_vivencia_confirm" to "이 메모와 사진을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다."
 )
