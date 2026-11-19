@@ -522,7 +522,7 @@ fun CaminoHeaderBanner(
                     contentDescription = camino.title,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp),
+                        .height(175.dp),
                     contentScale = ContentScale.Crop
                 )
             } else if (!camino.isTravelGuide) {
@@ -531,7 +531,7 @@ fun CaminoHeaderBanner(
                     contentDescription = camino.title,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp)
+                        .height(175.dp)
                         .background(bannerBg),
                     contentScale = ContentScale.Fit
                 )
@@ -540,7 +540,7 @@ fun CaminoHeaderBanner(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp)
+                        .height(175.dp)
                         .background(bannerBg)
                 )
             }
@@ -605,21 +605,16 @@ fun CaminoHeaderBanner(
                     color = Color.White.copy(alpha = 0.85f)
                 )
 
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(5.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
                         text = "${stats.completedKm} / ${stats.totalKm} km",
                         style = MaterialTheme.typography.labelSmall,
                         color = PilgrimYellow,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "•",
-                        color = Color.White.copy(alpha = 0.5f)
                     )
                     Text(
                         text = "${stats.progressPercent}% completado",
