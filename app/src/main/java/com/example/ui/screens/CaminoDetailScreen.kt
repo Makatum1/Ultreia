@@ -494,13 +494,103 @@ fun StagesListTab(
 fun CaminoHeaderBanner(
     camino: CaminoEntity,
     stats: CaminoStats,
-    onUpdateCoverPhoto: ((String) -> Unit)? = null
+    onUpdateCoverPhoto: ((String?) -> Unit)? = null
 ) {
     val bannerBg = if (camino.isTravelGuide) Color(0xFF1C4B64) else CaminoBlue
+    var showCoverPhotoDialog by remember { mutableStateOf(false) }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { onUpdateCoverPhoto?.invoke(it.toString()) }
+    }
+
+    val hasCover = !camino.coverPhotoUri.isNullOrBlank()
+
+    if (showCoverPhotoDialog) {
+        AlertDialog(
+            onDismissRequest = { showCoverPhotoDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Image,
+                    contentDescription = null,
+                    tint = CaminoBlue,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (camino.isTravelGuide) "Portada del Viaje" else "Portada del Camino",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (hasCover) {
+                            "Puedes cambiar la foto de portada actual o eliminarla para volver al diseño estándar."
+                        } else {
+                            "Selecciona una foto de tu galería para establecerla como portada de tu guía y de la exportación a PDF."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Button(
+                        onClick = {
+                            showCoverPhotoDialog = false
+                            imagePickerLauncher.launch("image/*")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (hasCover) Icons.Default.PhotoLibrary else Icons.Default.AddPhotoAlternate,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (hasCover) "Cambiar foto de portada" else "Seleccionar foto de portada")
+                    }
+
+                    if (hasCover) {
+                        OutlinedButton(
+                            onClick = {
+                                showCoverPhotoDialog = false
+                                onUpdateCoverPhoto?.invoke(null)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Eliminar portada")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showCoverPhotoDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     Card(
@@ -516,7 +606,7 @@ fun CaminoHeaderBanner(
                 .background(bannerBg)
         ) {
             // Background Image / Color
-            if (!camino.coverPhotoUri.isNullOrBlank()) {
+            if (hasCover) {
                 AsyncImage(
                     model = camino.coverPhotoUri,
                     contentDescription = camino.title,
@@ -557,8 +647,8 @@ fun CaminoHeaderBanner(
                     )
             )
 
-            // Fecha en la esquina superior derecha (alineada a la derecha, solo texto sin icono ni recuadro)
-            if (camino.startDate.isNotBlank()) {
+            // Fecha en la esquina superior derecha: SOLO mostrar si NO hay portada
+            if (!hasCover && camino.startDate.isNotBlank()) {
                 Text(
                     text = camino.startDate,
                     fontSize = 12.sp,
@@ -575,59 +665,71 @@ fun CaminoHeaderBanner(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
-                    .padding(end = if (onUpdateCoverPhoto != null) 120.dp else 16.dp)
+                    .padding(end = if (onUpdateCoverPhoto != null) 115.dp else 16.dp)
             ) {
-                Surface(
-                    color = PilgrimYellow,
-                    shape = RoundedCornerShape(6.dp)
-                ) {
+                if (hasCover) {
+                    // Con portada: SOLO el título abajo a la izquierda, nada más
                     Text(
-                        text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
-                        fontSize = 10.sp,
+                        text = camino.title,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = CaminoBlueDark,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-
-                Spacer(Modifier.height(4.dp))
-
-                Text(
-                    text = camino.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                Text(
-                    text = camino.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f)
-                )
-
-                Spacer(Modifier.height(5.dp))
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text(
-                        text = "${stats.completedKm} / ${stats.totalKm} km",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = PilgrimYellow,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${stats.progressPercent}% completado",
-                        style = MaterialTheme.typography.labelSmall,
                         color = Color.White
                     )
+                } else {
+                    Surface(
+                        color = PilgrimYellow,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CaminoBlueDark,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Text(
+                        text = camino.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    if (camino.subtitle.isNotBlank()) {
+                        Text(
+                            text = camino.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f)
+                        )
+                    }
+
+                    Spacer(Modifier.height(5.dp))
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "${stats.completedKm} / ${stats.totalKm} km",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PilgrimYellow,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${stats.progressPercent}% completado",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White
+                        )
+                    }
                 }
             }
 
-            // Botón abajo a la derecha con símbolo de imágenes para seleccionar/cambiar portada
+            // Botón abajo a la derecha con símbolo de imágenes para gestionar portada (añadir, cambiar o eliminar)
             if (onUpdateCoverPhoto != null) {
                 Surface(
-                    onClick = { imagePickerLauncher.launch("image/*") },
+                    onClick = { showCoverPhotoDialog = true },
                     shape = RoundedCornerShape(8.dp),
                     color = Color.Black.copy(alpha = 0.55f),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),

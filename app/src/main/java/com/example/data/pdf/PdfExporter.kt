@@ -275,7 +275,6 @@ object PdfExporter {
         languageMode: LanguageMode = LanguageMode.ES
     ) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        val isTravel = camino.isTravelGuide
         val pw = PAGE_WIDTH.toFloat()
         val ph = PAGE_HEIGHT.toFloat()
 
@@ -292,56 +291,24 @@ object PdfExporter {
         val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         canvas.drawBitmap(coverBitmap, null, destRect, bmpPaint)
 
-        // 2. Degradado superior para legibilidad de cabecera
-        val topGradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f, 0f, 0f, 180f,
-                intArrayOf(Color.argb(200, 10, 25, 35), Color.argb(120, 15, 30, 45), Color.TRANSPARENT),
-                floatArrayOf(0f, 0.5f, 1f),
-                Shader.TileMode.CLAMP
-            )
-        }
-        canvas.drawRect(0f, 0f, pw, 180f, topGradientPaint)
-
-        // 3. Degradado inferior amplio para realzar título, subtítulo e información de ruta
+        // 2. Degradado inferior para máxima legibilidad del título
         val bottomGradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                0f, ph * 0.40f, 0f, ph,
+                0f, ph * 0.50f, 0f, ph,
                 intArrayOf(Color.TRANSPARENT, Color.argb(160, 10, 20, 30), Color.argb(235, 10, 20, 30)),
                 floatArrayOf(0f, 0.45f, 1f),
                 Shader.TileMode.CLAMP
             )
         }
-        canvas.drawRect(0f, ph * 0.40f, pw, ph, bottomGradientPaint)
+        canvas.drawRect(0f, ph * 0.50f, pw, ph, bottomGradientPaint)
 
-        // Marco editorial perimetral sutil
-        paint.style = Paint.Style.STROKE
-        paint.color = Color.argb(80, 255, 255, 255)
-        paint.strokeWidth = 1.5f
-        canvas.drawRect(MARGIN - 15f, MARGIN - 15f, pw - MARGIN + 15f, ph - MARGIN + 15f, paint)
-        paint.style = Paint.Style.FILL
-
-        // 4. Encabezado superior: Badge Ultreia
-        val brandTopY = MARGIN + 18f
-        paint.color = COLOR_GOLD
-        paint.textSize = 10f
-        paint.typeface = pdfTypeface(true)
-        val guideType = if (isTravel) tr("tab_trips", languageMode).uppercase() else tr("tab_caminos", languageMode).uppercase()
-        val brandText = "ULTREIA • GUÍA DE $guideType"
-        canvas.drawText(brandText, MARGIN, brandTopY, paint)
-
-        // Línea dorada bajo el badge
-        paint.color = COLOR_GOLD
-        paint.strokeWidth = 2f
-        canvas.drawLine(MARGIN, brandTopY + 8f, MARGIN + 60f, brandTopY + 8f, paint)
-
-        // 5. Bloque Inferior: Título, Subtítulo, Métricas y Pie
+        // 3. SOLO el título abajo a la izquierda, nada más
         paint.color = Color.WHITE
-        paint.textSize = 28f
+        paint.textSize = 32f
         paint.typeface = pdfTypeface(true)
         paint.setShadowLayer(6f, 0f, 2f, Color.argb(220, 0, 0, 0))
 
-        val titleMaxWidth = pw - (MARGIN * 2)
+        val titleMaxWidth = pw - (MARGIN * 2) - 20f
         val titleWords = camino.title.split(" ")
         val titleLines = mutableListOf<String>()
         var currentLine = StringBuilder()
@@ -357,21 +324,9 @@ object PdfExporter {
         }
         if (currentLine.isNotEmpty()) titleLines.add(currentLine.toString())
 
-        val subText = camino.subtitle.trim()
-        val hasSub = subText.isNotBlank()
-
-        val totalStagesCount = stages.size
-        val totalKm = stages.sumOf { it.distanceKm.toDouble() }
-        val startOrigin = stages.firstOrNull()?.origin?.trim() ?: ""
-        val endDest = stages.lastOrNull()?.destination?.trim() ?: ""
-
-        val lineSpacing = 34f
-        val titleBlockH = titleLines.size * lineSpacing
-        val subBlockH = if (hasSub) 28f else 0f
-        val statsBlockH = 50f
-        val bottomBaseY = ph - MARGIN - 30f - statsBlockH - subBlockH - titleBlockH
-
-        var currentTextY = bottomBaseY.coerceAtLeast(ph * 0.48f)
+        val lineSpacing = 38f
+        val totalBlockH = titleLines.size * lineSpacing
+        var currentTextY = ph - MARGIN - 20f - totalBlockH
 
         for (line in titleLines) {
             canvas.drawText(line, MARGIN, currentTextY, paint)
@@ -379,51 +334,6 @@ object PdfExporter {
         }
 
         paint.clearShadowLayer()
-
-        if (hasSub) {
-            paint.color = Color.rgb(230, 235, 240)
-            paint.textSize = 14f
-            paint.typeface = pdfTypeface(false)
-            paint.setShadowLayer(4f, 0f, 1f, Color.argb(180, 0, 0, 0))
-            canvas.drawText(subText, MARGIN, currentTextY, paint)
-            paint.clearShadowLayer()
-            currentTextY += 22f
-        }
-
-        // Línea divisoria dorada
-        paint.color = COLOR_GOLD
-        paint.strokeWidth = 2f
-        canvas.drawLine(MARGIN, currentTextY + 2f, MARGIN + 120f, currentTextY + 2f, paint)
-        currentTextY += 20f
-
-        // Caja de métricas destacadas
-        val cardRect = RectF(MARGIN, currentTextY, pw - MARGIN, currentTextY + 38f)
-        paint.color = Color.argb(170, 20, 35, 50)
-        canvas.drawRoundRect(cardRect, 6f, 6f, paint)
-
-        paint.style = Paint.Style.STROKE
-        paint.color = Color.argb(90, 245, 178, 30)
-        paint.strokeWidth = 1f
-        canvas.drawRoundRect(cardRect, 6f, 6f, paint)
-        paint.style = Paint.Style.FILL
-
-        val metricLabel = if (isTravel) tr("tab_days", languageMode) else tr("tab_stages", languageMode)
-        val stagesStr = "$totalStagesCount $metricLabel"
-        val kmStr = String.format(java.util.Locale.US, "%.1f km", totalKm)
-        val routeStr = if (startOrigin.isNotBlank() && endDest.isNotBlank()) "$startOrigin → $endDest" else ""
-
-        paint.color = Color.WHITE
-        paint.textSize = 11f
-        paint.typeface = pdfTypeface(true)
-        val statsY = currentTextY + 23f
-
-        val pillText = if (routeStr.isNotBlank()) {
-            "$stagesStr  •  $kmStr  •  $routeStr"
-        } else {
-            "$stagesStr  •  $kmStr"
-        }
-        canvas.drawText(pillText, MARGIN + 14f, statsY, paint)
-
         canvas.restore()
     }
 
