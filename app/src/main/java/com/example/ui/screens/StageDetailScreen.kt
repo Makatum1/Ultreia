@@ -145,9 +145,23 @@ fun StageDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
                         val stagePrefix = if (activeCamino?.isTravelGuide == true || isTravel) viewModel.string("day") else viewModel.string("stage_prefix")
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -173,41 +187,41 @@ fun StageDetailScreen(
                             }
                         }
 
+                        Spacer(Modifier.height(5.dp))
+
                         val originClean = stage.origin.trim().ifBlank { "—" }
                         val destClean = stage.destination.trim().ifBlank { "—" }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(
-                                text = originClean,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = destClean,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                        Text(
+                            text = originClean,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Text(
+                            text = destClean,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        )
                     }
-                },
-                actions = {
+
                     IconButton(
                         onClick = { showEditStageDialog = true },
                         modifier = Modifier.testTag("stage_edit_button")
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Editar etapa", tint = CaminoBlue)
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
+                }
+            }
         }
     ) { innerPadding ->
         LazyColumn(
