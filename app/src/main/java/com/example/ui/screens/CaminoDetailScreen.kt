@@ -603,6 +603,7 @@ fun CaminoHeaderBanner(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .defaultMinSize(minHeight = 175.dp)
                 .background(bannerBg)
         ) {
             // Background Image / Color
@@ -610,9 +611,7 @@ fun CaminoHeaderBanner(
                 AsyncImage(
                     model = camino.coverPhotoUri,
                     contentDescription = camino.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(175.dp),
+                    modifier = Modifier.matchParentSize(),
                     contentScale = ContentScale.Crop
                 )
             } else if (!camino.isTravelGuide) {
@@ -620,8 +619,7 @@ fun CaminoHeaderBanner(
                     painter = painterResource(id = R.drawable.ic_ultreia_logo),
                     contentDescription = camino.title,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(175.dp)
+                        .matchParentSize()
                         .background(bannerBg),
                     contentScale = ContentScale.Fit
                 )
@@ -629,8 +627,7 @@ fun CaminoHeaderBanner(
                 // Perfil Viajes sin foto: solo el color #1C4B64 sin nada más
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(175.dp)
+                        .matchParentSize()
                         .background(bannerBg)
                 )
             }
@@ -647,103 +644,114 @@ fun CaminoHeaderBanner(
                     )
             )
 
-            // Fecha en la esquina superior derecha (alineada a la derecha, solo texto sin icono ni recuadro)
-            if (camino.startDate.isNotBlank()) {
-                Text(
-                    text = camino.startDate,
-                    fontSize = 12.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(14.dp)
-                )
-            }
-
-            // Header Texts (diseño del título unificado con o sin portada)
+            // Contenido completo de la cabecera ceñido a los márgenes
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
                     .padding(16.dp)
-                    .padding(end = if (onUpdateCoverPhoto != null) 125.dp else 16.dp)
             ) {
-                Surface(
-                    color = PilgrimYellow,
-                    shape = RoundedCornerShape(6.dp)
+                // Fila superior: Badge a la izquierda y Fecha a la derecha
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CaminoBlueDark,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    Surface(
+                        color = PilgrimYellow,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = if (camino.isTravelGuide) "ULTREIA VIAJE" else "ULTREIA GUÍA",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CaminoBlueDark,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    if (camino.startDate.isNotBlank()) {
+                        Text(
+                            text = camino.startDate,
+                            fontSize = 12.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
 
+                // Título del camino/viaje a toda la línea
                 Text(
                     text = camino.title,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
+                // Descripción o itinerario: usa toda la línea, sin cortar texto, ceñido a los márgenes
                 if (camino.subtitle.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         text = camino.subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.85f)
+                        color = Color.White.copy(alpha = 0.90f),
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(10.dp))
 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                // Fila inferior: Métricas (km y %) a la izquierda, Botón Portada a la derecha
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Text(
-                        text = "${stats.completedKm} / ${stats.totalKm} km",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = PilgrimYellow,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${stats.progressPercent}% completado",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
-                    )
-                }
-            }
-
-            // Botón abajo a la derecha con símbolo de imágenes para gestionar portada (añadir, cambiar o eliminar)
-            if (onUpdateCoverPhoto != null) {
-                Surface(
-                    onClick = { showCoverPhotoDialog = true },
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color.Black.copy(alpha = 0.55f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Image,
-                            contentDescription = if (hasCover) "1 Portada" else "Portada",
-                            tint = Color.White,
-                            modifier = Modifier.size(15.dp)
+                        Text(
+                            text = "${stats.completedKm} / ${stats.totalKm} km",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PilgrimYellow,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (hasCover) "1 Portada" else "Portada",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
+                            text = "${stats.progressPercent}% completado",
+                            style = MaterialTheme.typography.labelSmall,
                             color = Color.White
                         )
+                    }
+
+                    // Botón abajo a la derecha para gestionar portada (añadir, cambiar o eliminar)
+                    if (onUpdateCoverPhoto != null) {
+                        Surface(
+                            onClick = { showCoverPhotoDialog = true },
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.Black.copy(alpha = 0.55f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Image,
+                                    contentDescription = if (hasCover) "1 Portada" else "Portada",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = if (hasCover) "1 Portada" else "Portada",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White
+                                )
+                            }
+                        }
                     }
                 }
             }

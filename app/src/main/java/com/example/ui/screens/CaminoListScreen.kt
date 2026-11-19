@@ -535,8 +535,7 @@ fun CaminoItemCard(
                     Text(
                         text = camino.subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.85f),
-                        maxLines = 1
+                        color = Color.White.copy(alpha = 0.85f)
                     )
                 }
 
