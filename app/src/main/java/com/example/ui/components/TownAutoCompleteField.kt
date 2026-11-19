@@ -59,7 +59,7 @@ fun TownAutoCompleteField(
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor()
+                .menuAnchor(MenuAnchorType.PrimaryEditable, enabled = true)
         )
 
         if (suggestions.isNotEmpty()) {

@@ -646,7 +646,7 @@ fun StageDetailScreen(
                     }
                 }
             } else {
-                items(accommodations) { acc ->
+                items(accommodations, key = { it.id }) { acc ->
                     AccommodationCard(
                         acc = acc,
                         viewModel = viewModel,
@@ -725,7 +725,7 @@ fun StageDetailScreen(
                     }
                 }
             } else {
-                items(vivencias) { viv ->
+                items(vivencias, key = { it.id }) { viv ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

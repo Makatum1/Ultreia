@@ -359,7 +359,7 @@ fun CaminoListScreen(
                     }
                 }
             } else {
-                items(filteredCaminos) { camino ->
+                items(filteredCaminos, key = { it.id }) { camino ->
                     CaminoItemCard(
                         camino = camino,
                         viewModel = viewModel,

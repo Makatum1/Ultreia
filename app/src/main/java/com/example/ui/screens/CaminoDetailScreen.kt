@@ -432,7 +432,7 @@ fun StagesListTab(
                 }
             }
         } else {
-            items(stages) { stage ->
+            items(stages, key = { it.id }) { stage ->
                 val stageDate = viewModel.resolveStageDate(stage)
                 val isToday = remember(stageDate) { AppStrings.isToday(stageDate) }
 

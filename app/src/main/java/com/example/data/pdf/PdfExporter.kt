@@ -724,9 +724,15 @@ object PdfExporter {
             val mapBox = RectF(MARGIN, bannerY + 4f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 35f)
             drawMultiStageMapOnCanvas(context, canvas, stages, mapBox, isTravel)
             drawEditorialFooter(canvas, pageNumber, isTravel, camino.title, languageMode)
+            if (isTravel && titleIcon != null) {
+                try { titleIcon.recycle() } catch (_: Exception) {}
+            }
             true
         } else {
             drawEditorialFooter(canvas, pageNumber, isTravel, camino.title, languageMode)
+            if (isTravel && titleIcon != null) {
+                try { titleIcon.recycle() } catch (_: Exception) {}
+            }
             false
         }
 
@@ -1495,7 +1501,10 @@ object PdfExporter {
         canvas.drawText("ULTREIA ET SUSEIA", PAGE_WIDTH - MARGIN - 146f, PAGE_HEIGHT - 74f, paint)
 
         // Footer
-        drawEditorialFooter(canvas, 1, isTravel, camino?.title ?: "")
+        drawEditorialFooter(canvas, 1, isTravel, camino?.title ?: "", languageMode)
+        if (isTravel && statsIcon != null) {
+            try { statsIcon.recycle() } catch (_: Exception) {}
+        }
     }
 
     // ----------------------------------------------------

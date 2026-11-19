@@ -172,16 +172,16 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         _languageMode.value = mode
         try {
             val locale = when (mode) {
-                LanguageMode.ES -> Locale("es", "ES")
-                LanguageMode.EN -> Locale("en", "US")
-                LanguageMode.FR -> Locale("fr", "FR")
-                LanguageMode.IT -> Locale("it", "IT")
-                LanguageMode.DE -> Locale("de", "DE")
-                LanguageMode.NL -> Locale("nl", "NL")
-                LanguageMode.PL -> Locale("pl", "PL")
-                LanguageMode.ZH -> Locale("zh", "CN")
-                LanguageMode.KO -> Locale("ko", "KR")
-                LanguageMode.PT -> Locale("pt", "PT")
+                LanguageMode.ES -> Locale.forLanguageTag("es-ES")
+                LanguageMode.EN -> Locale.forLanguageTag("en-US")
+                LanguageMode.FR -> Locale.forLanguageTag("fr-FR")
+                LanguageMode.IT -> Locale.forLanguageTag("it-IT")
+                LanguageMode.DE -> Locale.forLanguageTag("de-DE")
+                LanguageMode.NL -> Locale.forLanguageTag("nl-NL")
+                LanguageMode.PL -> Locale.forLanguageTag("pl-PL")
+                LanguageMode.ZH -> Locale.forLanguageTag("zh-CN")
+                LanguageMode.KO -> Locale.forLanguageTag("ko-KR")
+                LanguageMode.PT -> Locale.forLanguageTag("pt-PT")
             }
             Locale.setDefault(locale)
         } catch (_: Exception) {}
