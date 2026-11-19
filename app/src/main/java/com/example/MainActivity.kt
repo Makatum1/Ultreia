@@ -208,23 +208,17 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
         }
     }
 
-    // Default select first or last active Camino/Trip if none is selected
+    // Default select first or last active Camino/Trip for the active profile if none is selected
     LaunchedEffect(caminos, selectedCamino, isTravelProfile) {
         if (selectedCamino == null && caminos.isNotEmpty()) {
+            val filtered = caminos.filter { it.isTravelGuide == isTravelProfile }
             val prefs = context.getSharedPreferences("ultreia_prefs", android.content.Context.MODE_PRIVATE)
-            val lastItemId = prefs.getLong("last_active_item_id", -1L)
-            val item = if (lastItemId != -1L) caminos.firstOrNull { it.id == lastItemId } else null
-            if (item != null) {
-                viewModel.selectCamino(item.id)
-            } else {
-                val filtered = caminos.filter { it.isTravelGuide == isTravelProfile }
-                val key = if (isTravelProfile) "last_active_trip_id" else "last_active_camino_id"
-                val lastId = prefs.getLong(key, -1L)
-                if (lastId != -1L && filtered.any { it.id == lastId }) {
-                    viewModel.selectCamino(lastId)
-                } else {
-                    filtered.firstOrNull()?.let { viewModel.selectCamino(it.id) }
-                }
+            val key = if (isTravelProfile) "last_active_trip_id" else "last_active_camino_id"
+            val lastId = prefs.getLong(key, -1L)
+            val target = (if (lastId != -1L) filtered.firstOrNull { it.id == lastId } else null)
+                ?: filtered.firstOrNull()
+            if (target != null) {
+                viewModel.selectCamino(target.id)
             }
         }
     }

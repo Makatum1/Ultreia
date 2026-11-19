@@ -629,8 +629,8 @@ fun CaminoHeaderBanner(
                 }
             }
 
-            // Botón abajo a la derecha con símbolo de imágenes para cambiar el fondo
-            if (camino.isTravelGuide && onUpdateCoverPhoto != null) {
+            // Botón abajo a la derecha con símbolo de imágenes para seleccionar/cambiar portada
+            if (onUpdateCoverPhoto != null) {
                 Surface(
                     onClick = { imagePickerLauncher.launch("image/*") },
                     shape = RoundedCornerShape(8.dp),
@@ -647,12 +647,12 @@ fun CaminoHeaderBanner(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Image,
-                            contentDescription = "Cambiar fondo",
+                            contentDescription = "Portada",
                             tint = Color.White,
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
-                            text = "Cambiar fondo",
+                            text = "Portada",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.White

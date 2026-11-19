@@ -72,11 +72,25 @@ object PdfExporter {
         try {
             var pageNumber = 1
 
-            // ---------------- PAGE 1: PORTADA & RESUMEN GENERAL ----------------
+            // ---------------- PORTADA COMPLETA DEDICADA (PÁGINA 1) ----------------
+            // Si el usuario ha seleccionado una imagen de portada, se genera como página 1
+            if (!camino.coverPhotoUri.isNullOrBlank()) {
+                val coverBmp = loadBitmapFromUri(context, camino.coverPhotoUri)
+                if (coverBmp != null) {
+                    val pageInfoCover = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
+                    val pageCover = pdfDocument.startPage(pageInfoCover)
+                    drawFullCoverPage(context, pageCover.canvas, camino, stages, coverBmp, languageMode)
+                    pdfDocument.finishPage(pageCover)
+                    coverBmp.recycle()
+                    pageNumber++
+                }
+            }
+
+            // ---------------- RESUMEN GENERAL E ITINERARIO ----------------
             val pageInfo1 = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
             val page1 = pdfDocument.startPage(pageInfo1)
             val canvas1 = page1.canvas
-            val mapDrawnOnCover = drawCoverPage(context, canvas1, camino, stages, repository, languageMode)
+            val mapDrawnOnCover = drawCoverPage(context, canvas1, camino, stages, repository, pageNumber, languageMode)
             pdfDocument.finishPage(page1)
             pageNumber++
 
@@ -221,11 +235,24 @@ object PdfExporter {
         }
     }
 
-    private fun loadBitmapFromUri(context: Context, uriStr: String): Bitmap? {
+    private fun loadBitmapFromUri(context: Context, uriStr: String, maxWidth: Int = 1200, maxHeight: Int = 1800): Bitmap? {
         return try {
             val uri = Uri.parse(uriStr)
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            openInputStreamForUri(context, uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, boundsOpts)
+            }
+            val origW = boundsOpts.outWidth
+            val origH = boundsOpts.outHeight
+            if (origW <= 0 || origH <= 0) return null
+
+            var sampleSize = 1
+            while (origW / (sampleSize * 2) >= maxWidth && origH / (sampleSize * 2) >= maxHeight) {
+                sampleSize *= 2
+            }
+
             val decodeOpts = BitmapFactory.Options().apply {
-                inScaled = false
+                inSampleSize = sampleSize
                 inPreferredConfig = Bitmap.Config.ARGB_8888
             }
             openInputStreamForUri(context, uri)?.use { stream ->
@@ -237,7 +264,171 @@ object PdfExporter {
     }
 
     // ----------------------------------------------------
-    // COVER PAGE (PORTADA EDITORIAL PROFESIONAL)
+    // FULL COVER PAGE (PORTADA EDITORIAL EXCLUSIVA PÁGINA 1)
+    // ----------------------------------------------------
+    private fun drawFullCoverPage(
+        context: Context,
+        canvas: Canvas,
+        camino: CaminoEntity,
+        stages: List<StageEntity>,
+        coverBitmap: Bitmap,
+        languageMode: LanguageMode = LanguageMode.ES
+    ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val isTravel = camino.isTravelGuide
+        val pw = PAGE_WIDTH.toFloat()
+        val ph = PAGE_HEIGHT.toFloat()
+
+        // 1. Dibujar la imagen de portada ocupando toda la página (center crop)
+        canvas.save()
+        canvas.clipRect(0f, 0f, pw, ph)
+
+        val scale = maxOf(pw / coverBitmap.width.toFloat(), ph / coverBitmap.height.toFloat())
+        val scaledW = coverBitmap.width * scale
+        val scaledH = coverBitmap.height * scale
+        val dx = (pw - scaledW) / 2f
+        val dy = (ph - scaledH) / 2f
+        val destRect = RectF(dx, dy, dx + scaledW, dy + scaledH)
+        val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(coverBitmap, null, destRect, bmpPaint)
+
+        // 2. Degradado superior para legibilidad de cabecera
+        val topGradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f, 0f, 0f, 180f,
+                intArrayOf(Color.argb(200, 10, 25, 35), Color.argb(120, 15, 30, 45), Color.TRANSPARENT),
+                floatArrayOf(0f, 0.5f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, 0f, pw, 180f, topGradientPaint)
+
+        // 3. Degradado inferior amplio para realzar título, subtítulo e información de ruta
+        val bottomGradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f, ph * 0.40f, 0f, ph,
+                intArrayOf(Color.TRANSPARENT, Color.argb(160, 10, 20, 30), Color.argb(235, 10, 20, 30)),
+                floatArrayOf(0f, 0.45f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, ph * 0.40f, pw, ph, bottomGradientPaint)
+
+        // Marco editorial perimetral sutil
+        paint.style = Paint.Style.STROKE
+        paint.color = Color.argb(80, 255, 255, 255)
+        paint.strokeWidth = 1.5f
+        canvas.drawRect(MARGIN - 15f, MARGIN - 15f, pw - MARGIN + 15f, ph - MARGIN + 15f, paint)
+        paint.style = Paint.Style.FILL
+
+        // 4. Encabezado superior: Badge Ultreia
+        val brandTopY = MARGIN + 18f
+        paint.color = COLOR_GOLD
+        paint.textSize = 10f
+        paint.typeface = pdfTypeface(true)
+        val guideType = if (isTravel) tr("tab_trips", languageMode).uppercase() else tr("tab_caminos", languageMode).uppercase()
+        val brandText = "ULTREIA • GUÍA DE $guideType"
+        canvas.drawText(brandText, MARGIN, brandTopY, paint)
+
+        // Línea dorada bajo el badge
+        paint.color = COLOR_GOLD
+        paint.strokeWidth = 2f
+        canvas.drawLine(MARGIN, brandTopY + 8f, MARGIN + 60f, brandTopY + 8f, paint)
+
+        // 5. Bloque Inferior: Título, Subtítulo, Métricas y Pie
+        paint.color = Color.WHITE
+        paint.textSize = 28f
+        paint.typeface = pdfTypeface(true)
+        paint.setShadowLayer(6f, 0f, 2f, Color.argb(220, 0, 0, 0))
+
+        val titleMaxWidth = pw - (MARGIN * 2)
+        val titleWords = camino.title.split(" ")
+        val titleLines = mutableListOf<String>()
+        var currentLine = StringBuilder()
+
+        for (word in titleWords) {
+            val candidate = if (currentLine.isEmpty()) word else "$currentLine $word"
+            if (paint.measureText(candidate) <= titleMaxWidth) {
+                currentLine.append(if (currentLine.isEmpty()) word else " $word")
+            } else {
+                if (currentLine.isNotEmpty()) titleLines.add(currentLine.toString())
+                currentLine = StringBuilder(word)
+            }
+        }
+        if (currentLine.isNotEmpty()) titleLines.add(currentLine.toString())
+
+        val subText = camino.subtitle.trim()
+        val hasSub = subText.isNotBlank()
+
+        val totalStagesCount = stages.size
+        val totalKm = stages.sumOf { it.distanceKm.toDouble() }
+        val startOrigin = stages.firstOrNull()?.origin?.trim() ?: ""
+        val endDest = stages.lastOrNull()?.destination?.trim() ?: ""
+
+        val lineSpacing = 34f
+        val titleBlockH = titleLines.size * lineSpacing
+        val subBlockH = if (hasSub) 28f else 0f
+        val statsBlockH = 50f
+        val bottomBaseY = ph - MARGIN - 30f - statsBlockH - subBlockH - titleBlockH
+
+        var currentTextY = bottomBaseY.coerceAtLeast(ph * 0.48f)
+
+        for (line in titleLines) {
+            canvas.drawText(line, MARGIN, currentTextY, paint)
+            currentTextY += lineSpacing
+        }
+
+        paint.clearShadowLayer()
+
+        if (hasSub) {
+            paint.color = Color.rgb(230, 235, 240)
+            paint.textSize = 14f
+            paint.typeface = pdfTypeface(false)
+            paint.setShadowLayer(4f, 0f, 1f, Color.argb(180, 0, 0, 0))
+            canvas.drawText(subText, MARGIN, currentTextY, paint)
+            paint.clearShadowLayer()
+            currentTextY += 22f
+        }
+
+        // Línea divisoria dorada
+        paint.color = COLOR_GOLD
+        paint.strokeWidth = 2f
+        canvas.drawLine(MARGIN, currentTextY + 2f, MARGIN + 120f, currentTextY + 2f, paint)
+        currentTextY += 20f
+
+        // Caja de métricas destacadas
+        val cardRect = RectF(MARGIN, currentTextY, pw - MARGIN, currentTextY + 38f)
+        paint.color = Color.argb(170, 20, 35, 50)
+        canvas.drawRoundRect(cardRect, 6f, 6f, paint)
+
+        paint.style = Paint.Style.STROKE
+        paint.color = Color.argb(90, 245, 178, 30)
+        paint.strokeWidth = 1f
+        canvas.drawRoundRect(cardRect, 6f, 6f, paint)
+        paint.style = Paint.Style.FILL
+
+        val metricLabel = if (isTravel) tr("tab_days", languageMode) else tr("tab_stages", languageMode)
+        val stagesStr = "$totalStagesCount $metricLabel"
+        val kmStr = String.format(java.util.Locale.US, "%.1f km", totalKm)
+        val routeStr = if (startOrigin.isNotBlank() && endDest.isNotBlank()) "$startOrigin → $endDest" else ""
+
+        paint.color = Color.WHITE
+        paint.textSize = 11f
+        paint.typeface = pdfTypeface(true)
+        val statsY = currentTextY + 23f
+
+        val pillText = if (routeStr.isNotBlank()) {
+            "$stagesStr  •  $kmStr  •  $routeStr"
+        } else {
+            "$stagesStr  •  $kmStr"
+        }
+        canvas.drawText(pillText, MARGIN + 14f, statsY, paint)
+
+        canvas.restore()
+    }
+
+    // ----------------------------------------------------
+    // COVER PAGE (RESUMEN EDITORIAL E ITINERARIO)
     // ----------------------------------------------------
     private fun drawCoverPage(
         context: Context,
@@ -245,6 +436,7 @@ object PdfExporter {
         camino: CaminoEntity,
         stages: List<StageEntity>,
         repository: CaminoRepository,
+        pageNumber: Int = 1,
         languageMode: LanguageMode = LanguageMode.ES
     ): Boolean {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -531,10 +723,10 @@ object PdfExporter {
             )
             val mapBox = RectF(MARGIN, bannerY + 4f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 35f)
             drawMultiStageMapOnCanvas(context, canvas, stages, mapBox, isTravel)
-            drawEditorialFooter(canvas, 1, isTravel, camino.title)
+            drawEditorialFooter(canvas, pageNumber, isTravel, camino.title, languageMode)
             true
         } else {
-            drawEditorialFooter(canvas, 1, isTravel, camino.title)
+            drawEditorialFooter(canvas, pageNumber, isTravel, camino.title, languageMode)
             false
         }
 

@@ -80,6 +80,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         if (targetId != null) {
             _selectedCaminoId.value = targetId
             _selectedStageId.value = null
+            _currentDestination.value = NavigationDestination.CaminoDetail(targetId)
+            _currentTab.value = MainTab.STAGES
             val editor = prefs.edit()
             editor.putLong("last_active_item_id", targetId)
             editor.putBoolean("last_active_is_travel", isTravel)
@@ -94,6 +96,8 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             _selectedCaminoId.value = null
             _selectedStageId.value = null
+            _currentDestination.value = NavigationDestination.CaminoList
+            _currentTab.value = MainTab.CAMINOS
         }
     }
 
@@ -233,13 +237,15 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     val savedTripId = prefs.getLong("last_active_trip_id", -1L)
                     val savedCaminoId = prefs.getLong("last_active_camino_id", -1L)
 
-                    val target = (if (savedItemId != -1L) allCams.firstOrNull { it.id == savedItemId } else null)
-                        ?: (if (savedIsTravel) {
-                            allCams.firstOrNull { it.id == savedTripId } ?: allCams.firstOrNull { it.isTravelGuide }
-                        } else {
-                            allCams.firstOrNull { it.id == savedCaminoId } ?: allCams.firstOrNull { !it.isTravelGuide }
-                        })
-                        ?: allCams.firstOrNull()
+                    val target = if (savedIsTravel) {
+                        allCams.firstOrNull { it.id == savedTripId }
+                            ?: (if (savedItemId != -1L) allCams.firstOrNull { it.id == savedItemId && it.isTravelGuide } else null)
+                            ?: allCams.firstOrNull { it.isTravelGuide }
+                    } else {
+                        allCams.firstOrNull { it.id == savedCaminoId }
+                            ?: (if (savedItemId != -1L) allCams.firstOrNull { it.id == savedItemId && !it.isTravelGuide } else null)
+                            ?: allCams.firstOrNull { !it.isTravelGuide }
+                    }
 
                     if (target != null) {
                         _isTravelProfile.value = target.isTravelGuide
@@ -252,6 +258,11 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                         } else {
                             _lastSelectedCaminoId = target.id
                         }
+                    } else {
+                        _isTravelProfile.value = savedIsTravel
+                        _selectedCaminoId.value = null
+                        _currentDestination.value = NavigationDestination.CaminoList
+                        _currentTab.value = MainTab.CAMINOS
                     }
                 }
             } catch (_: Exception) {}
