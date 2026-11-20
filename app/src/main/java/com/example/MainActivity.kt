@@ -116,7 +116,7 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
                 contentDescription = "Portada Ultreia",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                alignment = BiasAlignment(0.08f, 0f)
+                alignment = Alignment.Center
             )
         }
         return
