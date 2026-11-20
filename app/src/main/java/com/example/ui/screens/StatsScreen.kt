@@ -200,7 +200,7 @@ fun StatsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.PictureAsPdf,
-                            contentDescription = "Exportar Datos a PDF",
+                            contentDescription = viewModel.string("export_pdf"),
                             tint = CaminoBlue
                         )
                     }
@@ -759,7 +759,7 @@ private fun ActiveCaminoDataContent(
             ) {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("${viewModel.string("export_report_pdf")} ($routeTerm)", color = CaminoBlue, fontWeight = FontWeight.SemiBold)
+                Text(viewModel.string("export_pdf"), color = CaminoBlue, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -1052,7 +1052,7 @@ private fun GlobalTotalDataContent(
             ) {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(viewModel.string("export_global_report_pdf"), color = CaminoBlue, fontWeight = FontWeight.SemiBold)
+                Text(viewModel.string("export_pdf"), color = CaminoBlue, fontWeight = FontWeight.SemiBold)
             }
         }
 
