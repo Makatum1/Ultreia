@@ -49,7 +49,7 @@ val koStrings: Map<String, String> = mapOf(
     "lang_pt" to "포르투갈어",
     "export_pdf" to "PDF 내보내기",
     "export_pdf_desc" to "구간, 숙소 세부 정보, 지도 및 통계가 포함된 완전한 가이드를 생성합니다.",
-    "export_json" to "내보내기",
+    "export_json" to "JSON 내보내기",
     "stage_tips" to "구간 팁",
     "trip_tips" to "여행 요약",
     "see_more" to "더 보기",

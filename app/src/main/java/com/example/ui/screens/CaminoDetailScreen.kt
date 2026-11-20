@@ -129,7 +129,7 @@ fun CaminoDetailScreen(
                     ) {
                         Icon(
                             Icons.Default.FileUpload,
-                            contentDescription = "Exportar ${camino.title}",
+                            contentDescription = viewModel.string("export_json"),
                             tint = CaminoBlue
                         )
                     }
@@ -328,6 +328,7 @@ fun StagesListTab(
                     onClick = { viewModel.exportToPdf(context) },
                     colors = ButtonDefaults.buttonColors(containerColor = CaminoBlue),
                     shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier
                         .weight(1f)
                         .testTag("btn_export_pdf_camino")
@@ -337,13 +338,16 @@ fun StagesListTab(
                     Text(
                         text = viewModel.string("export_pdf"),
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
                 OutlinedButton(
                     onClick = { viewModel.exportSingleCaminoJson(context, camino.id) },
                     shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier
                         .weight(1f)
                         .testTag("btn_export_json_camino")
@@ -353,7 +357,9 @@ fun StagesListTab(
                     Text(
                         text = viewModel.string("export_json"),
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }

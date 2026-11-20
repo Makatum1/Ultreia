@@ -49,7 +49,7 @@ val ptStrings: Map<String, String> = mapOf(
     "lang_pt" to "Português",
     "export_pdf" to "Exportar PDF",
     "export_pdf_desc" to "Gera um documento completo com etapas, detalhes de alojamento, mapas e estatísticas.",
-    "export_json" to "Exportar",
+    "export_json" to "Exportar JSON",
     "stage_tips" to "Conselhos do Dia",
     "trip_tips" to "Resumo do Dia",
     "see_more" to "Ver mais",
