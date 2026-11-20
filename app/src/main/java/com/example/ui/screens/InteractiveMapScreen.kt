@@ -47,9 +47,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.CaminoViewModel
 import com.example.R
@@ -771,32 +768,6 @@ fun InteractiveMapScreen(
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
 
-    // Gestión del ciclo de vida de MapView y liberación de GPS al salir
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, mapViewRef) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> mapViewRef?.onResume()
-                Lifecycle.Event.ON_PAUSE -> {
-                    locationOverlayRef?.disableMyLocation()
-                    mapViewRef?.onPause()
-                }
-                Lifecycle.Event.ON_DESTROY -> {
-                    locationOverlayRef?.disableMyLocation()
-                    mapViewRef?.onDetach()
-                }
-                else -> {}
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            locationOverlayRef?.disableMyLocation()
-            mapViewRef?.onPause()
-            mapViewRef?.onDetach()
-        }
-    }
-
     // Launcher de permisos de ubicación
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -1098,11 +1069,6 @@ fun InteractiveMapScreen(
             },
             update = { mapView ->
                 mapViewRef = mapView
-            },
-            onRelease = { mapView ->
-                locationOverlayRef?.disableMyLocation()
-                mapView.onPause()
-                mapView.onDetach()
             }
         )
 
