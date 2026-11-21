@@ -15,6 +15,7 @@ import com.example.data.model.CaminoEntity
 import com.example.data.model.StageEntity
 import com.example.data.model.VivenciaItem
 import com.example.data.repository.CaminoRepository
+import com.example.data.sample.PredefinedRoutesData
 import com.example.ui.settings.AppStrings
 import com.example.ui.settings.LanguageMode
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,7 @@ object PdfExporter {
     private val COLOR_DIVIDER = Color.rgb(238, 242, 246)
     private val COLOR_WARM_BG = Color.rgb(255, 253, 247)
     private val COLOR_WARM_BORDER = Color.rgb(243, 230, 200)
+    private val COLOR_RED = Color.rgb(220, 38, 38)
 
     private fun tr(key: String, languageMode: LanguageMode): String = AppStrings.get(key, languageMode)
 
@@ -831,10 +833,13 @@ object PdfExporter {
             )
 
             // Micro 4: Dificultad
-            val diffColor = when (stage.difficulty.lowercase()) {
-                "fácil", "facil", "easy", "facile", "简单", "makkelijk", "einfach", "łatwy" -> COLOR_EMERALD
-                "moderada", "moderate", "modérée", "media", "中等", "gemiddeld", "mittel", "umiarkowany" -> COLOR_BLUE
-                else -> COLOR_AMBER
+            val diffLower = stage.difficulty.lowercase()
+            val diffColor = when {
+                diffLower.contains("muy") || diffLower.contains("schwer") -> COLOR_RED
+                diffLower.contains("exig") || diffLower.contains("demand") || diffLower.contains("impeg") || diffLower.contains("anspruch") -> COLOR_AMBER
+                diffLower.contains("mod") || diffLower.contains("media") -> COLOR_BLUE
+                diffLower.contains("fác") || diffLower.contains("fac") || diffLower.contains("easy") -> COLOR_EMERALD
+                else -> COLOR_BLUE
             }
             drawMetricBox(
                 canvas = canvas,
@@ -843,7 +848,7 @@ object PdfExporter {
                 w = cardW,
                 h = cardH,
                 label = tr("difficulty", languageMode).uppercase(),
-                value = stage.difficulty.ifBlank { "—" },
+                value = PredefinedRoutesData.getLocalizedDifficulty(stage.difficulty, languageMode).ifBlank { "—" },
                 accentColor = diffColor,
                 bgColor = COLOR_CARD_BG,
                 borderColor = COLOR_CARD_BORDER

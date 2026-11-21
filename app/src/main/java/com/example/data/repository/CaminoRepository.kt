@@ -136,17 +136,24 @@ class CaminoRepository(val context: Context) {
         val updatedDest = if (!parseResult.destination.isNullOrBlank()) parseResult.destination else stage.destination
 
         val timeStr = if (parseResult.formattedTime.isNotBlank()) parseResult.formattedTime else stage.estimatedTime
+        val dist = if (parseResult.distanceKm > 0) parseResult.distanceKm else stage.distanceKm
+        val gain = if (parseResult.elevationGainM > 0) parseResult.elevationGainM else stage.elevationGainM
+        val loss = if (parseResult.elevationLossM > 0) parseResult.elevationLossM else stage.elevationLossM
+        val hours = if (parseResult.estimatedHours > 0) parseResult.estimatedHours else parseHours(timeStr)
+
+        val autoDifficulty = calculateAutoDifficulty(dist, gain, loss, hours)
 
         val serializedPoints = GpxParser.serializePoints(parseResult.points)
 
-        // No se modifica origen ni destino; se actualizan únicamente distancia, desniveles acumulados y tiempo
+        // No se modifica origen ni destino; se actualizan distancia, desniveles acumulados, tiempo y dificultad calculada
         val updatedStage = stage.copy(
             origin = stage.origin,
             destination = stage.destination,
-            distanceKm = if (parseResult.distanceKm > 0) parseResult.distanceKm else stage.distanceKm,
-            elevationGainM = if (parseResult.elevationGainM > 0) parseResult.elevationGainM else stage.elevationGainM,
-            elevationLossM = if (parseResult.elevationLossM > 0) parseResult.elevationLossM else stage.elevationLossM,
+            distanceKm = dist,
+            elevationGainM = gain,
+            elevationLossM = loss,
             estimatedTime = timeStr,
+            difficulty = autoDifficulty,
             gpxTrackJson = serializedPoints,
             isCompleted = if (markAsCompleted) true else stage.isCompleted
         )
@@ -205,5 +212,65 @@ class CaminoRepository(val context: Context) {
             completedElevationGainM = completedElevationGain,
             progressPercent = percent
         )
+    }
+
+    companion object {
+        fun parseHours(timeStr: String): Double {
+            try {
+                val hMatch = Regex("(\\d+)\\s*h", RegexOption.IGNORE_CASE).find(timeStr)
+                val mMatch = Regex("(\\d+)\\s*m", RegexOption.IGNORE_CASE).find(timeStr)
+                if (hMatch != null || mMatch != null) {
+                    val h = hMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                    val m = mMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                    return h + (m / 60.0)
+                }
+                val colonParts = timeStr.split(":")
+                if (colonParts.size >= 2) {
+                    val h = colonParts[0].trim().toDoubleOrNull() ?: 0.0
+                    val m = colonParts[1].trim().toDoubleOrNull() ?: 0.0
+                    return h + (m / 60.0)
+                }
+            } catch (_: Exception) {}
+            return 0.0
+        }
+
+        /**
+         * Puntuación para el cálculo de dificultad:
+         * Distancia: <15km (0 pts), 15-25km (1 pt), >25km (2 pts)
+         * Desnivel +: <300m (0 pts), 300-700m (1 pt), >700m (2 pts)
+         * Desnivel -: <300m (0 pts), 300-700m (1 pt), >700m (2 pts)
+         * Tiempo: <4h (0 pts), 4-6h (1 pt), >6h (2 pts)
+         * Suma de puntos: 0-2 (Fácil), 3-4 (Moderado), 5-6 (Exigente), 7+ (Muy Difícil)
+         */
+        fun calculateAutoDifficulty(distanceKm: Double, elevationGainM: Int, elevationLossM: Int, hours: Double): String {
+            var points = 0
+            points += when {
+                distanceKm < 15.0 -> 0
+                distanceKm <= 25.0 -> 1
+                else -> 2
+            }
+            points += when {
+                elevationGainM < 300 -> 0
+                elevationGainM <= 700 -> 1
+                else -> 2
+            }
+            points += when {
+                elevationLossM < 300 -> 0
+                elevationLossM <= 700 -> 1
+                else -> 2
+            }
+            points += when {
+                hours < 4.0 -> 0
+                hours <= 6.0 -> 1
+                else -> 2
+            }
+
+            return when {
+                points <= 2 -> "Fácil"
+                points <= 4 -> "Moderado"
+                points <= 6 -> "Exigente"
+                else -> "Muy Difícil"
+            }
+        }
     }
 }

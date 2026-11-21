@@ -1430,19 +1430,19 @@ object PredefinedRoutesData {
     fun getLocalizedDifficulty(diff: String, mode: LanguageMode): String {
         val clean = diff.trim().lowercase()
         return when {
-            clean.contains("muy") || clean.contains("very") || clean.contains("sehr") || clean.contains("très") || clean.contains("molto") || clean.contains("zeer") || clean.contains("bardzo") || clean.contains("极") -> when (mode) {
-                LanguageMode.ES -> "Muy exigente"
-                LanguageMode.EN -> "Very demanding"
-                LanguageMode.FR -> "Très exigeante"
-                LanguageMode.IT -> "Molto impegnativa"
-                LanguageMode.DE -> "Sehr anspruchsvoll"
-                LanguageMode.NL -> "Zeer veeleisend"
-                LanguageMode.PL -> "Bardzo wymagający"
-                LanguageMode.ZH -> "极具挑战性"
+            clean.contains("muy") || clean.contains("very") || clean.contains("sehr") || clean.contains("très") || clean.contains("molto") || clean.contains("zeer") || clean.contains("bardzo") || clean.contains("极") || clean.contains("schwer") || clean.contains("difficult") -> when (mode) {
+                LanguageMode.ES -> "Muy Difícil"
+                LanguageMode.EN -> "Very Difficult"
+                LanguageMode.FR -> "Très difficile"
+                LanguageMode.IT -> "Molto difficile"
+                LanguageMode.DE -> "Sehr schwer"
+                LanguageMode.NL -> "Zeer moeilijk"
+                LanguageMode.PL -> "Bardzo trudny"
+                LanguageMode.ZH -> "非常困难"
                 LanguageMode.KO -> "매우 어려움"
-                LanguageMode.PT -> "Muito exigente"
+                LanguageMode.PT -> "Muito Difícil"
             }
-            clean.contains("exig") || clean.contains("demand") || clean.contains("anspruch") || clean.contains("impeg") || clean.contains("veeleis") || clean.contains("wymag") || clean.contains("挑战") || clean.contains("어려움") -> when (mode) {
+            clean.contains("exig") || clean.contains("demand") || clean.contains("anspruch") || clean.contains("impeg") || clean.contains("veeleis") || clean.contains("wymag") || clean.contains("挑战") || clean.contains("difícil") || clean.contains("dificil") -> when (mode) {
                 LanguageMode.ES -> "Exigente"
                 LanguageMode.EN -> "Demanding"
                 LanguageMode.FR -> "Exigeante"
@@ -1454,17 +1454,17 @@ object PredefinedRoutesData {
                 LanguageMode.KO -> "어려움"
                 LanguageMode.PT -> "Exigente"
             }
-            clean.contains("mod") || clean.contains("mäßig") || clean.contains("gemid") || clean.contains("umiark") || clean.contains("中") || clean.contains("보통") -> when (mode) {
-                LanguageMode.ES -> "Moderada"
+            clean.contains("mod") || clean.contains("media") || clean.contains("medio") || clean.contains("mäßig") || clean.contains("gemid") || clean.contains("umiark") || clean.contains("中") || clean.contains("보통") -> when (mode) {
+                LanguageMode.ES -> "Moderado"
                 LanguageMode.EN -> "Moderate"
-                LanguageMode.FR -> "Modérée"
-                LanguageMode.IT -> "Moderata"
+                LanguageMode.FR -> "Modéré"
+                LanguageMode.IT -> "Moderato"
                 LanguageMode.DE -> "Mäßig"
                 LanguageMode.NL -> "Gemiddeld"
                 LanguageMode.PL -> "Umiarkowany"
                 LanguageMode.ZH -> "中等"
                 LanguageMode.KO -> "보통"
-                LanguageMode.PT -> "Moderada"
+                LanguageMode.PT -> "Moderado"
             }
             clean.contains("fác") || clean.contains("fac") || clean.contains("eas") || clean.contains("leich") || clean.contains("makk") || clean.contains("łatw") || clean.contains("简") || clean.contains("쉬움") -> when (mode) {
                 LanguageMode.ES -> "Fácil"

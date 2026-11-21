@@ -47,6 +47,7 @@ import com.example.data.model.StageEntity
 import com.example.data.repository.CaminoStats
 import com.example.ui.CaminoViewModel
 import com.example.ui.components.SettingsActionMenu
+import com.example.ui.components.DifficultySelectionGroup
 import com.example.ui.components.TownAutoCompleteField
 import com.example.ui.settings.AppStrings
 import com.example.ui.theme.*
@@ -1056,7 +1057,7 @@ fun AddStageDialog(
     var gainStr by remember { mutableStateOf("") }
     var lossStr by remember { mutableStateOf("") }
     var timeStr by remember { mutableStateOf("5h 00m") }
-    var difficulty by remember { mutableStateOf("Moderada") }
+    var difficulty by remember { mutableStateOf("Moderado") }
     var notes by remember { mutableStateOf("") }
 
     val difficulties = listOf("Fácil", "Moderada", "Difícil", "Muy exigente")
@@ -1212,53 +1213,11 @@ fun AddStageDialog(
                 item {
                     Text("${viewModel?.string("difficulty") ?: "Dificultad"}:", style = MaterialTheme.typography.labelSmall)
                     Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("Fácil", "Moderada").forEach { diff ->
-                            FilterChip(
-                                selected = difficulty == diff,
-                                onClick = { difficulty = diff },
-                                label = {
-                                    Text(
-                                        viewModel?.localizeDifficulty(diff) ?: diff,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .defaultMinSize(minHeight = 40.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("Exigente", "Muy exigente").forEach { diff ->
-                            FilterChip(
-                                selected = difficulty == diff,
-                                onClick = { difficulty = diff },
-                                label = {
-                                    Text(
-                                        viewModel?.localizeDifficulty(diff) ?: diff,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .defaultMinSize(minHeight = 40.dp)
-                            )
-                        }
-                    }
+                    DifficultySelectionGroup(
+                        selectedDifficulty = difficulty,
+                        onSelectDifficulty = { difficulty = it },
+                        viewModel = viewModel
+                    )
                 }
                 item {
                     OutlinedTextField(

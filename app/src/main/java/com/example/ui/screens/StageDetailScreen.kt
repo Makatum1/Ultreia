@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.ui.components.DifficultySelectionGroup
 import com.example.ui.components.TownAutoCompleteField
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -361,8 +362,7 @@ fun StageDetailScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Terrain, contentDescription = null, tint = PilgrimYellowDark, modifier = Modifier.size(20.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("${viewModel.string("difficulty")}: ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(viewModel.localizeDifficulty(stage.difficulty), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    Text(viewModel.string("difficulty"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
 
                                 // GPX sync indicator
@@ -390,6 +390,16 @@ fun StageDetailScreen(
                                     }
                                 }
                             }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            DifficultySelectionGroup(
+                                selectedDifficulty = stage.difficulty,
+                                onSelectDifficulty = { newDiff ->
+                                    viewModel.updateStage(stage.copy(difficulty = newDiff))
+                                },
+                                viewModel = viewModel
+                            )
                         }
                     }
                 }
@@ -1290,53 +1300,11 @@ fun EditStageDialog(
                 item {
                     Text("${viewModel?.string("difficulty") ?: "Dificultad"}:", style = MaterialTheme.typography.labelSmall)
                     Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("Fácil", "Moderada").forEach { diff ->
-                            FilterChip(
-                                selected = difficulty == diff,
-                                onClick = { difficulty = diff },
-                                label = {
-                                    Text(
-                                        viewModel?.localizeDifficulty(diff) ?: diff,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .defaultMinSize(minHeight = 40.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("Exigente", "Muy exigente").forEach { diff ->
-                            FilterChip(
-                                selected = difficulty == diff,
-                                onClick = { difficulty = diff },
-                                label = {
-                                    Text(
-                                        viewModel?.localizeDifficulty(diff) ?: diff,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .defaultMinSize(minHeight = 40.dp)
-                            )
-                        }
-                    }
+                    DifficultySelectionGroup(
+                        selectedDifficulty = difficulty,
+                        onSelectDifficulty = { difficulty = it },
+                        viewModel = viewModel
+                    )
                 }
                 item {
                     OutlinedTextField(
