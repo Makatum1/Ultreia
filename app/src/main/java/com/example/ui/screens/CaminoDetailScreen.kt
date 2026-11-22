@@ -48,6 +48,7 @@ import com.example.data.repository.CaminoStats
 import com.example.ui.CaminoViewModel
 import com.example.ui.components.SettingsActionMenu
 import com.example.ui.components.DifficultySelectionGroup
+import com.example.ui.components.normalizeDifficulty
 import com.example.ui.components.TownAutoCompleteField
 import com.example.ui.settings.AppStrings
 import com.example.ui.theme.*
@@ -981,23 +982,25 @@ fun StageCardItem(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val normDiff = normalizeDifficulty(stage.difficulty)
+                        val (diffBgColor, diffTextColor, diffBorderColor) = when (normDiff) {
+                            "Fácil" -> Triple(Color(0xFF16A34A).copy(alpha = 0.12f), Color(0xFF15803D), Color(0xFF16A34A).copy(alpha = 0.40f))
+                            "Moderado" -> Triple(Color(0xFFEAB308).copy(alpha = 0.18f), Color(0xFFB45309), Color(0xFFEAB308).copy(alpha = 0.50f))
+                            "Exigente" -> Triple(Color(0xFFF57C00).copy(alpha = 0.15f), Color(0xFFC65100), Color(0xFFF57C00).copy(alpha = 0.45f))
+                            "Muy Exigente" -> Triple(Color(0xFFDC2626).copy(alpha = 0.14f), Color(0xFFB91C1C), Color(0xFFDC2626).copy(alpha = 0.40f))
+                            else -> Triple(Color(0xFFEAB308).copy(alpha = 0.18f), Color(0xFFB45309), Color(0xFFEAB308).copy(alpha = 0.50f))
+                        }
+
                         Surface(
-                            color = when (stage.difficulty) {
-                                "Fácil", "Easy", "Facile", "Leicht", "Łatwy", "Makkelijk", "简单" -> CaminoGreen.copy(alpha = 0.12f)
-                                "Moderada", "Moderate", "Modérée", "Moderata", "Mäßig", "Umiarkowany", "Gemiddeld", "中等" -> PilgrimYellow.copy(alpha = 0.25f)
-                                else -> Color(0xFFEF4444).copy(alpha = 0.12f)
-                            },
-                            shape = RoundedCornerShape(4.dp)
+                            color = diffBgColor,
+                            shape = RoundedCornerShape(4.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, diffBorderColor)
                         ) {
                             Text(
                                 text = viewModel.localizeDifficulty(stage.difficulty),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = when (stage.difficulty) {
-                                    "Fácil", "Easy", "Facile", "Leicht", "Łatwy", "Makkelijk", "简单" -> CaminoGreen
-                                    "Moderada", "Moderate", "Modérée", "Moderata", "Mäßig", "Umiarkowany", "Gemiddeld", "中等" -> PilgrimYellowDark
-                                    else -> Color(0xFFDC2626)
-                                },
+                                color = diffTextColor,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }

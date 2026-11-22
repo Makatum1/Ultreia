@@ -694,43 +694,6 @@ fun AddCaminoDialog(
         },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Switch: Guía de viaje
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = viewModel?.string("travel_guide_label") ?: "Guía de viaje",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = CaminoBlue
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = viewModel?.string("travel_guide_desc") ?: "Si se activa, se transforma en una guía de viaje general y se eliminan las referencias al Camino de Santiago.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Switch(
-                                checked = isTravelGuide,
-                                onCheckedChange = { isTravelGuide = it }
-                            )
-                        }
-                    }
-                }
 
                 if (isFirstCamino && onSeedSample != null) {
                     item {
