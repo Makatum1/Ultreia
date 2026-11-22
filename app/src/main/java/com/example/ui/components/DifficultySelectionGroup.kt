@@ -47,9 +47,9 @@ val DIFFICULTY_OPTIONS = listOf(
     ),
     DifficultyOption(
         key = "Exigente",
-        color = Color(0xFFF57C00), // Naranja intermedio perfectamente diferenciable (#F57C00)
+        color = Color(0xFFF97316), // Naranja vibrante (#F97316)
         selectedTextColor = Color.White,
-        unselectedTextColor = Color(0xFFC65100)
+        unselectedTextColor = Color(0xFFC2410C)
     ),
     DifficultyOption(
         key = "Muy Exigente",

@@ -983,25 +983,24 @@ fun StageCardItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         val normDiff = normalizeDifficulty(stage.difficulty)
-                        val (diffBgColor, diffTextColor, diffBorderColor) = when (normDiff) {
-                            "Fácil" -> Triple(Color(0xFF16A34A).copy(alpha = 0.12f), Color(0xFF15803D), Color(0xFF16A34A).copy(alpha = 0.40f))
-                            "Moderado" -> Triple(Color(0xFFEAB308).copy(alpha = 0.18f), Color(0xFFB45309), Color(0xFFEAB308).copy(alpha = 0.50f))
-                            "Exigente" -> Triple(Color(0xFFF57C00).copy(alpha = 0.15f), Color(0xFFC65100), Color(0xFFF57C00).copy(alpha = 0.45f))
-                            "Muy Exigente" -> Triple(Color(0xFFDC2626).copy(alpha = 0.14f), Color(0xFFB91C1C), Color(0xFFDC2626).copy(alpha = 0.40f))
-                            else -> Triple(Color(0xFFEAB308).copy(alpha = 0.18f), Color(0xFFB45309), Color(0xFFEAB308).copy(alpha = 0.50f))
+                        val (diffBgColor, diffTextColor) = when (normDiff) {
+                            "Fácil" -> Pair(Color(0xFF16A34A), Color.White)
+                            "Moderado" -> Pair(Color(0xFFEAB308), Color(0xFF1F2937))
+                            "Exigente" -> Pair(Color(0xFFF97316), Color.White)
+                            "Muy Exigente" -> Pair(Color(0xFFDC2626), Color.White)
+                            else -> Pair(Color(0xFFEAB308), Color(0xFF1F2937))
                         }
 
                         Surface(
                             color = diffBgColor,
-                            shape = RoundedCornerShape(4.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, diffBorderColor)
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
                                 text = viewModel.localizeDifficulty(stage.difficulty),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = diffTextColor,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
                             )
                         }
 
