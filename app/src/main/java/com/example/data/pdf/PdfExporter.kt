@@ -55,6 +55,7 @@ object PdfExporter {
     private val COLOR_DIVIDER = Color.rgb(238, 242, 246)
     private val COLOR_WARM_BG = Color.rgb(255, 253, 247)
     private val COLOR_WARM_BORDER = Color.rgb(243, 230, 200)
+    private val COLOR_ORANGE = Color.rgb(245, 124, 0)
     private val COLOR_RED = Color.rgb(220, 38, 38)
 
     private fun tr(key: String, languageMode: LanguageMode): String = AppStrings.get(key, languageMode)
@@ -836,8 +837,8 @@ object PdfExporter {
             val diffLower = stage.difficulty.lowercase()
             val diffColor = when {
                 diffLower.contains("muy") || diffLower.contains("schwer") -> COLOR_RED
-                diffLower.contains("exig") || diffLower.contains("demand") || diffLower.contains("impeg") || diffLower.contains("anspruch") -> COLOR_AMBER
-                diffLower.contains("mod") || diffLower.contains("media") -> COLOR_BLUE
+                diffLower.contains("exig") || diffLower.contains("demand") || diffLower.contains("impeg") || diffLower.contains("anspruch") -> COLOR_ORANGE
+                diffLower.contains("mod") || diffLower.contains("media") -> COLOR_AMBER
                 diffLower.contains("fác") || diffLower.contains("fac") || diffLower.contains("easy") -> COLOR_EMERALD
                 else -> COLOR_BLUE
             }

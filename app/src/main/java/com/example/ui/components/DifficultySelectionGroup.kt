@@ -47,12 +47,12 @@ val DIFFICULTY_OPTIONS = listOf(
     ),
     DifficultyOption(
         key = "Exigente",
-        color = Color(0xFFEA580C), // Naranja
+        color = Color(0xFFF57C00), // Naranja intermedio perfectamente diferenciable (#F57C00)
         selectedTextColor = Color.White,
-        unselectedTextColor = Color(0xFFC2410C)
+        unselectedTextColor = Color(0xFFC65100)
     ),
     DifficultyOption(
-        key = "Muy Difícil",
+        key = "Muy Exigente",
         color = Color(0xFFDC2626), // Rojo
         selectedTextColor = Color.White,
         unselectedTextColor = Color(0xFFB91C1C)
@@ -62,7 +62,7 @@ val DIFFICULTY_OPTIONS = listOf(
 fun normalizeDifficulty(diff: String?): String {
     val clean = diff?.trim()?.lowercase() ?: ""
     return when {
-        clean.contains("muy") || clean.contains("very") || clean.contains("sehr") || clean.contains("très") || clean.contains("molto") || clean.contains("zeer") || clean.contains("bardzo") || clean.contains("极") || clean.contains("difficult") -> "Muy Difícil"
+        clean.contains("muy") || clean.contains("very") || clean.contains("sehr") || clean.contains("très") || clean.contains("molto") || clean.contains("zeer") || clean.contains("bardzo") || clean.contains("极") || clean.contains("difficult") -> "Muy Exigente"
         clean.contains("exig") || clean.contains("demand") || clean.contains("anspruch") || clean.contains("impeg") || clean.contains("veeleis") || clean.contains("wymag") || clean.contains("挑战") || clean.contains("difícil") || clean.contains("dificil") -> "Exigente"
         clean.contains("fác") || clean.contains("fac") || clean.contains("eas") || clean.contains("leich") || clean.contains("makk") || clean.contains("łatw") || clean.contains("简") || clean.contains("쉬움") -> "Fácil"
         else -> "Moderado"

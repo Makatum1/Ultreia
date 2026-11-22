@@ -621,6 +621,45 @@ fun AddCaminoDialog(
     var isTravelGuide by remember { mutableStateOf(initialIsTravelGuide) }
     var selectedPhotoUri by remember { mutableStateOf<String?>(null) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val parsed = try {
+            val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+            java.time.LocalDate.parse(startDate.trim(), formatter)
+        } catch (_: Exception) {
+            try {
+                val sdf = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                val cal = java.util.Calendar.getInstance()
+                val p = sdf.parse(startDate.trim())
+                if (p != null) {
+                    cal.time = p
+                    java.time.LocalDate.of(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+                } else java.time.LocalDate.now()
+            } catch (_: Exception) {
+                java.time.LocalDate.now()
+            }
+        }
+        DisposableEffect(Unit) {
+            val dialog = android.app.DatePickerDialog(
+                context,
+                { _, year, month, dayOfMonth ->
+                    val selected = java.time.LocalDate.of(year, month + 1, dayOfMonth)
+                    startDate = selected.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    showDatePicker = false
+                },
+                parsed.year,
+                parsed.monthValue - 1,
+                parsed.dayOfMonth
+            )
+            dialog.setOnCancelListener { showDatePicker = false }
+            dialog.setOnDismissListener { showDatePicker = false }
+            dialog.show()
+            onDispose { dialog.dismiss() }
+        }
+    }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -742,6 +781,17 @@ fun AddCaminoDialog(
                         value = startDate,
                         onValueChange = { startDate = it },
                         label = { Text(viewModel?.string("start_date_label") ?: "Fecha de inicio") },
+                        placeholder = { Text("dd/MM/yyyy") },
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = "Seleccionar fecha en calendario",
+                                    tint = CaminoBlue
+                                )
+                            }
+                        },
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

@@ -175,7 +175,7 @@ val ptStrings: Map<String, String> = mapOf(
     "diff_easy" to "Fácil",
     "diff_moderate" to "Moderado",
     "diff_demanding" to "Exigente",
-    "diff_very_demanding" to "Muito Difícil",
+    "diff_very_demanding" to "Muito Exigente",
     "notes_recommendations" to "RECOMENDAÇÕES",
     "notes_last_minute_tips" to "CONSELHOS DE ÚLTIMA HORA",
     "view_on_maps" to "Ver no Maps",

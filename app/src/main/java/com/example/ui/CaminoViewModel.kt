@@ -453,6 +453,9 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
     fun localizeDifficulty(diff: String): String =
         com.example.data.sample.PredefinedRoutesData.getLocalizedDifficulty(diff, _languageMode.value)
 
+    fun calculateAutoDifficulty(distanceKm: Double, elevationGainM: Int, elevationLossM: Int): String =
+        repository.calculateAutoDifficulty(distanceKm, elevationGainM, elevationLossM)
+
     fun localizeNotes(notes: String?, origin: String = "", destination: String = ""): String =
         com.example.data.sample.PredefinedRoutesData.getLocalizedNotes(notes ?: "", _languageMode.value, origin, destination)
 

@@ -1431,16 +1431,16 @@ object PredefinedRoutesData {
         val clean = diff.trim().lowercase()
         return when {
             clean.contains("muy") || clean.contains("very") || clean.contains("sehr") || clean.contains("très") || clean.contains("molto") || clean.contains("zeer") || clean.contains("bardzo") || clean.contains("极") || clean.contains("schwer") || clean.contains("difficult") -> when (mode) {
-                LanguageMode.ES -> "Muy Difícil"
-                LanguageMode.EN -> "Very Difficult"
-                LanguageMode.FR -> "Très difficile"
-                LanguageMode.IT -> "Molto difficile"
-                LanguageMode.DE -> "Sehr schwer"
-                LanguageMode.NL -> "Zeer moeilijk"
-                LanguageMode.PL -> "Bardzo trudny"
-                LanguageMode.ZH -> "非常困难"
+                LanguageMode.ES -> "Muy Exigente"
+                LanguageMode.EN -> "Very Demanding"
+                LanguageMode.FR -> "Très exigeant"
+                LanguageMode.IT -> "Molto impegnativo"
+                LanguageMode.DE -> "Sehr anspruchsvoll"
+                LanguageMode.NL -> "Zeer veeleisend"
+                LanguageMode.PL -> "Bardzo wymagający"
+                LanguageMode.ZH -> "极具挑战性"
                 LanguageMode.KO -> "매우 어려움"
-                LanguageMode.PT -> "Muito Difícil"
+                LanguageMode.PT -> "Muito Exigente"
             }
             clean.contains("exig") || clean.contains("demand") || clean.contains("anspruch") || clean.contains("impeg") || clean.contains("veeleis") || clean.contains("wymag") || clean.contains("挑战") || clean.contains("difícil") || clean.contains("dificil") -> when (mode) {
                 LanguageMode.ES -> "Exigente"
