@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -356,39 +357,11 @@ fun StageDetailScreen(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Terrain, contentDescription = null, tint = PilgrimYellowDark, modifier = Modifier.size(20.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(viewModel.string("difficulty"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                }
-
-                                // GPX sync indicator
-                                Surface(
-                                    color = if (points.isNotEmpty()) CaminoGreen.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Route,
-                                            contentDescription = null,
-                                            tint = if (points.isNotEmpty()) CaminoGreen else Color.Gray,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = if (points.isNotEmpty()) "${points.size} pts GPX" else "Sin GPX",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (points.isNotEmpty()) CaminoGreen else Color.Gray
-                                        )
-                                    }
-                                }
+                                Icon(Icons.Default.Terrain, contentDescription = null, tint = PilgrimYellowDark, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(viewModel.string("difficulty"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             }
 
                             Spacer(Modifier.height(8.dp))
@@ -875,6 +848,9 @@ fun StageDetailScreen(
             onPickFile = {
                 showGpxImportDialog = false
                 gpxFileLauncher.launch("*/*")
+            },
+            onClearData = {
+                viewModel.clearStageGpxData(stage.id)
             }
         )
     }
@@ -1647,7 +1623,8 @@ fun AddAccommodationDialog(
 fun GpxImportDialog(
     stage: StageEntity,
     onDismiss: () -> Unit,
-    onPickFile: () -> Unit
+    onPickFile: () -> Unit,
+    onClearData: () -> Unit = {}
 ) {
     val hasGpx = !stage.gpxTrackJson.isNullOrBlank()
     AlertDialog(
@@ -1691,6 +1668,23 @@ fun GpxImportDialog(
                     Icon(if (hasGpx) Icons.Default.Sync else Icons.Default.FolderOpen, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(if (hasGpx) "Sustituir por nuevo archivo GPX" else "Seleccionar archivo GPX del dispositivo")
+                }
+
+                if (hasGpx) {
+                    OutlinedButton(
+                        onClick = {
+                            onClearData()
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Limpiar Datos")
+                    }
                 }
             }
         },

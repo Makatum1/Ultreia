@@ -132,19 +132,16 @@ class CaminoRepository(val context: Context) {
         val stage = dao.getStageByIdOnce(stageId) ?: return@withContext null
         val parseResult = GpxParser.parse(gpxXmlContent)
 
-        val updatedOrigin = if (!parseResult.origin.isNullOrBlank()) parseResult.origin else stage.origin
-        val updatedDest = if (!parseResult.destination.isNullOrBlank()) parseResult.destination else stage.destination
-
-        val timeStr = if (parseResult.formattedTime.isNotBlank()) parseResult.formattedTime else stage.estimatedTime
-        val dist = if (parseResult.distanceKm > 0) parseResult.distanceKm else stage.distanceKm
-        val gain = if (parseResult.elevationGainM > 0) parseResult.elevationGainM else stage.elevationGainM
-        val loss = if (parseResult.elevationLossM > 0) parseResult.elevationLossM else stage.elevationLossM
+        // Reinicio obligatorio: los datos provienen estricta y únicamente del archivo GPX procesado
+        val timeStr = if (parseResult.formattedTime.isNotBlank()) parseResult.formattedTime else "n/d"
+        val dist = parseResult.distanceKm
+        val gain = parseResult.elevationGainM
+        val loss = parseResult.elevationLossM
 
         val autoDifficulty = calculateAutoDifficulty(dist, gain, loss)
-
         val serializedPoints = GpxParser.serializePoints(parseResult.points)
 
-        // No se modifica origen ni destino; se actualizan distancia, desniveles acumulados, tiempo y dificultad calculada
+        // No se modifica origen ni destino; se actualizan distancia, desniveles, tiempo y dificultad calculada del GPX
         val updatedStage = stage.copy(
             origin = stage.origin,
             destination = stage.destination,
@@ -159,6 +156,23 @@ class CaminoRepository(val context: Context) {
 
         dao.updateStage(updatedStage)
         updatedStage
+    }
+
+    /**
+     * Limpia el archivo GPX asociado a una etapa y reinicia sus métricas a cero.
+     */
+    suspend fun clearStageGpxData(stageId: Long): StageEntity? = withContext(Dispatchers.IO) {
+        val stage = dao.getStageByIdOnce(stageId) ?: return@withContext null
+        val clearedStage = stage.copy(
+            distanceKm = 0.0,
+            elevationGainM = 0,
+            elevationLossM = 0,
+            estimatedTime = "n/d",
+            difficulty = "Moderado",
+            gpxTrackJson = null
+        )
+        dao.updateStage(clearedStage)
+        clearedStage
     }
 
     fun parseRoomOptions(json: String?): List<RoomPriceOption> {

@@ -1,18 +1,19 @@
 package com.example.data.gpx
 
-import android.location.Location
 import com.example.data.model.GpxPoint
 import org.json.JSONArray
 import org.json.JSONObject
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
+import org.xml.sax.Attributes
+import org.xml.sax.InputSource
+import org.xml.sax.helpers.DefaultHandler
 import java.io.StringReader
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import javax.xml.parsers.SAXParserFactory
 import kotlin.math.*
 
-private data class RawGpxPoint(
+data class RawGpxPoint(
     val lat: Double,
     val lon: Double,
     val ele: Double,
@@ -28,10 +29,30 @@ data class GpxParseResult(
     val origin: String?,
     val destination: String?,
     val estimatedHours: Double,
-    val formattedTime: String = ""
+    val formattedTime: String = "",
+    val totalTrkptCount: Int = 0,
+    val ignoredWptCount: Int = 0,
+    val ignoredRteptCount: Int = 0,
+    val minElevationM: Double = 0.0,
+    val maxElevationM: Double = 0.0,
+    val totalDurationMs: Long = 0L,
+    val movingDurationMs: Long = 0L,
+    val debugLog: String = ""
 )
 
 object GpxParser {
+
+    const val EARTH_RADIUS_METERS = 6371008.8
+    const val ELEVATION_THRESHOLD_M = 5.0
+    const val MOVING_SPEED_MS = 0.5
+
+    private fun safeLog(tag: String, msg: String) {
+        try {
+            android.util.Log.d(tag, msg)
+        } catch (_: Throwable) {
+            println("[$tag] $msg")
+        }
+    }
 
     private fun parseIsoTimestamp(timeStr: String): Long? {
         val clean = timeStr.trim()
@@ -63,289 +84,315 @@ object GpxParser {
     }
 
     /**
-     * Parses standard GPX 1.0 / 1.1 XML string and computes the 4 key track metrics:
-     * 1. Distance (Km): Native Android Location.distanceBetween per <trkseg> with unreal speed filter (> 30 km/h). Max 2 decimals.
-     * 2. Time: Recorded duration summing point-to-point intervals <= 10s ("X h Y min").
-     * 3. Elevation Gain & Loss (Double Filter): Moving average smoothing (11-point window) + Hysteresis threshold (0.80m).
+     * Calcula la distancia Haversine 2D en metros entre dos coordenadas geográficas.
+     * Radio medio terrestre: 6,371,008.8 m.
      */
-    fun parse(gpxContent: String): GpxParseResult {
-        val rawPoints = mutableListOf<RawGpxPoint>()
+    fun haversineDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val lat1Rad = Math.toRadians(lat1)
+        val lat2Rad = Math.toRadians(lat2)
+
+        val a = sin(dLat / 2.0).pow(2.0) +
+                cos(lat1Rad) * cos(lat2Rad) * sin(dLon / 2.0).pow(2.0)
+        val c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a))
+        return EARTH_RADIUS_METERS * c
+    }
+
+    fun haversineDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        return haversineDistanceMeters(lat1, lon1, lat2, lon2) / 1000.0
+    }
+
+    /**
+     * Procesa el archivo GPX con parser XML nativo:
+     * - Lee ÚNICAMENTE <trk><trkseg><trkpt>. Ignora <wpt> y <rtept>.
+     * - Si hay varios <trkseg>, los concatena sin sumar el salto inter-segmento a la distancia.
+     * - Distancia: Fórmula Haversine 2D (R = 6371008.8 m). Formato 2 decimales.
+     * - Desnivel (+ y -): Altitudes originales sin alisar con histéresis de 5 metros (ELEVATION_THRESHOLD_M = 5.0).
+     * - Tiempo: Tiempo total (primer a último trkpt) y tiempo en movimiento (velocidad > 0.5 m/s). Si no hay timestamps -> "n/d".
+     */
+    fun parse(gpxContent: String, fileName: String = "track.gpx"): GpxParseResult {
         val segments = mutableListOf<MutableList<RawGpxPoint>>()
         var currentSegment = mutableListOf<RawGpxPoint>()
         var originName: String? = null
         var destName: String? = null
 
-        try {
-            val factory = XmlPullParserFactory.newInstance()
-            factory.isNamespaceAware = true
-            val parser = factory.newPullParser()
-            parser.setInput(StringReader(gpxContent))
+        var totalTrkptCount = 0
+        var ignoredWptCount = 0
+        var ignoredRteptCount = 0
 
-            var eventType = parser.eventType
+        try {
+            val saxFactory = SAXParserFactory.newInstance()
+            saxFactory.isNamespaceAware = true
+            val saxParser = saxFactory.newSAXParser()
+
+            var insideTrk = false
+            var insideTrkseg = false
+            var insideTrkpt = false
+
             var currentLat: Double? = null
             var currentLon: Double? = null
             var currentEle = 0.0
             var hasEle = false
             var currentTimeMillis: Long? = null
-            var insideTrkpt = false
-            var currentTag = ""
+            val textBuffer = StringBuilder()
 
-            while (eventType != XmlPullParser.END_DOCUMENT) {
-                when (eventType) {
-                    XmlPullParser.START_TAG -> {
-                        val tagName = parser.name?.substringAfter(":")?.lowercase() ?: ""
-                        currentTag = tagName
-                        if (tagName == "trkseg") {
-                            if (currentSegment.isNotEmpty()) {
-                                segments.add(currentSegment)
-                                currentSegment = mutableListOf()
+            val handler = object : DefaultHandler() {
+                override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes?) {
+                    val tag = (localName?.takeIf { it.isNotEmpty() } ?: qName?.substringAfter(":") ?: "").lowercase()
+                    textBuffer.setLength(0)
+
+                    when (tag) {
+                        "trk" -> insideTrk = true
+                        "trkseg" -> {
+                            if (insideTrk) {
+                                insideTrkseg = true
+                                if (currentSegment.isNotEmpty()) {
+                                    segments.add(currentSegment)
+                                    currentSegment = mutableListOf()
+                                }
                             }
-                        } else if (tagName == "trkpt" || tagName == "wpt") {
-                            var latStr: String? = null
-                            var lonStr: String? = null
-                            for (i in 0 until parser.attributeCount) {
-                                val attr = parser.getAttributeName(i).lowercase()
-                                if (attr == "lat") latStr = parser.getAttributeValue(i)
-                                if (attr == "lon") lonStr = parser.getAttributeValue(i)
-                            }
-                            currentLat = latStr?.toDoubleOrNull()
-                            currentLon = lonStr?.toDoubleOrNull()
-                            currentEle = 0.0
-                            hasEle = false
-                            currentTimeMillis = null
-                            insideTrkpt = true
                         }
+                        "trkpt" -> {
+                            if (insideTrk && insideTrkseg) {
+                                insideTrkpt = true
+                                var latStr: String? = null
+                                var lonStr: String? = null
+                                if (attributes != null) {
+                                    for (i in 0 until attributes.length) {
+                                        val attrName = attributes.getLocalName(i).ifEmpty { attributes.getQName(i) }.lowercase()
+                                        if (attrName == "lat") latStr = attributes.getValue(i)
+                                        if (attrName == "lon") lonStr = attributes.getValue(i)
+                                    }
+                                }
+                                currentLat = latStr?.toDoubleOrNull()
+                                currentLon = lonStr?.toDoubleOrNull()
+                                currentEle = 0.0
+                                hasEle = false
+                                currentTimeMillis = null
+                            }
+                        }
+                        "wpt" -> ignoredWptCount++
+                        "rtept" -> ignoredRteptCount++
                     }
-                    XmlPullParser.TEXT -> {
-                        val text = parser.text?.trim() ?: ""
-                        if (insideTrkpt && text.isNotEmpty()) {
-                            when (currentTag) {
-                                "ele" -> {
+                }
+
+                override fun characters(ch: CharArray?, start: Int, length: Int) {
+                    if (ch != null && length > 0) {
+                        textBuffer.append(ch, start, length)
+                    }
+                }
+
+                override fun endElement(uri: String?, localName: String?, qName: String?) {
+                    val tag = (localName?.takeIf { it.isNotEmpty() } ?: qName?.substringAfter(":") ?: "").lowercase()
+                    val text = textBuffer.toString().trim()
+
+                    if (insideTrkpt) {
+                        when (tag) {
+                            "ele" -> {
+                                if (text.isNotEmpty()) {
                                     currentEle = text.toDoubleOrNull() ?: 0.0
                                     hasEle = true
                                 }
-                                "time" -> {
+                            }
+                            "time" -> {
+                                if (text.isNotEmpty()) {
                                     currentTimeMillis = parseIsoTimestamp(text)
                                 }
                             }
-                        } else if (currentTag == "name" && text.isNotEmpty()) {
-                            if (originName == null) originName = text
-                            else destName = text
-                        }
-                    }
-                    XmlPullParser.END_TAG -> {
-                        val endTag = parser.name?.substringAfter(":")?.lowercase() ?: ""
-                        if (endTag == "trkpt" || endTag == "wpt") {
-                            if (currentLat != null && currentLon != null) {
-                                val pt = RawGpxPoint(currentLat, currentLon, currentEle, hasEle, currentTimeMillis)
-                                rawPoints.add(pt)
-                                currentSegment.add(pt)
-                            }
-                            insideTrkpt = false
-                            currentLat = null
-                            currentLon = null
-                            currentEle = 0.0
-                            hasEle = false
-                            currentTimeMillis = null
-                        } else if (endTag == "trkseg") {
-                            if (currentSegment.isNotEmpty()) {
-                                segments.add(currentSegment)
-                                currentSegment = mutableListOf()
+                            "trkpt" -> {
+                                if (currentLat != null && currentLon != null) {
+                                    val pt = RawGpxPoint(currentLat!!, currentLon!!, currentEle, hasEle, currentTimeMillis)
+                                    currentSegment.add(pt)
+                                    totalTrkptCount++
+                                }
+                                insideTrkpt = false
+                                currentLat = null
+                                currentLon = null
+                                currentEle = 0.0
+                                hasEle = false
+                                currentTimeMillis = null
                             }
                         }
-                        currentTag = ""
+                    } else {
+                        when (tag) {
+                            "name" -> {
+                                if (text.isNotEmpty() && !insideTrk) {
+                                    if (originName == null) originName = text
+                                    else destName = text
+                                }
+                            }
+                            "trkseg" -> {
+                                if (insideTrkseg) {
+                                    if (currentSegment.isNotEmpty()) {
+                                        segments.add(currentSegment)
+                                        currentSegment = mutableListOf()
+                                    }
+                                    insideTrkseg = false
+                                }
+                            }
+                            "trk" -> insideTrk = false
+                        }
                     }
+                    textBuffer.setLength(0)
                 }
-                eventType = parser.next()
             }
+
+            saxParser.parse(InputSource(StringReader(gpxContent)), handler)
+
             if (currentSegment.isNotEmpty()) {
                 segments.add(currentSegment)
                 currentSegment = mutableListOf()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            safeLog("GpxParser", "Error al procesar XML GPX: ${e.message}")
         }
 
-        if (rawPoints.isEmpty()) {
-            val trkptFullRegex = """<trkpt[^>]*lat=["']([-0-9.]+)["'][^>]*lon=["']([-0-9.]+)["'][^>]*>(.*?)</trkpt>""".toRegex(RegexOption.DOT_MATCHES_ALL)
-            for (match in trkptFullRegex.findAll(gpxContent)) {
-                val lat = match.groupValues[1].toDoubleOrNull()
-                val lon = match.groupValues[2].toDoubleOrNull()
-                val inner = match.groupValues[3]
-                val eleMatch = """<ele>([-0-9.]+)</ele>""".toRegex().find(inner)
-                val ele = eleMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-                val hasEle = eleMatch != null
-                val timeStr = """<time>(.*?)</time>""".toRegex().find(inner)?.groupValues?.get(1)?.trim()
-                val timeMillis = if (!timeStr.isNullOrBlank()) parseIsoTimestamp(timeStr) else null
-                if (lat != null && lon != null) {
-                    val pt = RawGpxPoint(lat, lon, ele, hasEle, timeMillis)
-                    rawPoints.add(pt)
-                    currentSegment.add(pt)
-                }
-            }
-            if (rawPoints.isEmpty()) {
-                val simpleTrkpt = """<trkpt[^>]*lat=["']([-0-9.]+)["'][^>]*lon=["']([-0-9.]+)["']""".toRegex()
-                for (m in simpleTrkpt.findAll(gpxContent)) {
-                    val lat = m.groupValues[1].toDoubleOrNull()
-                    val lon = m.groupValues[2].toDoubleOrNull()
-                    if (lat != null && lon != null) {
-                        val pt = RawGpxPoint(lat, lon, 0.0, false, null)
-                        rawPoints.add(pt)
-                        currentSegment.add(pt)
-                    }
-                }
-            }
-            if (currentSegment.isNotEmpty()) {
-                segments.add(currentSegment)
-                currentSegment = mutableListOf()
-            }
-            val nameMatch = """<name>(.*?)</name>""".toRegex().find(gpxContent)
-            if (nameMatch != null) {
-                val nameText = nameMatch.groupValues[1].trim()
-                if (originName == null) originName = nameText
-            }
-        }
-
-        if (segments.isEmpty() && rawPoints.isNotEmpty()) {
-            segments.add(rawPoints)
-        }
-
-        // 1. DISTANCIA (KM) CON FORMULA NATIVA, SEGMENTOS Y FILTRO DE VELOCIDAD (< 30 km/h)
+        // 1. DISTANCIA (Haversine 2D por segmentos, sin sumar saltos inter-segmento)
         var totalDistanceMeters = 0.0
-        val results = FloatArray(1)
         for (segment in segments) {
             for (i in 0 until segment.size - 1) {
                 val p1 = segment[i]
                 val p2 = segment[i + 1]
-                Location.distanceBetween(p1.lat, p1.lon, p2.lat, p2.lon, results)
-                val stepMeters = results[0].toDouble()
+                totalDistanceMeters += haversineDistanceMeters(p1.lat, p1.lon, p2.lat, p2.lon)
+            }
+        }
+        val distanceKm = Math.round((totalDistanceMeters / 1000.0) * 100.0) / 100.0
 
-                // Filtro de velocidad irreal: si la velocidad supera 30 km/h se ignora el tramo
-                var isUnrealSpeed = false
+        // 2. DESNIVEL (+ y -) CON ALTITUDES ORIGINALES E HISTÉRESIS DE 5 METROS
+        var accumGain = 0.0
+        var accumLoss = 0.0
+        var minElevation = Double.MAX_VALUE
+        var maxElevation = -Double.MAX_VALUE
+
+        for (segment in segments) {
+            val elePoints = segment.filter { it.hasEle }
+            if (elePoints.isEmpty()) continue
+
+            var refEle = elePoints[0].ele
+            if (refEle < minElevation) minElevation = refEle
+            if (refEle > maxElevation) maxElevation = refEle
+
+            for (i in 1 until elePoints.size) {
+                val currentEle = elePoints[i].ele
+                if (currentEle < minElevation) minElevation = currentEle
+                if (currentEle > maxElevation) maxElevation = currentEle
+
+                val diff = currentEle - refEle
+                if (abs(diff) >= ELEVATION_THRESHOLD_M) {
+                    if (diff > 0) {
+                        accumGain += diff
+                    } else {
+                        accumLoss += abs(diff)
+                    }
+                    refEle = currentEle
+                }
+            }
+        }
+
+        val elevationGainM = Math.round(accumGain).toInt()
+        val elevationLossM = Math.round(accumLoss).toInt()
+        if (minElevation == Double.MAX_VALUE) {
+            minElevation = 0.0
+            maxElevation = 0.0
+        }
+
+        // 3. TIEMPOS (Tiempo Total y Tiempo en Movimiento con velocidad > 0.5 m/s)
+        val allTrackPoints = segments.flatten()
+        val timedPoints = allTrackPoints.filter { it.timeMillis != null }
+        val firstTime = timedPoints.firstOrNull()?.timeMillis
+        val lastTime = timedPoints.lastOrNull()?.timeMillis
+
+        val totalDurationMs = if (firstTime != null && lastTime != null && lastTime > firstTime) {
+            lastTime - firstTime
+        } else 0L
+
+        var movingDurationMs = 0L
+        for (segment in segments) {
+            for (i in 0 until segment.size - 1) {
+                val p1 = segment[i]
+                val p2 = segment[i + 1]
                 if (p1.timeMillis != null && p2.timeMillis != null) {
-                    val dtSec = (p2.timeMillis - p1.timeMillis) / 1000.0
-                    if (dtSec > 0.0) {
-                        val speedKmh = (stepMeters / dtSec) * 3.6
-                        if (speedKmh > 30.0) {
-                            isUnrealSpeed = true
+                    val dtMillis = p2.timeMillis - p1.timeMillis
+                    if (dtMillis > 0L) {
+                        val dtSec = dtMillis / 1000.0
+                        val distMeters = haversineDistanceMeters(p1.lat, p1.lon, p2.lat, p2.lon)
+                        val speedMs = distMeters / dtSec
+                        if (speedMs > MOVING_SPEED_MS) {
+                            movingDurationMs += dtMillis
                         }
                     }
                 }
-
-                if (!isUnrealSpeed) {
-                    totalDistanceMeters += stepMeters
-                }
-            }
-        }
-        val distanceKm = round((totalDistanceMeters / 1000.0) * 100.0) / 100.0
-
-        // 2. DESNIVEL POSITIVO Y NEGATIVO ACUMULADO (Suavizado 11 puntos + Histéresis 0.80m)
-        var gainM = 0.0
-        var lossM = 0.0
-        val elevationPoints = rawPoints.filter { it.hasEle }
-        if (elevationPoints.size >= 2) {
-            // Paso 1 (Suavizado): Media móvil con ventana de 11 puntos (radio = 5 puntos a cada lado)
-            val rawEle = elevationPoints.map { it.ele }
-            val smoothed = DoubleArray(rawEle.size)
-            val radius = 5
-            for (i in rawEle.indices) {
-                val start = maxOf(0, i - radius)
-                val end = minOf(rawEle.lastIndex, i + radius)
-                var sum = 0.0
-                var count = 0
-                for (j in start..end) {
-                    sum += rawEle[j]
-                    count++
-                }
-                smoothed[i] = sum / count
-            }
-
-            // Paso 2 (Histéresis): Umbral de 0.80 metros. Solo suma cuando el cambio respecto al último punto validado supera 0.80m
-            val threshold = 0.80
-            var lastValidatedEle = smoothed[0]
-            for (i in 1 until smoothed.size) {
-                val current = smoothed[i]
-                val dEle = current - lastValidatedEle
-                if (dEle >= threshold) {
-                    gainM += dEle
-                    lastValidatedEle = current
-                } else if (dEle <= -threshold) {
-                    lossM += abs(dEle)
-                    lastValidatedEle = current
-                }
-            }
-        }
-        val finalElevationGainM = gainM.roundToInt()
-        val finalElevationLossM = lossM.roundToInt()
-
-        // 3. TIEMPO GRABADO: Suma de los intervalos entre puntos hasta 10 segundos (sin huecos)
-        var recordedDurationSec = 0.0
-        val timedPoints = rawPoints.filter { it.timeMillis != null }
-        for (i in 0 until timedPoints.size - 1) {
-            val p1 = timedPoints[i]
-            val p2 = timedPoints[i + 1]
-            val dtSec = (p2.timeMillis!! - p1.timeMillis!!) / 1000.0
-            if (dtSec > 0.0 && dtSec <= 10.0) {
-                recordedDurationSec += dtSec
             }
         }
 
-        val durationMinutes = if (recordedDurationSec > 0.0) {
-            (recordedDurationSec / 60.0).roundToLong()
+        val hasTimestamps = timedPoints.isNotEmpty() && (totalDurationMs > 0L || movingDurationMs > 0L)
+        val formattedTime: String
+        val estimatedHours: Double
+
+        if (!hasTimestamps) {
+            formattedTime = "n/d"
+            estimatedHours = 0.0
         } else {
-            // Fallback si el GPX no contiene marcas de tiempo consecutivas de muestreo
-            val firstTime = timedPoints.firstOrNull()?.timeMillis
-            val lastTime = timedPoints.lastOrNull()?.timeMillis
-            if (firstTime != null && lastTime != null && lastTime >= firstTime) {
-                (lastTime - firstTime) / 60000L
-            } else if (distanceKm > 0) {
-                (((distanceKm / 4.2) + (finalElevationGainM / 400.0)) * 60).toLong()
-            } else 0L
+            val timeToFormat = if (movingDurationMs > 0L) movingDurationMs else totalDurationMs
+            val hours = timeToFormat / (1000 * 3600)
+            val mins = (timeToFormat % (1000 * 3600)) / (1000 * 60)
+            formattedTime = if (hours > 0) "${hours}h ${mins.toString().padStart(2, '0')}m" else "${mins}m"
+            estimatedHours = timeToFormat / (1000.0 * 3600.0)
         }
 
-        val hours = durationMinutes / 60L
-        val mins = durationMinutes % 60L
-        val formattedTime = if (hours > 0) {
-            "${hours} h ${mins} min"
-        } else {
-            "${mins} min"
-        }
-        val estimatedHours = durationMinutes / 60.0
+        // Resumen de depuración
+        val totalSec = totalDurationMs / 1000
+        val totalH = totalSec / 3600
+        val totalM = (totalSec % 3600) / 60
+        val movingSec = movingDurationMs / 1000
+        val movingH = movingSec / 3600
+        val movingM = (movingSec % 3600) / 60
 
-        // Puntos simplificados para renderizado en mapa / elevación (máximo 250)
-        val sampledPoints = if (rawPoints.size > 250) {
-            val step = rawPoints.size / 250
-            rawPoints.filterIndexed { index, _ -> index % step == 0 || index == rawPoints.lastIndex }
+        val debugLog = buildString {
+            appendLine("=== [GPX DEBUG LOG] ===")
+            appendLine("Archivo: $fileName")
+            appendLine("trkpt leídos (<trk><trkseg><trkpt>): $totalTrkptCount")
+            appendLine("wpt ignorados: $ignoredWptCount")
+            appendLine("rtept ignorados: $ignoredRteptCount")
+            appendLine("Distancia (Haversine 2D): $distanceKm km")
+            appendLine("Desnivel positivo (+): +$elevationGainM m")
+            appendLine("Desnivel negativo (-): -$elevationLossM m")
+            appendLine("Altitud mínima: ${minElevation} m | Altitud máxima: ${maxElevation} m")
+            appendLine("Tiempo total (inicio a fin): ${totalH}h ${totalM}m")
+            appendLine("Tiempo en movimiento (> 0.5 m/s): ${movingH}h ${movingM}m")
+            appendLine("Tiempo formateado: $formattedTime")
+            appendLine("========================")
+        }
+        safeLog("GpxParser", debugLog)
+
+        // Puntos simplificados para mapa y perfil de elevación (máximo 300)
+        val sampledPoints = if (allTrackPoints.size > 300) {
+            val step = allTrackPoints.size / 300
+            allTrackPoints.filterIndexed { index, _ -> index % step == 0 || index == allTrackPoints.lastIndex }
                 .map { GpxPoint(it.lat, it.lon, it.ele) }
         } else {
-            rawPoints.map { GpxPoint(it.lat, it.lon, it.ele) }
+            allTrackPoints.map { GpxPoint(it.lat, it.lon, it.ele) }
         }
 
         return GpxParseResult(
             points = sampledPoints,
             distanceKm = distanceKm,
-            elevationGainM = finalElevationGainM,
-            elevationLossM = finalElevationLossM,
+            elevationGainM = elevationGainM,
+            elevationLossM = elevationLossM,
             origin = originName,
             destination = destName,
             estimatedHours = estimatedHours,
-            formattedTime = formattedTime
+            formattedTime = formattedTime,
+            totalTrkptCount = totalTrkptCount,
+            ignoredWptCount = ignoredWptCount,
+            ignoredRteptCount = ignoredRteptCount,
+            minElevationM = minElevation,
+            maxElevationM = maxElevation,
+            totalDurationMs = totalDurationMs,
+            movingDurationMs = movingDurationMs,
+            debugLog = debugLog
         )
-    }
-
-    private fun haversineDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371000.0 // Earth radius in meters
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2).pow(2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLon / 2).pow(2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return r * c
-    }
-
-    fun haversineDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        return haversineDistanceMeters(lat1, lon1, lat2, lon2) / 1000.0
     }
 
     fun serializePoints(points: List<GpxPoint>): String {

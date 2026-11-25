@@ -1181,6 +1181,15 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun clearStageGpxData(stageId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = repository.clearStageGpxData(stageId)
+            if (updated != null) {
+                _userMessage.value = "Datos de GPX eliminados y valores reiniciados."
+            }
+        }
+    }
+
     fun addAccommodation(
         stageId: Long,
         name: String,
