@@ -129,7 +129,8 @@ class CaminoRepository(val context: Context) {
      * updates origin/destination if available, and stores track points JSON.
      */
     suspend fun importGpxIntoStage(stageId: Long, gpxXmlContent: String, markAsCompleted: Boolean = false): StageEntity? = withContext(Dispatchers.IO) {
-        val stage = dao.getStageByIdOnce(stageId) ?: return@withContext null
+        // Limpieza automática previa a la subida/sustitución del GPX
+        val clearedStage = clearStageGpxData(stageId) ?: return@withContext null
         val parseResult = GpxParser.parse(gpxXmlContent)
 
         // Reinicio obligatorio: los datos provienen estricta y únicamente del archivo GPX procesado
@@ -142,16 +143,16 @@ class CaminoRepository(val context: Context) {
         val serializedPoints = GpxParser.serializePoints(parseResult.points)
 
         // No se modifica origen ni destino; se actualizan distancia, desniveles, tiempo y dificultad calculada del GPX
-        val updatedStage = stage.copy(
-            origin = stage.origin,
-            destination = stage.destination,
+        val updatedStage = clearedStage.copy(
+            origin = clearedStage.origin,
+            destination = clearedStage.destination,
             distanceKm = dist,
             elevationGainM = gain,
             elevationLossM = loss,
             estimatedTime = timeStr,
             difficulty = autoDifficulty,
             gpxTrackJson = serializedPoints,
-            isCompleted = if (markAsCompleted) true else stage.isCompleted
+            isCompleted = if (markAsCompleted) true else clearedStage.isCompleted
         )
 
         dao.updateStage(updatedStage)
