@@ -155,4 +155,26 @@ class GpxParserTest {
         val result = GpxParser.parse(gpx)
         assertEquals("n/d", result.formattedTime)
     }
+
+    @Test
+    fun testBarometricSmoothTrackPreservesSmallUndulations() {
+        // Traza suave tipo reloj barométrico (1 Hz, muchos puntos planos y pasos graduales de 1 m)
+        // Debe detectar la subida de +30 m con umbral adaptativo de 2 m (sin perder micro-ondulaciones de 3 m)
+        val sb = StringBuilder()
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?><gpx version=\"1.1\"><trk><trkseg>")
+        var ele = 100.0
+        for (i in 0 until 1000) {
+            // 10 subidas y bajadas de 3 m (100 -> 103 -> 100) espaciadas cada 100 puntos
+            val mod = i % 100
+            if (mod in 1..3) ele += 1.0
+            else if (mod in 51..53) ele -= 1.0
+            val lat = 43.0 + i * 0.00001
+            sb.append("<trkpt lat=\"$lat\" lon=\"-8.0\"><ele>$ele</ele></trkpt>")
+        }
+        sb.append("</trkseg></trk></gpx>")
+
+        val result = GpxParser.parse(sb.toString())
+        assertTrue("Desnivel positivo esperado >= 20 m (con umbral 5 m daría 0), obtenido: ${result.elevationGainM}", result.elevationGainM >= 20)
+        assertTrue("Desnivel negativo esperado >= 20 m (con umbral 5 m daría 0), obtenido: ${result.elevationLossM}", result.elevationLossM >= 20)
+    }
 }

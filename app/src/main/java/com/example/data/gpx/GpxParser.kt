@@ -44,7 +44,37 @@ object GpxParser {
 
     const val EARTH_RADIUS_METERS = 6371008.8
     const val ELEVATION_THRESHOLD_M = 5.0
+    const val ELEVATION_THRESHOLD_BAROMETRIC_M = 2.0
     const val MOVING_SPEED_MS = 0.5
+
+    /**
+     * Determina el umbral de histéresis adecuado según el ruido de elevación del segmento:
+     * - Trazas suaves / barométricas (1 Hz, baja inversión de pendiente): 2.0 m.
+     * - Trazas GPS estándar con ruido decimal: 5.0 m.
+     */
+    private fun effectiveElevationThreshold(elePoints: List<RawGpxPoint>): Double {
+        if (elePoints.size < 100) return ELEVATION_THRESHOLD_M
+        var sumAbsDiff = 0.0
+        var reversals = 0
+        var prevDir = 0
+        for (i in 1 until elePoints.size) {
+            val d = elePoints[i].ele - elePoints[i - 1].ele
+            sumAbsDiff += abs(d)
+            if (d != 0.0) {
+                val dir = if (d > 0) 1 else -1
+                if (prevDir != 0 && dir != prevDir) reversals++
+                prevDir = dir
+            }
+        }
+        val n = elePoints.size - 1
+        val meanAbsDiff = sumAbsDiff / n
+        val reversalRatio = reversals.toDouble() / n
+        return if (meanAbsDiff < 0.15 && reversalRatio < 0.05) {
+            ELEVATION_THRESHOLD_BAROMETRIC_M
+        } else {
+            ELEVATION_THRESHOLD_M
+        }
+    }
 
     private fun safeLog(tag: String, msg: String) {
         try {
@@ -259,7 +289,7 @@ object GpxParser {
         }
         val distanceKm = Math.round((totalDistanceMeters / 1000.0) * 100.0) / 100.0
 
-        // 2. DESNIVEL (+ y -) CON ALTITUDES ORIGINALES E HISTÉRESIS DE 5 METROS
+        // 2. DESNIVEL (+ y -) CON ALTITUDES ORIGINALES E HISTÉRESIS ADAPTATIVA (2m barométrico / 5m GPS)
         var accumGain = 0.0
         var accumLoss = 0.0
         var minElevation = Double.MAX_VALUE
@@ -269,6 +299,7 @@ object GpxParser {
             val elePoints = segment.filter { it.hasEle }
             if (elePoints.isEmpty()) continue
 
+            val threshold = effectiveElevationThreshold(elePoints)
             var refEle = elePoints[0].ele
             if (refEle < minElevation) minElevation = refEle
             if (refEle > maxElevation) maxElevation = refEle
@@ -279,7 +310,7 @@ object GpxParser {
                 if (currentEle > maxElevation) maxElevation = currentEle
 
                 val diff = currentEle - refEle
-                if (abs(diff) >= ELEVATION_THRESHOLD_M) {
+                if (abs(diff) >= threshold) {
                     if (diff > 0) {
                         accumGain += diff
                     } else {
