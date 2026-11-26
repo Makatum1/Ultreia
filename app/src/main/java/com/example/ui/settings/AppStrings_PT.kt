@@ -134,6 +134,8 @@ val ptStrings: Map<String, String> = mapOf(
     "feedback_desc" to "Tem alguma ideia para melhorar o Ultreia, encontrou algum problema ou simplesmente precisa de ajuda para organizar um Caminho? A sua opinião é muito valiosa para nós. Toque abaixo para nos escrever.",
     "settings_desc" to "Preferências gerais, tema e idiomas suportados",
     "backup_section_title" to "Cópias de Segurança e Restauração",
+    "date_cascade_title" to "Alteração de data",
+    "date_cascade_desc" to "Alterou a data desta etapa. Pretende também atualizar as datas das etapas seguintes para manter a ordem?",
     "date_cascade_message" to "Se alterar a data de início, as datas de todas as etapas seguintes serão recalculadas automaticamente. Deseja continuar?",
     "date_cascade_yes" to "Sim, recalcular",
     "date_cascade_no" to "Não, manter",

@@ -17,4 +17,6 @@
     <string name="number_abbr">序号</string>
     <string name="stage_number_label">赛段编号</string>
     <string name="day_number_label">日程编号</string>
+    <string name="date_cascade_title">更改日期</string>
+    <string name="date_cascade_desc">您已更改此赛段的日期。是否也要更新后续赛段的日期以保持顺序？</string>
 </resources>

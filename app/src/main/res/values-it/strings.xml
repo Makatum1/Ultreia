@@ -17,4 +17,6 @@
     <string name="number_abbr">N°</string>
     <string name="stage_number_label">Numero di Tappa</string>
     <string name="day_number_label">Numero di Giorno</string>
+    <string name="date_cascade_title">Cambio di data</string>
+    <string name="date_cascade_desc">Hai cambiato la data di questa tappa. Vuoi aggiornare anche le date delle tappe successive per mantenere l\'ordine?</string>
 </resources>

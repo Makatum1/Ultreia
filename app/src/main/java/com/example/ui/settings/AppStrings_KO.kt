@@ -134,6 +134,8 @@ val koStrings: Map<String, String> = mapOf(
     "feedback_desc" to "Ultreia를 개선할 아이디어가 있거나, 문제를 발견했거나, 순례길을 계획하는 데 도움이 필요하신가요? 여러분의 의견은 저희에게 소중합니다. 아래를 눌러 메시지를 보내주세요.",
     "settings_desc" to "환경설정, 화면 테마 및 지원 언어",
     "backup_section_title" to "백업 및 데이터 복원",
+    "date_cascade_title" to "날짜 변경",
+    "date_cascade_desc" to "이 구간의 날짜를 변경했습니다. 순서를 유지하기 위해 이후 구간들의 날짜도 함께 업데이트하시겠습니까?",
     "date_cascade_message" to "시작 날짜를 변경하면 이후 모든 구간의 날짜가 자동으로 재계산됩니다. 계속하시겠습니까?",
     "date_cascade_yes" to "예, 재계산합니다",
     "date_cascade_no" to "아니요, 그대로 둡니다",

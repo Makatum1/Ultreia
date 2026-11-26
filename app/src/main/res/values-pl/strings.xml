@@ -17,4 +17,6 @@
     <string name="number_abbr">Nr</string>
     <string name="stage_number_label">Numer Etapu</string>
     <string name="day_number_label">Numer Dnia</string>
+    <string name="date_cascade_title">Zmiana daty</string>
+    <string name="date_cascade_desc">Zmieniłeś datę tego etapu. Czy chcesz również zaktualizować daty kolejnych etapów, aby zachować kolejność?</string>
 </resources>

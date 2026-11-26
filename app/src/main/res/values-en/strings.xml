@@ -17,4 +17,6 @@
     <string name="number_abbr">No.</string>
     <string name="stage_number_label">Stage Number</string>
     <string name="day_number_label">Day Number</string>
+    <string name="date_cascade_title">Date Change</string>
+    <string name="date_cascade_desc">You have changed the date of this stage. Do you want to update the dates of the following stages to keep them in order?</string>
 </resources>

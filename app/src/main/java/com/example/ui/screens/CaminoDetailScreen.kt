@@ -964,13 +964,7 @@ fun StageCardItem(
                         )
                         Text("•", color = MaterialTheme.colorScheme.outline)
                         Text(
-                            text = "+${stage.elevationGainM}m",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text("•", color = MaterialTheme.colorScheme.outline)
-                        Text(
-                            text = stage.estimatedTime,
+                            text = "+${stage.elevationGainM} m / -${stage.elevationLossM} m",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1004,18 +998,35 @@ fun StageCardItem(
                             )
                         }
 
-                        if (stage.stageNotes.isNotBlank()) {
+                        val cleanTime = stage.estimatedTime.trim()
+                        val hasValidTime = cleanTime.isNotEmpty() &&
+                            !cleanTime.equals("n/d", ignoreCase = true) &&
+                            !cleanTime.equals("null", ignoreCase = true) &&
+                            cleanTime != "-" &&
+                            cleanTime != "--"
+
+                        if (hasValidTime) {
                             Surface(
-                                color = PilgrimYellowLight,
-                                shape = RoundedCornerShape(4.dp)
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(6.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(10.dp), tint = PilgrimYellowDark)
-                                    Spacer(Modifier.width(2.dp))
-                                    Text(viewModel.string("stage_tips_tag"), fontSize = 10.sp, color = PilgrimYellowDark, fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(11.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(Modifier.width(3.dp))
+                                    Text(
+                                        text = cleanTime,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }

@@ -17,4 +17,6 @@
     <string name="number_abbr">Nr.</string>
     <string name="stage_number_label">Etappenummer</string>
     <string name="day_number_label">Dagnummer</string>
+    <string name="date_cascade_title">Datumwijziging</string>
+    <string name="date_cascade_desc">Je hebt de datum van deze etappe gewijzigd. Wil je ook de datums van de volgende etappes bijwerken om de volgorde te behouden?</string>
 </resources>
