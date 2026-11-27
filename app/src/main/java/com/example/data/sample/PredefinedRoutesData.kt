@@ -1428,6 +1428,12 @@ object PredefinedRoutesData {
     }
 
     fun getLocalizedDifficulty(diff: String, mode: LanguageMode): String {
+        if (diff.contains("|")) {
+            return diff.split("|")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .joinToString(" / ") { getLocalizedDifficulty(it, mode) }
+        }
         val clean = diff.trim().lowercase()
         return when {
             clean.contains("muy") || clean.contains("very") || clean.contains("sehr") || clean.contains("très") || clean.contains("molto") || clean.contains("zeer") || clean.contains("bardzo") || clean.contains("极") || clean.contains("schwer") || clean.contains("difficult") -> when (mode) {

@@ -251,46 +251,91 @@ class CaminoRepository(val context: Context) {
             return 0.0
         }
 
-        fun evaluateDistanceLevel(distanceKm: Double, elevationM: Int): Int {
+        /**
+         * Evaluación de distancia (km) con franjas de transición de 1,5 - 2 km:
+         * - < 16.5 km -> Fácil (0.0)
+         * - 16.5 - 18.5 km -> Fácil|Moderado (0.5)
+         * - 18.5 - 25.5 km -> Moderado (1.0)
+         * - 25.5 - 27.5 km -> Moderado|Exigente (1.5)
+         * - 27.5 - 32.5 km -> Exigente (2.0)
+         * - 32.5 - 34.5 km -> Exigente|Muy Exigente (2.5)
+         * - > 34.5 km -> Muy Exigente (3.0)
+         */
+        fun evaluateDistanceScore(distanceKm: Double): Double {
             return when {
-                distanceKm < 17.4 -> 0
-                distanceKm <= 18.6 -> if (elevationM >= 350) 1 else 0
-                distanceKm < 27.2 -> 1
-                distanceKm <= 28.8 -> if (elevationM >= 700) 2 else 1
-                distanceKm < 33.0 -> 2
-                distanceKm <= 35.0 -> if (elevationM >= 1100) 3 else 2
-                else -> 3
-            }
-        }
-
-        fun evaluateElevationLevel(elevationM: Int, distanceKm: Double): Int {
-            return when {
-                elevationM < 380 -> 0
-                elevationM <= 425 -> if (distanceKm >= 16.0) 1 else 0
-                elevationM < 765 -> 1
-                elevationM <= 835 -> if (distanceKm >= 25.0) 2 else 1
-                elevationM < 1160 -> 2
-                elevationM <= 1240 -> if (distanceKm >= 30.0) 3 else 2
-                else -> 3
+                distanceKm < 16.5 -> 0.0
+                distanceKm <= 18.5 -> 0.5
+                distanceKm < 25.5 -> 1.0
+                distanceKm <= 27.5 -> 1.5
+                distanceKm < 32.5 -> 2.0
+                distanceKm <= 34.5 -> 2.5
+                else -> 3.0
             }
         }
 
         /**
-         * Evaluación orientativa de dificultad según distancia y desnivel:
-         * - Baremos Distancia: <18 km (Fácil), 18-28 km (Moderado), 28-34 km (Exigente), >34 km (Muy Exigente)
-         * - Baremos Desnivel: <400 m (Fácil), 400-800 m (Moderado), 800-1200 m (Exigente), >1200 m (Muy Exigente)
-         * - Zona de transición orientativa para evitar saltos bruscos por unos metros o ligeras variaciones
-         * - Regla de oro: El nivel final es siempre el más alto entre la evaluación de distancia y desnivel
+         * Evaluación de desnivel máximo (mayor entre subida y bajada, m):
+         * - < 280 m -> Fácil (0.0)
+         * - 280 - 350 m -> Fácil|Moderado (0.5)
+         * - 350 - 570 m -> Moderado (1.0)
+         * - 570 - 650 m -> Moderado|Exigente (1.5)
+         * - 650 - 900 m -> Exigente (2.0)
+         * - 900 - 1020 m -> Exigente|Muy Exigente (2.5)
+         * - > 1020 m -> Muy Exigente (3.0)
+         */
+        fun evaluateElevationScore(elevationM: Int): Double {
+            return when {
+                elevationM < 280 -> 0.0
+                elevationM <= 350 -> 0.5
+                elevationM < 570 -> 1.0
+                elevationM <= 650 -> 1.5
+                elevationM < 900 -> 2.0
+                elevationM <= 1020 -> 2.5
+                else -> 3.0
+            }
+        }
+
+        /**
+         * Evaluación combinada por Km-Esfuerzo real:
+         * kmEsfuerzo = km + (subida / 100) + (bajada / 300)
+         * y penalización por densidad de subida alta (>= 35 m/km con >= 800 m de subida).
+         */
+        fun evaluateEffortScore(distanceKm: Double, elevationGainM: Int, elevationLossM: Int): Double {
+            val kmEffort = distanceKm + (elevationGainM / 100.0) + (elevationLossM / 300.0)
+            var score = when {
+                kmEffort < 18.5 -> 0.0
+                kmEffort <= 20.5 -> 0.5
+                kmEffort < 29.0 -> 1.0
+                kmEffort <= 31.0 -> 1.5
+                kmEffort < 38.0 -> 2.0
+                kmEffort <= 41.0 -> 2.5
+                else -> 3.0
+            }
+            val gainPerKm = if (distanceKm > 0.5) elevationGainM / distanceKm else 0.0
+            if (gainPerKm >= 35.0 && elevationGainM >= 800) {
+                score = maxOf(score, if (kmEffort >= 38.0 || elevationGainM > 1020) 3.0 else 2.5)
+            }
+            return score
+        }
+
+        /**
+         * Evaluación realista de dificultad combinando distancia, desnivel y Km-Esfuerzo.
+         * En zonas límite devuelve valores combinados ("Fácil|Moderado", "Moderado|Exigente", "Exigente|Muy Exigente")
+         * para mostrar ambas tarjetas de dificultad en la interfaz.
          */
         fun calculateAutoDifficulty(distanceKm: Double, elevationGainM: Int, elevationLossM: Int): String {
             val maxElevation = maxOf(elevationGainM, elevationLossM)
-            val distLevel = evaluateDistanceLevel(distanceKm, maxElevation)
-            val elevLevel = evaluateElevationLevel(maxElevation, distanceKm)
-            val finalLevel = maxOf(distLevel, elevLevel)
-            return when (finalLevel) {
-                0 -> "Fácil"
-                1 -> "Moderado"
-                2 -> "Exigente"
+            val distScore = evaluateDistanceScore(distanceKm)
+            val elevScore = evaluateElevationScore(maxElevation)
+            val effortScore = evaluateEffortScore(distanceKm, elevationGainM, elevationLossM)
+            val finalScore = maxOf(distScore, elevScore, effortScore)
+            return when (finalScore) {
+                0.0 -> "Fácil"
+                0.5 -> "Fácil|Moderado"
+                1.0 -> "Moderado"
+                1.5 -> "Moderado|Exigente"
+                2.0 -> "Exigente"
+                2.5 -> "Exigente|Muy Exigente"
                 else -> "Muy Exigente"
             }
         }

@@ -32,4 +32,33 @@ class ExampleUnitTest {
         assertTrue(result.distanceKm > 0)
         assertTrue(result.elevationLossM > 0)
     }
+
+    @Test
+    fun testRealisticAutoDifficulty() {
+        // Caso real reportado: 28.65 km, +457 m / -386 m -> Exigente
+        assertEquals(
+            "Exigente",
+            com.example.data.repository.CaminoRepository.calculateAutoDifficulty(28.65, 457, 386)
+        )
+        // 25 km con +1000 m -> Exigente|Muy Exigente (pendiente muy alta)
+        assertEquals(
+            "Exigente|Muy Exigente",
+            com.example.data.repository.CaminoRepository.calculateAutoDifficulty(25.0, 1000, 0)
+        )
+        // 35 km con +1000 m -> Muy Exigente
+        assertEquals(
+            "Muy Exigente",
+            com.example.data.repository.CaminoRepository.calculateAutoDifficulty(35.0, 1000, 0)
+        )
+        // Franja 16.5-18.5 km -> Fácil|Moderado
+        assertEquals(
+            "Fácil|Moderado",
+            com.example.data.repository.CaminoRepository.calculateAutoDifficulty(17.5, 120, 100)
+        )
+        // Franja 25.5-27.5 km -> Moderado|Exigente
+        assertEquals(
+            "Moderado|Exigente",
+            com.example.data.repository.CaminoRepository.calculateAutoDifficulty(26.5, 300, 300)
+        )
+    }
 }

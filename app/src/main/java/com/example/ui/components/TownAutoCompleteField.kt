@@ -2,12 +2,17 @@ package com.example.ui.components
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.screens.TownCoordinates
@@ -27,17 +32,22 @@ fun TownAutoCompleteField(
     context: Context = LocalContext.current
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var dismissedByUser by remember { mutableStateOf(false) }
     var suggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(value) {
         val trimmed = value.trim()
-        if (trimmed.length >= 2) {
+        if (trimmed.length >= 2 && !dismissedByUser) {
             delay(250) // Debounce para no saturar peticiones
             val list = withContext(Dispatchers.IO) {
                 TownCoordinates.searchTowns(trimmed, context)
             }
             suggestions = list
-            expanded = list.isNotEmpty() && !list.any { it.equals(trimmed, ignoreCase = true) }
+            if (!dismissedByUser) {
+                expanded = list.isNotEmpty() && !list.any { it.equals(trimmed, ignoreCase = true) }
+            }
         } else {
             suggestions = emptyList()
             expanded = false
@@ -52,11 +62,21 @@ fun TownAutoCompleteField(
         OutlinedTextField(
             value = value,
             onValueChange = {
+                dismissedByUser = false
                 onValueChange(it)
             },
             label = { Text(label) },
             placeholder = { Text(placeholder) },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    dismissedByUser = true
+                    expanded = false
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
+                }
+            ),
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryEditable, enabled = true)
@@ -86,8 +106,10 @@ fun TownAutoCompleteField(
                             )
                         },
                         onClick = {
+                            dismissedByUser = true
                             onValueChange(town)
                             expanded = false
+                            keyboardController?.hide()
                         },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                     )

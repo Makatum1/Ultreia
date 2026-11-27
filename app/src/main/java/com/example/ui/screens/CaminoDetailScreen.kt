@@ -49,6 +49,7 @@ import com.example.ui.CaminoViewModel
 import com.example.ui.components.SettingsActionMenu
 import com.example.ui.components.DifficultySelectionGroup
 import com.example.ui.components.normalizeDifficulty
+import com.example.ui.components.parseDifficultyKeys
 import com.example.ui.components.TownAutoCompleteField
 import com.example.ui.settings.AppStrings
 import com.example.ui.theme.*
@@ -976,26 +977,28 @@ fun StageCardItem(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val normDiff = normalizeDifficulty(stage.difficulty)
-                        val (diffBgColor, diffTextColor) = when (normDiff) {
-                            "Fácil" -> Pair(Color(0xFF16A34A), Color.White)
-                            "Moderado" -> Pair(Color(0xFFEAB308), Color(0xFF1F2937))
-                            "Exigente" -> Pair(Color(0xFFF97316), Color.White)
-                            "Muy Exigente" -> Pair(Color(0xFFDC2626), Color.White)
-                            else -> Pair(Color(0xFFEAB308), Color(0xFF1F2937))
-                        }
+                        val diffKeys = parseDifficultyKeys(stage.difficulty)
+                        diffKeys.forEach { key ->
+                            val (diffBgColor, diffTextColor) = when (key) {
+                                "Fácil" -> Pair(Color(0xFF16A34A), Color.White)
+                                "Moderado" -> Pair(Color(0xFFEAB308), Color(0xFF1F2937))
+                                "Exigente" -> Pair(Color(0xFFF97316), Color.White)
+                                "Muy Exigente" -> Pair(Color(0xFFDC2626), Color.White)
+                                else -> Pair(Color(0xFFEAB308), Color(0xFF1F2937))
+                            }
 
-                        Surface(
-                            color = diffBgColor,
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = viewModel.localizeDifficulty(stage.difficulty),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = diffTextColor,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
-                            )
+                            Surface(
+                                color = diffBgColor,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = viewModel.localizeDifficulty(key),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = diffTextColor,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+                                )
+                            }
                         }
 
                         val cleanTime = stage.estimatedTime.trim()

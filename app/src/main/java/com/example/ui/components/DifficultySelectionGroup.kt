@@ -69,6 +69,19 @@ fun normalizeDifficulty(diff: String?): String {
     }
 }
 
+/**
+ * Extrae 1 o 2 claves de dificultad cuando viene una dificultad combinada (ej. "Moderado|Exigente").
+ */
+fun parseDifficultyKeys(diff: String?): List<String> {
+    if (diff.isNullOrBlank()) return listOf("Moderado")
+    val parts = diff.split("|", "/", ",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { normalizeDifficulty(it) }
+        .distinct()
+    return if (parts.isEmpty()) listOf("Moderado") else parts.take(2)
+}
+
 @Composable
 fun DifficultySelectionGroup(
     selectedDifficulty: String,
@@ -76,7 +89,7 @@ fun DifficultySelectionGroup(
     viewModel: CaminoViewModel? = null,
     modifier: Modifier = Modifier
 ) {
-    val currentSelected = normalizeDifficulty(selectedDifficulty)
+    val selectedKeys = parseDifficultyKeys(selectedDifficulty)
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -84,7 +97,7 @@ fun DifficultySelectionGroup(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             DIFFICULTY_OPTIONS.take(2).forEach { option ->
-                val isSelected = (option.key == currentSelected)
+                val isSelected = selectedKeys.contains(option.key)
                 DifficultyButton(
                     option = option,
                     isSelected = isSelected,
@@ -100,7 +113,7 @@ fun DifficultySelectionGroup(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             DIFFICULTY_OPTIONS.drop(2).forEach { option ->
-                val isSelected = (option.key == currentSelected)
+                val isSelected = selectedKeys.contains(option.key)
                 DifficultyButton(
                     option = option,
                     isSelected = isSelected,
