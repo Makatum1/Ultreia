@@ -30,6 +30,8 @@ object PdfExporter {
 
     private const val PAGE_WIDTH = 595 // Standard A4 width in points
     private const val PAGE_HEIGHT = 842 // Standard A4 height in points
+    private const val LANDSCAPE_WIDTH = 842 // Standard A4 landscape width in points
+    private const val LANDSCAPE_HEIGHT = 595 // Standard A4 landscape height in points
     private const val MARGIN = 40f
 
     // Official Travel Guide Luxury Editorial Palette
@@ -2676,6 +2678,487 @@ object PdfExporter {
             }
         }
         return currentY
+    }
+
+    /**
+     * Exporta el mapa de la vista "Total" en formato A4 Horizontal (apaisado),
+     * separando por zonas geográficas según el perfil (Caminos vs Viajes) e incluyendo leyenda de colores.
+     */
+    suspend fun generateAndShareTotalMapPdf(
+        context: Context,
+        caminosChronological: List<CaminoEntity>,
+        stages: List<StageEntity>,
+        isTravel: Boolean,
+        languageMode: LanguageMode = LanguageMode.ES
+    ): Result<File> = withContext(Dispatchers.IO) {
+        val pdfDocument = PdfDocument()
+        try {
+            val filteredCaminos = caminosChronological.filter { it.isTravelGuide == isTravel }
+            val stagesByCamino = stages.groupBy { it.caminoId }
+
+            data class CaminoGeoData(
+                val camino: CaminoEntity,
+                val number: Int,
+                val colorInt: Int,
+                val totalKm: Double,
+                val stageLines: List<List<com.example.data.model.GpxPoint>>,
+                val allPoints: List<com.example.data.model.GpxPoint>,
+                val centerLat: Double?,
+                val centerLon: Double?
+            )
+
+            val geoList = filteredCaminos.mapIndexed { index, c ->
+                val colorHex = com.example.ui.screens.getCaminoColorHex(c.id, index)
+                val colorInt = try { Color.parseColor(colorHex) } catch (_: Exception) { COLOR_BLUE }
+                val cStages = (stagesByCamino[c.id] ?: emptyList()).sortedBy { it.dayNumber }
+                val lines = mutableListOf<List<com.example.data.model.GpxPoint>>()
+                val pts = mutableListOf<com.example.data.model.GpxPoint>()
+
+                for (stg in cStages) {
+                    val gpx = GpxParser.deserializePoints(stg.gpxTrackJson)
+                    if (gpx.size >= 2) {
+                        lines.add(gpx)
+                        pts.addAll(gpx)
+                    } else {
+                        val sCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.origin, context)
+                        val eCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.destination, context)
+                        if (sCoord != null && eCoord != null) {
+                            val pairPts = listOf(
+                                com.example.data.model.GpxPoint(sCoord.first, sCoord.second),
+                                com.example.data.model.GpxPoint(eCoord.first, eCoord.second)
+                            )
+                            lines.add(pairPts)
+                            pts.addAll(pairPts)
+                        } else if (sCoord != null) {
+                            pts.add(com.example.data.model.GpxPoint(sCoord.first, sCoord.second))
+                        } else if (eCoord != null) {
+                            pts.add(com.example.data.model.GpxPoint(eCoord.first, eCoord.second))
+                        }
+                    }
+                }
+
+                val cLat = if (pts.isNotEmpty()) pts.map { it.lat }.average() else null
+                val cLon = if (pts.isNotEmpty()) pts.map { it.lon }.average() else null
+                val km = if (cStages.isNotEmpty()) cStages.sumOf { it.distanceKm } else c.totalEstimatedKm
+
+                CaminoGeoData(
+                    camino = c,
+                    number = index + 1,
+                    colorInt = colorInt,
+                    totalKm = km,
+                    stageLines = lines,
+                    allPoints = pts,
+                    centerLat = cLat,
+                    centerLon = cLon
+                )
+            }
+
+            fun drawLandscapeHeader(canvas: Canvas, title: String, subtitle: String) {
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                paint.color = COLOR_HEADER_BG
+                canvas.drawRect(0f, 0f, LANDSCAPE_WIDTH.toFloat(), 48f, paint)
+                paint.color = COLOR_GOLD
+                canvas.drawRect(0f, 45f, LANDSCAPE_WIDTH.toFloat(), 48f, paint)
+
+                paint.color = Color.WHITE
+                paint.typeface = pdfTypeface(true)
+                paint.textSize = 9f
+                val brand = if (isTravel) "ULTREIA VIAJES" else "ULTREIA"
+                canvas.drawText("$brand  •  $subtitle", 28f, 18f, paint)
+
+                paint.textSize = 14f
+                canvas.drawText(title, 28f, 37f, paint)
+            }
+
+            fun drawLandscapeFooter(canvas: Canvas, pageNum: Int) {
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                paint.color = COLOR_DIVIDER
+                canvas.drawLine(28f, LANDSCAPE_HEIGHT - 26f, LANDSCAPE_WIDTH - 28f, LANDSCAPE_HEIGHT - 26f, paint)
+                paint.color = COLOR_MUTED
+                paint.textSize = 8f
+                paint.typeface = pdfTypeface(false)
+                val label = if (isTravel) tr("total_trips_scope", languageMode) else tr("total_caminos_scope", languageMode)
+                canvas.drawText("Ultreia • $label", 28f, LANDSCAPE_HEIGHT - 12f, paint)
+                val pText = "${tr("pdf_page", languageMode)} $pageNum"
+                val w = paint.measureText(pText)
+                canvas.drawText(pText, LANDSCAPE_WIDTH - 28f - w, LANDSCAPE_HEIGHT - 12f, paint)
+            }
+
+            fun drawZoneMapAndLegend(
+                canvas: Canvas,
+                items: List<CaminoGeoData>,
+                areaRect: RectF,
+                zoneTitle: String? = null,
+                minSpanDeg: Double = 1.2
+            ) {
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                var topOffset = areaRect.top
+                if (zoneTitle != null) {
+                    paint.color = COLOR_NAVY
+                    paint.typeface = pdfTypeface(true)
+                    paint.textSize = 11f
+                    canvas.drawText(zoneTitle, areaRect.left, topOffset + 12f, paint)
+                    topOffset += 18f
+                }
+
+                val contentRect = RectF(areaRect.left, topOffset, areaRect.right, areaRect.bottom)
+                val legendWidth = (contentRect.width() * 0.28f).coerceIn(135f, 220f)
+                val gap = 12f
+                val mapRect = RectF(contentRect.left, contentRect.top, contentRect.right - legendWidth - gap, contentRect.bottom)
+                val legendRect = RectF(mapRect.right + gap, contentRect.top, contentRect.right, contentRect.bottom)
+
+                // Renderizar mapa si hay puntos
+                val pts = items.flatMap { it.allPoints }
+                if (pts.isNotEmpty()) {
+                    var minLat = pts.minOf { it.lat }
+                    var maxLat = pts.maxOf { it.lat }
+                    var minLon = pts.minOf { it.lon }
+                    var maxLon = pts.maxOf { it.lon }
+
+                    if (maxLat - minLat < minSpanDeg) {
+                        val c = (minLat + maxLat) / 2.0
+                        minLat = c - minSpanDeg / 2.0
+                        maxLat = c + minSpanDeg / 2.0
+                    }
+                    if (maxLon - minLon < minSpanDeg) {
+                        val c = (minLon + maxLon) / 2.0
+                        minLon = c - minSpanDeg / 2.0
+                        maxLon = c + minSpanDeg / 2.0
+                    }
+
+                    val latMargin = maxOf((maxLat - minLat) * 0.14, 0.15)
+                    val lonMargin = maxOf((maxLon - minLon) * 0.14, 0.15)
+                    val bbMinLat = (minLat - latMargin).coerceIn(-85.0, 85.0)
+                    val bbMaxLat = (maxLat + latMargin).coerceIn(-85.0, 85.0)
+                    var bbMinLon = (minLon - lonMargin).coerceIn(-180.0, 180.0)
+                    var bbMaxLon = (maxLon + lonMargin).coerceIn(-180.0, 180.0)
+
+                    // Ajustar proporción al rectángulo apaisado del mapa
+                    val mapAspect = (mapRect.width() / mapRect.height().coerceAtLeast(1f)).toDouble()
+                    val mercYMin = latToMercatorY(bbMaxLat, 0)
+                    val mercYMax = latToMercatorY(bbMinLat, 0)
+                    val deltaY = (mercYMax - mercYMin).coerceAtLeast(0.0001)
+                    val deltaX = ((bbMaxLon - bbMinLon) / 360.0).coerceAtLeast(0.0001)
+
+                    if (deltaX / deltaY < mapAspect) {
+                        val centerLon = (bbMinLon + bbMaxLon) / 2.0
+                        val neededLon = deltaY * mapAspect * 360.0
+                        bbMinLon = (centerLon - neededLon / 2.0).coerceIn(-180.0, 180.0)
+                        bbMaxLon = (centerLon + neededLon / 2.0).coerceIn(-180.0, 180.0)
+                    }
+
+                    val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 13, 16)
+                    val mapBitmap = getSatelliteOrReliefBitmap(
+                        context, bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, zoom,
+                        mapRect.width().toInt().coerceAtLeast(100),
+                        mapRect.height().toInt().coerceAtLeast(100)
+                    )
+
+                    val xMinTile = lonToTileX(bbMinLon, zoom)
+                    val xMaxTile = lonToTileX(bbMaxLon, zoom)
+                    val yMinMerc = latToMercatorY(bbMaxLat, zoom)
+                    val yMaxMerc = latToMercatorY(bbMinLat, zoom)
+                    val spanX = ((xMaxTile - xMinTile) * 256.0).coerceAtLeast(1.0)
+                    val spanY = ((yMaxMerc - yMinMerc) * 256.0).coerceAtLeast(1.0)
+                    val scale = minOf(mapRect.width() / spanX, mapRect.height() / spanY).toFloat()
+                    val actualW = (spanX * scale).toFloat()
+                    val actualH = (spanY * scale).toFloat()
+                    val originX = mapRect.left + (mapRect.width() - actualW) / 2f
+                    val originY = mapRect.top + (mapRect.height() - actualH) / 2f
+
+                    val clipPath = Path().apply { addRoundRect(mapRect, 8f, 8f, Path.Direction.CW) }
+                    canvas.save()
+                    canvas.clipPath(clipPath)
+
+                    paint.color = Color.rgb(245, 247, 250)
+                    canvas.drawRect(mapRect, paint)
+
+                    val destRect = RectF(originX, originY, originX + actualW, originY + actualH)
+                    val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        isFilterBitmap = true
+                        isDither = true
+                    }
+                    canvas.drawBitmap(mapBitmap, null, destRect, bmpPaint)
+
+                    fun px(lon: Double) = originX + ((lonToTileX(lon, zoom) - xMinTile) * 256.0 * scale).toFloat()
+                    fun py(lat: Double) = originY + ((latToMercatorY(lat, zoom) - yMinMerc) * 256.0 * scale).toFloat()
+
+                    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.STROKE
+                        strokeCap = Paint.Cap.ROUND
+                        strokeJoin = Paint.Join.ROUND
+                    }
+
+                    for (item in items) {
+                        for (line in item.stageLines) {
+                            if (line.size < 2) continue
+                            val path = Path()
+                            for (i in line.indices) {
+                                val x = px(line[i].lon)
+                                val y = py(line[i].lat)
+                                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                            }
+                            linePaint.color = Color.argb(225, 255, 255, 255)
+                            linePaint.strokeWidth = 3.8f
+                            canvas.drawPath(path, linePaint)
+
+                            linePaint.color = item.colorInt
+                            linePaint.strokeWidth = 2.2f
+                            canvas.drawPath(path, linePaint)
+                        }
+                        if (item.allPoints.isNotEmpty()) {
+                            val first = item.allPoints.first()
+                            val last = item.allPoints.last()
+                            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+                            dotPaint.color = Color.WHITE
+                            canvas.drawCircle(px(first.lon), py(first.lat), 4.2f, dotPaint)
+                            canvas.drawCircle(px(last.lon), py(last.lat), 4.2f, dotPaint)
+                            dotPaint.color = item.colorInt
+                            canvas.drawCircle(px(first.lon), py(first.lat), 2.8f, dotPaint)
+                            canvas.drawCircle(px(last.lon), py(last.lat), 2.8f, dotPaint)
+                        }
+                    }
+                    canvas.restore()
+
+                    val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = 1f
+                        color = COLOR_CARD_BORDER
+                    }
+                    canvas.drawRoundRect(mapRect, 8f, 8f, borderPaint)
+                } else {
+                    paint.color = COLOR_CARD_BG
+                    canvas.drawRoundRect(mapRect, 8f, 8f, paint)
+                    paint.color = COLOR_MUTED
+                    paint.textSize = 10f
+                    paint.typeface = pdfTypeface(false)
+                    canvas.drawText("Sin coordenadas registradas en esta zona", mapRect.left + 16f, mapRect.centerY(), paint)
+                }
+
+                // Dibujar Leyenda a la derecha
+                paint.color = COLOR_CARD_BG
+                canvas.drawRoundRect(legendRect, 8f, 8f, paint)
+                val lBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.STROKE
+                    strokeWidth = 1f
+                    color = COLOR_CARD_BORDER
+                }
+                canvas.drawRoundRect(legendRect, 8f, 8f, lBorder)
+
+                var ly = legendRect.top + 18f
+                paint.color = COLOR_NAVY
+                paint.typeface = pdfTypeface(true)
+                paint.textSize = 10f
+                val legendTitle = if (isTravel) "LEYENDA DE VIAJES" else "LEYENDA DE CAMINOS"
+                canvas.drawText(legendTitle, legendRect.left + 10f, ly, paint)
+                ly += 8f
+                paint.color = COLOR_DIVIDER
+                canvas.drawLine(legendRect.left + 10f, ly, legendRect.right - 10f, ly, paint)
+                ly += 14f
+
+                val maxLegendY = legendRect.bottom - 10f
+                for (item in items) {
+                    if (ly > maxLegendY) break
+                    val badgeX = legendRect.left + 17f
+                    val badgeY = ly - 3.5f
+                    paint.color = item.colorInt
+                    canvas.drawCircle(badgeX, badgeY, 7.5f, paint)
+
+                    paint.color = Color.WHITE
+                    paint.typeface = pdfTypeface(true)
+                    paint.textSize = 7.5f
+                    val numStr = "${item.number}"
+                    val numW = paint.measureText(numStr)
+                    canvas.drawText(numStr, badgeX - numW / 2f, badgeY + 2.5f, paint)
+
+                    paint.color = COLOR_SLATE
+                    paint.typeface = pdfTypeface(true)
+                    paint.textSize = 8.5f
+                    val maxTitleW = legendRect.width() - 36f
+                    var titleText = item.camino.title
+                    while (titleText.length > 3 && paint.measureText("$titleText…") > maxTitleW) {
+                        titleText = titleText.dropLast(1)
+                    }
+                    if (titleText != item.camino.title) titleText = "$titleText…"
+                    canvas.drawText(titleText, legendRect.left + 30f, ly, paint)
+
+                    if (item.totalKm > 0.0 && ly + 10f <= maxLegendY) {
+                        ly += 10f
+                        paint.color = COLOR_MUTED
+                        paint.typeface = pdfTypeface(false)
+                        paint.textSize = 7.5f
+                        val kmTxt = String.format(java.util.Locale.US, "%.1f km", item.totalKm)
+                        canvas.drawText(kmTxt, legendRect.left + 30f, ly, paint)
+                    }
+                    ly += 16f
+                }
+            }
+
+            var pageNumber = 1
+
+            if (!isTravel) {
+                // =====================================================
+                // PERFIL CAMINOS:
+                // 1) Península Ibérica / España / Portugal / Francia (1 A4 Horizontal)
+                // 2) Canarias y Baleares (1 A4 Horizontal dividida a mitad si hay rutas)
+                // =====================================================
+                val canarias = mutableListOf<CaminoGeoData>()
+                val baleares = mutableListOf<CaminoGeoData>()
+                val principal = mutableListOf<CaminoGeoData>()
+
+                for (item in geoList) {
+                    val lat = item.centerLat
+                    val lon = item.centerLon
+                    when {
+                        lat != null && lon != null && lat in 27.0..29.8 && lon in -18.5..-13.0 -> canarias.add(item)
+                        lat != null && lon != null && lat in 38.5..40.3 && lon in 1.0..4.5 -> baleares.add(item)
+                        else -> principal.add(item)
+                    }
+                }
+
+                // Página 1: Principal
+                val p1Info = PdfDocument.PageInfo.Builder(LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, pageNumber).create()
+                val p1 = pdfDocument.startPage(p1Info)
+                drawLandscapeHeader(p1.canvas, "RED TOTAL DE CAMINOS", "Península Ibérica y Rutas Continentales")
+                drawZoneMapAndLegend(
+                    p1.canvas,
+                    principal.ifEmpty { geoList },
+                    RectF(28f, 60f, LANDSCAPE_WIDTH - 28f, LANDSCAPE_HEIGHT - 36f),
+                    minSpanDeg = 1.5
+                )
+                drawLandscapeFooter(p1.canvas, pageNumber)
+                pdfDocument.finishPage(p1)
+                pageNumber++
+
+                // Página 2: Canarias y Baleares (media página para cada archipiélago)
+                if (canarias.isNotEmpty() || baleares.isNotEmpty()) {
+                    val p2Info = PdfDocument.PageInfo.Builder(LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, pageNumber).create()
+                    val p2 = pdfDocument.startPage(p2Info)
+                    drawLandscapeHeader(p2.canvas, "RED TOTAL DE CAMINOS", "Islas Canarias y Baleares")
+
+                    val halfW = (LANDSCAPE_WIDTH - 56f - 16f) / 2f
+                    val leftHalf = RectF(28f, 60f, 28f + halfW, LANDSCAPE_HEIGHT - 36f)
+                    val rightHalf = RectF(28f + halfW + 16f, 60f, LANDSCAPE_WIDTH - 28f, LANDSCAPE_HEIGHT - 36f)
+
+                    drawZoneMapAndLegend(p2.canvas, canarias, leftHalf, zoneTitle = "Islas Canarias", minSpanDeg = 0.8)
+                    drawZoneMapAndLegend(p2.canvas, baleares, rightHalf, zoneTitle = "Islas Baleares", minSpanDeg = 0.8)
+
+                    drawLandscapeFooter(p2.canvas, pageNumber)
+                    pdfDocument.finishPage(p2)
+                    pageNumber++
+                }
+            } else {
+                // =====================================================
+                // PERFIL VIAJES:
+                // Páginas separadas por zonas geográficas (solo zonas con viajes)
+                // =====================================================
+                fun classifyTravelZone(lat: Double?, lon: Double?): String {
+                    if (lat == null || lon == null) return "Otras Zonas"
+                    return when {
+                        lat in 27.5..44.0 && lon in -13.5..4.5 -> "Península Ibérica y Marruecos"
+                        lat in 35.0..71.5 && lon in -25.0..30.0 -> "Europa Occidental"
+                        lat in 7.0..24.5 && lon in -93.0..-59.0 -> "Centroamérica"
+                        lat in -56.0..13.5 && lon in -82.0..-34.0 -> "Sudamérica"
+                        (lat >= 49.0 && lon in -141.0..-52.0) || (lat in 41.7..49.0 && lon in -95.0..-52.0) -> "Canadá"
+                        (lat in 24.0..49.5 && lon in -125.0..-66.0) || (lat in 51.0..71.5 && lon in -170.0..-130.0) || (lat in 18.5..22.5 && lon in -161.0..-154.5) -> "EEUU"
+                        lat in -48.0..0.0 && (lon in 110.0..180.0 || lon in -180.0..-165.0) -> "Oceanía"
+                        lat in -11.0..77.0 && lon in 25.0..180.0 -> "Asia"
+                        else -> "Otras Zonas"
+                    }
+                }
+
+                val zoneOrder = listOf(
+                    "Península Ibérica y Marruecos",
+                    "Europa Occidental",
+                    "Asia",
+                    "EEUU",
+                    "Centroamérica",
+                    "Canadá",
+                    "Sudamérica",
+                    "Oceanía",
+                    "Otras Zonas"
+                )
+
+                val grouped = geoList.groupBy { classifyTravelZone(it.centerLat, it.centerLon) }
+                val finalPages = mutableListOf<Pair<String, List<CaminoGeoData>>>()
+
+                for (zone in zoneOrder) {
+                    val items = grouped[zone] ?: continue
+                    if (items.isEmpty()) continue
+                    if (zone == "Asia") {
+                        val pts = items.flatMap { it.allPoints }
+                        val spanLon = if (pts.isNotEmpty()) pts.maxOf { it.lon } - pts.minOf { it.lon } else 0.0
+                        val spanLat = if (pts.isNotEmpty()) pts.maxOf { it.lat } - pts.minOf { it.lat } else 0.0
+                        if (spanLon > 45.0 || spanLat > 35.0) {
+                            val sub = items.groupBy { itGeo ->
+                                val la = itGeo.centerLat ?: 0.0
+                                val lo = itGeo.centerLon ?: 0.0
+                                when {
+                                    lo < 60.0 -> "Asia Occidental y Oriente Medio"
+                                    lo <= 92.0 -> "Asia Central y Meridional"
+                                    la < 23.0 -> "Sudeste Asiático"
+                                    else -> "Asia Oriental"
+                                }
+                            }
+                            listOf("Asia Occidental y Oriente Medio", "Asia Central y Meridional", "Sudeste Asiático", "Asia Oriental").forEach { sz ->
+                                val subItems = sub[sz]
+                                if (!subItems.isNullOrEmpty()) finalPages.add(sz to subItems)
+                            }
+                        } else {
+                            finalPages.add(zone to items)
+                        }
+                    } else {
+                        finalPages.add(zone to items)
+                    }
+                }
+
+                if (finalPages.isEmpty()) {
+                    finalPages.add("Mapa Global de Viajes" to geoList)
+                }
+
+                for ((zoneTitle, items) in finalPages) {
+                    val pInfo = PdfDocument.PageInfo.Builder(LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, pageNumber).create()
+                    val page = pdfDocument.startPage(pInfo)
+                    drawLandscapeHeader(page.canvas, "RED TOTAL DE VIAJES", zoneTitle)
+                    drawZoneMapAndLegend(
+                        page.canvas,
+                        items,
+                        RectF(28f, 60f, LANDSCAPE_WIDTH - 28f, LANDSCAPE_HEIGHT - 36f),
+                        minSpanDeg = 2.5
+                    )
+                    drawLandscapeFooter(page.canvas, pageNumber)
+                    pdfDocument.finishPage(page)
+                    pageNumber++
+                }
+            }
+
+            val outputDir = File(context.cacheDir, "shared_docs")
+            if (!outputDir.exists()) outputDir.mkdirs()
+
+            val fileName = if (isTravel) "Ultreia_Mapa_Total_Viajes.pdf" else "Ultreia_Mapa_Total_Caminos.pdf"
+            val pdfFile = File(outputDir, fileName)
+            FileOutputStream(pdfFile).use { fos ->
+                pdfDocument.writeTo(fos)
+            }
+            pdfDocument.close()
+
+            withContext(Dispatchers.Main) {
+                val shareTitle = if (isTravel) "Red Total de Viajes (Mapa PDF)" else "Red Total de Caminos (Mapa PDF)"
+                sharePdfFile(context, pdfFile, shareTitle, isTravel)
+            }
+            Result.success(pdfFile)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        } finally {
+            try { pdfDocument.close() } catch (_: Exception) {}
+            tileMemoryCache.values.forEach { bmp ->
+                if (!bmp.isRecycled) {
+                    try { bmp.recycle() } catch (_: Exception) {}
+                }
+            }
+            tileMemoryCache.clear()
+        }
     }
 
     private fun sharePdfFile(context: Context, file: File, title: String, isTravel: Boolean) {

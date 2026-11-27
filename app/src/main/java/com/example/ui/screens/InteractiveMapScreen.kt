@@ -54,7 +54,10 @@ import com.example.data.gpx.GpxParser
 import com.example.data.model.CaminoEntity
 import com.example.data.model.GpxPoint
 import com.example.data.model.StageEntity
+import com.example.data.pdf.PdfExporter
+import com.example.ui.settings.LanguageMode
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -132,6 +135,27 @@ fun getCaminoColorHex(caminoId: Long, index: Int = -1): String {
         kotlin.math.abs(caminoId.hashCode()) % CAMINO_PALETTE_HEX.size
     }
     return CAMINO_PALETTE_HEX[idx]
+}
+
+/**
+ * Convierte una fecha de inicio (ej. "15/05/2026" o "2026-05-15") en un entero yyyyMMdd
+ * para ordenar cronológicamente del más antiguo al más reciente.
+ */
+fun parseStartDateSortable(dateStr: String): Long {
+    val clean = dateStr.trim()
+    if (clean.isEmpty()) return Long.MAX_VALUE
+    val parts = clean.split("/", "-", ".").mapNotNull { it.trim().toLongOrNull() }
+    if (parts.size == 3) {
+        val (y, m, d) = if (parts[0] > 1000) {
+            Triple(parts[0], parts[1], parts[2]) // yyyy-MM-dd
+        } else {
+            Triple(parts[2], parts[1], parts[0]) // dd/MM/yyyy
+        }
+        if (y in 1900..2100 && m in 1..12 && d in 1..31) {
+            return y * 10000L + m * 100L + d
+        }
+    }
+    return Long.MAX_VALUE
 }
 
 /**
@@ -732,10 +756,34 @@ fun InteractiveMapScreen(
     val allStages = allStagesState?.value?.ifEmpty { stages } ?: stages
     val isTravel = camino.isTravelGuide
 
+    // Caminos o Viajes del perfil activo ordenados cronológicamente (más antiguo primero)
+    val filteredCaminosChronological = remember(allCaminos, isTravel) {
+        allCaminos.filter { it.isTravelGuide == isTravel }
+            .sortedWith(compareBy<CaminoEntity>({ parseStartDateSortable(it.startDate) }, { it.id }))
+    }
+    val filteredCaminoIds = remember(filteredCaminosChronological) {
+        filteredCaminosChronological.map { it.id }.toSet()
+    }
+    val caminoNumberMap = remember(filteredCaminosChronological) {
+        filteredCaminosChronological.mapIndexed { index, c -> c.id to (index + 1) }.toMap()
+    }
+    val caminoColorMap = remember(filteredCaminosChronological) {
+        filteredCaminosChronological.mapIndexed { index, c -> c.id to getCaminoColorHex(c.id, index) }.toMap()
+    }
+    val caminoMapById = remember(filteredCaminosChronological) {
+        filteredCaminosChronological.associateBy { it.id }
+    }
+    val filteredTotalStages = remember(allStages, filteredCaminoIds, stages) {
+        val base = if (allStages.isNotEmpty()) allStages else stages
+        base.filter { filteredCaminoIds.contains(it.caminoId) }
+    }
+
     // Modo de visualización: "Este Camino" / "Este Viaje" (por defecto) vs "Total Caminos" / "Total Viajes"
     var mapScopeMode by remember { mutableStateOf(MapScopeMode.CURRENT_CAMINO) }
     var showScopeDropdown by remember { mutableStateOf(false) }
     var isTotalHidden by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var isExportingPdf by remember { mutableStateOf(false) }
 
     fun tr(key: String, fallback: String): String = viewModel?.string(key) ?: fallback
 
@@ -883,7 +931,11 @@ fun InteractiveMapScreen(
                         position = startPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        val prefix = if (hasGpx) "Inicio etapa (GPX)" else (if (isTravel) "Día ${stg.dayNumber}" else "Etapa ${stg.dayNumber}")
+                        val prefix = if (hasGpx) {
+                            if (isTravel) "Inicio día (GPX)" else "Inicio etapa (GPX)"
+                        } else {
+                            if (isTravel) "Día ${stg.dayNumber}" else "Etapa ${stg.dayNumber}"
+                        }
                         title = "$prefix: ${stg.origin}"
                         snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Sin desplazamiento)"
                         setOnMarkerClickListener { _, _ ->
@@ -898,7 +950,9 @@ fun InteractiveMapScreen(
                         position = endPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        val endPrefix = if (hasGpx) "Fin etapa (GPX)" else "Llegada"
+                        val endPrefix = if (hasGpx) {
+                            if (isTravel) "Fin día (GPX)" else "Fin etapa (GPX)"
+                        } else "Llegada"
                         title = "$endPrefix: ${stg.destination}"
                         snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Fin de jornada)"
                         setOnMarkerClickListener { _, _ ->
@@ -916,14 +970,7 @@ fun InteractiveMapScreen(
             if (isTotalHidden) {
                 map.invalidate()
             } else {
-                val filteredCaminos = allCaminos.filter { it.isTravelGuide == isTravel }
-                val filteredCaminoIds = filteredCaminos.map { it.id }.toSet()
-                val candidateStages = if (allStages.isNotEmpty()) allStages else sortedStages
-                val stagesToDraw = candidateStages.filter { filteredCaminoIds.contains(it.caminoId) }
-
-                val caminoColorMap = filteredCaminos.mapIndexed { index, c ->
-                    c.id to getCaminoColorHex(c.id, index)
-                }.toMap()
+                val stagesToDraw = filteredTotalStages
 
                 for (stg in stagesToDraw) {
                 // Color único e idéntico para todas las etapas, polilíneas y marcadores del mismo camino
@@ -984,7 +1031,11 @@ fun InteractiveMapScreen(
                         position = startPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = false)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        val prefix = if (hasGpx) "Inicio etapa (GPX)" else (if (isTravel) "Día ${stg.dayNumber}" else "Etapa ${stg.dayNumber}")
+                        val prefix = if (hasGpx) {
+                            if (isTravel) "Inicio día (GPX)" else "Inicio etapa (GPX)"
+                        } else {
+                            if (isTravel) "Día ${stg.dayNumber}" else "Etapa ${stg.dayNumber}"
+                        }
                         title = "$cName - $prefix: ${stg.origin}"
                         snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Sin desplazamiento)"
                         setOnMarkerClickListener { _, _ ->
@@ -999,7 +1050,9 @@ fun InteractiveMapScreen(
                         position = endPoint
                         icon = createStageMarkerDrawable(context, stg.dayNumber, colorHex, isDestination = true)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        val endPrefix = if (hasGpx) "Fin etapa (GPX)" else "Llegada"
+                        val endPrefix = if (hasGpx) {
+                            if (isTravel) "Fin día (GPX)" else "Fin etapa (GPX)"
+                        } else "Llegada"
                         title = "$cName - $endPrefix: ${stg.destination}"
                         snippet = if (stg.distanceKm > 0.0) "${stg.distanceKm} km" else "0 km (Fin de jornada)"
                         setOnMarkerClickListener { _, _ ->
@@ -1132,8 +1185,8 @@ fun InteractiveMapScreen(
                             .padding(14.dp)
                     )
                 } else if (mapScopeMode == MapScopeMode.TOTAL) {
-                    val count = allCaminos.count { it.isTravelGuide == camino.isTravelGuide }.let { if (it > 0) it else allCaminos.size }
-                    val label = if (camino.isTravelGuide) tr("tab_trips", "viajes").lowercase() else tr("tab_caminos", "caminos").lowercase()
+                    val count = filteredCaminosChronological.size
+                    val label = if (isTravel) tr("tab_trips", "viajes").lowercase() else tr("tab_caminos", "caminos").lowercase()
                     Text(
                         text = "🌍 $count $label",
                         fontSize = 12.sp,
@@ -1143,12 +1196,69 @@ fun InteractiveMapScreen(
                             .align(Alignment.TopEnd)
                             .padding(14.dp)
                     )
+
+                    // Botón de exportar mapa en PDF en la esquina inferior derecha de la tarjeta superior
+                    Surface(
+                        onClick = {
+                            if (!isExportingPdf) {
+                                isExportingPdf = true
+                                val lang = viewModel?.languageMode?.value ?: LanguageMode.ES
+                                coroutineScope.launch {
+                                    val result = PdfExporter.generateAndShareTotalMapPdf(
+                                        context = context,
+                                        caminosChronological = filteredCaminosChronological,
+                                        stages = filteredTotalStages,
+                                        isTravel = isTravel,
+                                        languageMode = lang
+                                    )
+                                    isExportingPdf = false
+                                    result.onFailure { err ->
+                                        Toast.makeText(
+                                            context,
+                                            "Error al exportar PDF: ${err.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        },
+                        color = PilgrimYellow,
+                        shape = CircleShape,
+                        shadowElevation = 4.dp,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(14.dp)
+                            .size(36.dp)
+                            .testTag("btn_map_total_export_pdf")
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            if (isExportingPdf) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = CaminoBlueDark
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = "Exportar PDF",
+                                    tint = CaminoBlueDark,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(14.dp)
+                        .padding(
+                            start = 14.dp,
+                            top = 14.dp,
+                            bottom = 14.dp,
+                            end = if (mapScopeMode == MapScopeMode.TOTAL) 58.dp else 14.dp
+                        )
                 ) {
                     Surface(
                         color = PilgrimYellow,
@@ -1156,7 +1266,7 @@ fun InteractiveMapScreen(
                     ) {
                         Text(
                             text = if (mapScopeMode == MapScopeMode.TOTAL) {
-                                "RED GLOBAL DE RUTAS"
+                                if (isTravel) "RED GLOBAL DE VIAJES" else "RED GLOBAL DE CAMINOS"
                             } else if (camino.isTravelGuide) {
                                 "ULTREIA VIAJE"
                             } else {
@@ -1172,7 +1282,9 @@ fun InteractiveMapScreen(
                     Spacer(Modifier.height(4.dp))
 
                     Text(
-                        text = if (mapScopeMode == MapScopeMode.TOTAL) "Red Total de Caminos" else camino.title,
+                        text = if (mapScopeMode == MapScopeMode.TOTAL) {
+                            if (isTravel) "Red Total de Viajes" else "Red Total de Caminos"
+                        } else camino.title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
@@ -1182,7 +1294,7 @@ fun InteractiveMapScreen(
 
                     Text(
                         text = if (mapScopeMode == MapScopeMode.TOTAL) {
-                            "Todas las etapas mostradas con colores diferenciados por camino"
+                            if (isTravel) "Todos los días mostrados con colores diferenciados por viaje" else "Todas las etapas mostradas con colores diferenciados por camino"
                         } else {
                             camino.subtitle
                         },
@@ -1200,7 +1312,7 @@ fun InteractiveMapScreen(
                     ) {
                         Text(
                             text = if (mapScopeMode == MapScopeMode.TOTAL) {
-                                "${allStages.filter { it.isCompleted }.sumOf { it.distanceKm }.toInt()} / ${allStages.sumOf { it.distanceKm }.toInt()} km"
+                                "${filteredTotalStages.filter { it.isCompleted }.sumOf { it.distanceKm }.toInt()} / ${filteredTotalStages.sumOf { it.distanceKm }.toInt()} km"
                             } else {
                                 "${completedKmStr} / ${totalKmStr} km"
                             },
@@ -1214,7 +1326,8 @@ fun InteractiveMapScreen(
                         )
                         Text(
                             text = if (mapScopeMode == MapScopeMode.TOTAL) {
-                                "${allStages.size} etapas totales"
+                                val unitLabel = if (isTravel) "días totales" else "etapas totales"
+                                "${filteredTotalStages.size} $unitLabel"
                             } else {
                                 "${progressPercent}% completado"
                             },
@@ -1338,7 +1451,13 @@ fun InteractiveMapScreen(
             val stage = selectedDetailStage
             if (stage != null) {
                 val hasGpx = !stage.gpxTrackJson.isNullOrBlank()
-                val stageColor = getStageComposeColor(stage.dayNumber)
+                val stageColor = if (mapScopeMode == MapScopeMode.TOTAL) {
+                    val hex = caminoColorMap[stage.caminoId] ?: getCaminoColorHex(stage.caminoId)
+                    try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { CaminoBlue }
+                } else {
+                    getStageComposeColor(stage.dayNumber)
+                }
+                val stageCaminoNum = caminoNumberMap[stage.caminoId] ?: 1
 
                 Card(
                     modifier = Modifier
@@ -1357,15 +1476,16 @@ fun InteractiveMapScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Box(
                                     modifier = Modifier
-                                        .size(24.dp)
-                                        .background(stageColor, CircleShape),
+                                        .defaultMinSize(minWidth = 28.dp, minHeight = 24.dp)
+                                        .background(stageColor, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "${stage.dayNumber}",
+                                        text = if (mapScopeMode == MapScopeMode.TOTAL) "$stageCaminoNum.${stage.dayNumber}" else "${stage.dayNumber}",
                                         color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
@@ -1374,7 +1494,7 @@ fun InteractiveMapScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Día ${stage.dayNumber}: ${stage.origin} → ${stage.destination}",
+                                        text = if (isTravel) "${tr("day", "Día")} ${stage.dayNumber}: ${stage.origin} → ${stage.destination}" else "${tr("stage_tips_tag", "Etapa")} ${stage.dayNumber}: ${stage.origin} → ${stage.destination}",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1516,30 +1636,53 @@ fun InteractiveMapScreen(
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
 
+                    val dropdownStages = remember(mapScopeMode, filteredTotalStages, sortedStages, caminoNumberMap) {
+                        if (mapScopeMode == MapScopeMode.TOTAL) {
+                            filteredTotalStages.sortedWith(
+                                compareBy<StageEntity>({ caminoNumberMap[it.caminoId] ?: Int.MAX_VALUE }, { it.dayNumber })
+                            )
+                        } else {
+                            sortedStages
+                        }
+                    }
+
                     DropdownMenu(
                         expanded = showStagesDropdown,
                         onDismissRequest = { showStagesDropdown = false },
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .heightIn(max = 350.dp)
+                            .fillMaxWidth(0.88f)
+                            .heightIn(max = 360.dp)
                     ) {
-                        sortedStages.forEach { stg ->
-                            val isChecked = selectedStageIds.contains(stg.id)
-                            val stageColor = getStageComposeColor(stg.dayNumber)
+                        dropdownStages.forEach { stg ->
+                            val isChecked = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                selectedDetailStage?.id == stg.id
+                            } else {
+                                selectedStageIds.contains(stg.id)
+                            }
+                            val parentCamino = caminoMapById[stg.caminoId] ?: camino
+                            val caminoNum = caminoNumberMap[stg.caminoId] ?: 1
+                            val caminoColorHex = caminoColorMap[stg.caminoId] ?: getCaminoColorHex(stg.caminoId)
+                            val indicatorColor = try {
+                                Color(android.graphics.Color.parseColor(caminoColorHex))
+                            } catch (_: Exception) {
+                                CaminoBlue
+                            }
+
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(
                                             modifier = Modifier
-                                                .size(20.dp)
-                                                .background(stageColor, CircleShape),
+                                                .size(28.dp)
+                                                .background(indicatorColor, CircleShape),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = "${stg.dayNumber}",
+                                                text = "$caminoNum.${stg.dayNumber}",
                                                 color = Color.White,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1
                                             )
                                         }
                                         Spacer(Modifier.width(8.dp))
@@ -1552,7 +1695,7 @@ fun InteractiveMapScreen(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
-                                                text = "${stg.distanceKm} km • +${stg.elevationGainM}m",
+                                                text = "${stg.distanceKm} km",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -1560,8 +1703,24 @@ fun InteractiveMapScreen(
                                     }
                                 },
                                 onClick = {
-                                    selectedStageIds = setOf(stg.id)
-                                    selectedDetailStage = stg
+                                    if (mapScopeMode == MapScopeMode.TOTAL) {
+                                        selectedDetailStage = stg
+                                        val pts = GpxParser.deserializePoints(stg.gpxTrackJson).map { GeoPoint(it.lat, it.lon) }.ifEmpty {
+                                            val sCoord = TownCoordinates.findCoordinates(stg.origin, context)
+                                            val eCoord = TownCoordinates.findCoordinates(stg.destination, context)
+                                            if (sCoord != null && eCoord != null) {
+                                                listOf(GeoPoint(sCoord.first, sCoord.second), GeoPoint(eCoord.first, eCoord.second))
+                                            } else emptyList()
+                                        }
+                                        if (pts.isNotEmpty()) {
+                                            try {
+                                                mapViewRef?.zoomToBoundingBox(BoundingBox.fromGeoPoints(pts), true, 120)
+                                            } catch (_: Exception) {}
+                                        }
+                                    } else {
+                                        selectedStageIds = setOf(stg.id)
+                                        selectedDetailStage = stg
+                                    }
                                     showStagesDropdown = false
                                 }
                             )
