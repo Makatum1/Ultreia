@@ -1951,6 +1951,221 @@ object PdfExporter {
         return null
     }
 
+    private fun downloadTileHd(context: Context, zoom: Int, x: Int, y: Int): Bitmap? {
+        val cacheKey = "roadmap-hd-$zoom-$x-$y"
+        tileMemoryCache[cacheKey]?.let { return it }
+
+        val cacheDir = File(context.cacheDir, "roadmap_tiles")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        val tileFile = File(cacheDir, "$cacheKey.png")
+        if (tileFile.exists() && tileFile.length() > 0) {
+            val bmp = BitmapFactory.decodeFile(tileFile.absolutePath)
+            if (bmp != null) {
+                tileMemoryCache[cacheKey] = bmp
+                return bmp
+            }
+        }
+
+        val urls = listOf(
+            "https://mt1.google.com/vt/lyrs=m&hl=es&scale=2&x=$x&y=$y&z=$zoom",
+            "https://mt0.google.com/vt/lyrs=m&hl=es&scale=2&x=$x&y=$y&z=$zoom",
+            "https://mt2.google.com/vt/lyrs=m&hl=es&scale=2&x=$x&y=$y&z=$zoom",
+            "https://mt3.google.com/vt/lyrs=m&hl=es&scale=2&x=$x&y=$y&z=$zoom",
+            "https://tile.openstreetmap.org/$zoom/$x/$y.png"
+        )
+
+        for (urlString in urls) {
+            try {
+                val url = URL(urlString)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 1800
+                conn.readTimeout = 2500
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:100.0) Ultreia/2.0")
+                if (conn.responseCode == 200) {
+                    val bytes = conn.inputStream.use { it.readBytes() }
+                    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (bmp != null) {
+                        try { tileFile.writeBytes(bytes) } catch (_: Exception) {}
+                        tileMemoryCache[cacheKey] = bmp
+                        return bmp
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    private fun getHighResMapBitmap(
+        context: Context,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        zoom: Int,
+        targetW: Int,
+        targetH: Int,
+        maxTiles: Int = 49
+    ): Bitmap {
+        val minTX = Math.floor(lonToTileX(minLon, zoom)).toInt()
+        val maxTX = Math.floor(lonToTileX(maxLon, zoom)).toInt()
+        val minTY = Math.floor(latToMercatorY(maxLat, zoom)).toInt()
+        val maxTY = Math.floor(latToMercatorY(minLat, zoom)).toInt()
+
+        val numX = (maxTX - minTX + 1).coerceAtLeast(1)
+        val numY = (maxTY - minTY + 1).coerceAtLeast(1)
+
+        if (numX * numY > maxTiles) {
+            return generate2DPrintReliefBitmap(targetW, targetH)
+        }
+
+        val coords = mutableListOf<Pair<Int, Int>>()
+        for (tx in minTX..maxTX) {
+            for (ty in minTY..maxTY) {
+                coords.add(tx to ty)
+            }
+        }
+
+        val tileMap = ConcurrentHashMap<Pair<Int, Int>, Bitmap>()
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(6)
+        try {
+            val futures = coords.map { pair ->
+                pool.submit {
+                    val bmp = downloadTileHd(context, zoom, pair.first, pair.second)
+                    if (bmp != null) tileMap[pair] = bmp
+                }
+            }
+            futures.forEach { try { it.get() } catch (_: Exception) {} }
+        } finally {
+            pool.shutdownNow()
+        }
+
+        if (tileMap.isEmpty()) {
+            return generate2DPrintReliefBitmap(targetW, targetH)
+        }
+
+        // Preservar resolución HD 512px si la mayoría de teselas son scale=2
+        val tilePx = if (tileMap.values.any { it.width >= 512 }) 512 else 256
+        val stitched = Bitmap.createBitmap(numX * tilePx, numY * tilePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(stitched)
+        val bgPaint = Paint().apply { color = Color.rgb(245, 247, 250) }
+        canvas.drawRect(0f, 0f, stitched.width.toFloat(), stitched.height.toFloat(), bgPaint)
+
+        for ((pair, tile) in tileMap) {
+            val dx = (pair.first - minTX) * tilePx
+            val dy = (pair.second - minTY) * tilePx
+            val dst = Rect(dx, dy, dx + tilePx, dy + tilePx)
+            canvas.drawBitmap(tile, null, dst, Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true })
+        }
+
+        val x1 = ((lonToTileX(minLon, zoom) - minTX) * tilePx).toFloat().coerceIn(0f, (numX * tilePx).toFloat())
+        val x2 = ((lonToTileX(maxLon, zoom) - minTX) * tilePx).toFloat().coerceIn(0f, (numX * tilePx).toFloat())
+        val y1 = ((latToMercatorY(maxLat, zoom) - minTY) * tilePx).toFloat().coerceIn(0f, (numY * tilePx).toFloat())
+        val y2 = ((latToMercatorY(minLat, zoom) - minTY) * tilePx).toFloat().coerceIn(0f, (numY * tilePx).toFloat())
+
+        val cropW = (x2 - x1).toInt().coerceAtLeast(1)
+        val cropH = (y2 - y1).toInt().coerceIn(1, stitched.height - y1.toInt().coerceAtLeast(0)).coerceAtLeast(1)
+        val safeX1 = x1.toInt().coerceIn(0, (stitched.width - 1).coerceAtLeast(0))
+        val safeY1 = y1.toInt().coerceIn(0, (stitched.height - 1).coerceAtLeast(0))
+        val safeW = cropW.coerceAtMost(stitched.width - safeX1).coerceAtLeast(1)
+        val safeH = cropH.coerceAtMost(stitched.height - safeY1).coerceAtLeast(1)
+
+        return try {
+            Bitmap.createBitmap(stitched, safeX1, safeY1, safeW, safeH)
+        } catch (_: Exception) {
+            stitched
+        }
+    }
+
+    private fun drawMajorCityLabels(
+        canvas: Canvas,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        projectX: (Double) -> Float,
+        projectY: (Double) -> Float
+    ) {
+        val majorCities = listOf(
+            Triple("Madrid", 40.4168, -3.7038),
+            Triple("Barcelona", 41.3851, 2.1734),
+            Triple("Santiago", 42.8782, -8.5448),
+            Triple("Oviedo", 43.3619, -5.8494),
+            Triple("Bilbao", 43.2630, -2.9350),
+            Triple("Pamplona", 42.8125, -1.6458),
+            Triple("Burgos", 42.3440, -3.6969),
+            Triple("León", 42.5987, -5.5671),
+            Triple("Zaragoza", 41.6488, -0.8891),
+            Triple("Valencia", 39.4699, -0.3763),
+            Triple("Sevilla", 37.3891, -5.9845),
+            Triple("Málaga", 36.7213, -4.4214),
+            Triple("Lisboa", 38.7223, -9.1393),
+            Triple("Oporto", 41.1579, -8.6291),
+            Triple("París", 48.8566, 2.3522),
+            Triple("Burdeos", 44.8378, -0.5792),
+            Triple("Toulouse", 43.6047, 1.4442),
+            Triple("Palma", 39.5696, 2.6502),
+            Triple("Las Palmas", 28.1235, -15.4363),
+            Triple("S.C. Tenerife", 28.4636, -16.2518),
+            Triple("Marrakech", 31.6295, -7.9811),
+            Triple("Tánger", 35.7595, -5.8340),
+            Triple("Londres", 51.5074, -0.1278),
+            Triple("Roma", 41.9028, 12.4964),
+            Triple("Berlín", 52.5200, 13.4050),
+            Triple("Ámsterdam", 52.3676, 4.9041),
+            Triple("Zúrich", 47.3769, 8.5417),
+            Triple("Nueva York", 40.7128, -74.0060),
+            Triple("Los Ángeles", 34.0522, -118.2437),
+            Triple("Chicago", 41.8781, -87.6298),
+            Triple("Toronto", 43.6532, -79.3832),
+            Triple("Vancouver", 49.2827, -123.1207),
+            Triple("Ciudad de México", 19.4326, -99.1332),
+            Triple("San José", 9.9281, -84.0907),
+            Triple("Bogotá", 4.7110, -74.0721),
+            Triple("Lima", -12.0464, -77.0428),
+            Triple("Buenos Aires", -34.6037, -58.3816),
+            Triple("Santiago de Chile", -33.4489, -70.6693),
+            Triple("Río de Janeiro", -22.9068, -43.1729),
+            Triple("Tokio", 35.6762, 139.6503),
+            Triple("Seúl", 37.5665, 126.9780),
+            Triple("Pekín", 39.9042, 116.4074),
+            Triple("Bangkok", 13.7563, 100.5018),
+            Triple("Nueva Delhi", 28.6139, 77.2090),
+            Triple("Dubái", 25.2048, 55.2708),
+            Triple("Sídney", -33.8688, 151.2093),
+            Triple("Auckland", -36.8485, 174.7633)
+        )
+
+        val placedBoxes = mutableListOf<RectF>()
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(30, 41, 59)
+            textSize = 7.5f
+            typeface = pdfTypeface(true)
+        }
+        val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(230, 255, 255, 255)
+            textSize = 7.5f
+            typeface = pdfTypeface(true)
+            style = Paint.Style.STROKE
+            strokeWidth = 2.4f
+        }
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(71, 85, 105)
+        }
+
+        for ((name, lat, lon) in majorCities) {
+            if (lat !in minLat..maxLat || lon !in minLon..maxLon) continue
+            val x = projectX(lon)
+            val y = projectY(lat)
+            val tw = textPaint.measureText(name)
+            val box = RectF(x - 2f, y - 10f, x + tw + 6f, y + 3f)
+            if (placedBoxes.any { RectF.intersects(it, box) }) continue
+            placedBoxes.add(box)
+            canvas.drawCircle(x, y, 1.8f, dotPaint)
+            canvas.drawText(name, x + 4f, y - 1.5f, haloPaint)
+            canvas.drawText(name, x + 4f, y - 1.5f, textPaint)
+        }
+    }
+
     /**
      * Generador de fondo de mapa 2D en vista cenital (plana) optimizado específicamente
      * para impresión en papel (ahorro de tinta, contraste alto y curvas de nivel ortogonales).
@@ -2847,11 +3062,12 @@ object PdfExporter {
                         bbMaxLon = (centerLon + neededLon / 2.0).coerceIn(-180.0, 180.0)
                     }
 
-                    val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 13, 16)
-                    val mapBitmap = getSatelliteOrReliefBitmap(
+                    val zoom = calculateBestZoom(bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, 2, 13, 49)
+                    val mapBitmap = getHighResMapBitmap(
                         context, bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, zoom,
                         mapRect.width().toInt().coerceAtLeast(100),
-                        mapRect.height().toInt().coerceAtLeast(100)
+                        mapRect.height().toInt().coerceAtLeast(100),
+                        maxTiles = 49
                     )
 
                     val xMinTile = lonToTileX(bbMinLon, zoom)
@@ -2882,6 +3098,8 @@ object PdfExporter {
 
                     fun px(lon: Double) = originX + ((lonToTileX(lon, zoom) - xMinTile) * 256.0 * scale).toFloat()
                     fun py(lat: Double) = originY + ((latToMercatorY(lat, zoom) - yMinMerc) * 256.0 * scale).toFloat()
+
+                    drawMajorCityLabels(canvas, bbMinLat, bbMaxLat, bbMinLon, bbMaxLon, ::px, ::py)
 
                     val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         style = Paint.Style.STROKE
