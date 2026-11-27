@@ -1479,22 +1479,29 @@ fun InteractiveMapScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Box(
                                     modifier = Modifier
-                                        .defaultMinSize(minWidth = 28.dp, minHeight = 24.dp)
-                                        .background(stageColor, RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                        .size(28.dp)
+                                        .background(stageColor, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = if (mapScopeMode == MapScopeMode.TOTAL) "$stageCaminoNum.${stage.dayNumber}" else "${stage.dayNumber}",
                                         color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = if (mapScopeMode == MapScopeMode.TOTAL) 9.sp else 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
                                     )
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 Column {
+                                    val detailParent = caminoMapById[stage.caminoId] ?: camino
                                     Text(
-                                        text = if (isTravel) "${tr("day", "Día")} ${stage.dayNumber}: ${stage.origin} → ${stage.destination}" else "${tr("stage_tips_tag", "Etapa")} ${stage.dayNumber}: ${stage.origin} → ${stage.destination}",
+                                        text = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                            "${detailParent.title}: ${stage.origin} → ${stage.destination}"
+                                        } else if (isTravel) {
+                                            "${tr("day", "Día")} ${stage.dayNumber}: ${stage.origin} → ${stage.destination}"
+                                        } else {
+                                            "${tr("stage_prefix", "Etapa")} ${stage.dayNumber}: ${stage.origin} → ${stage.destination}"
+                                        },
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1662,10 +1669,26 @@ fun InteractiveMapScreen(
                             val parentCamino = caminoMapById[stg.caminoId] ?: camino
                             val caminoNum = caminoNumberMap[stg.caminoId] ?: 1
                             val caminoColorHex = caminoColorMap[stg.caminoId] ?: getCaminoColorHex(stg.caminoId)
-                            val indicatorColor = try {
-                                Color(android.graphics.Color.parseColor(caminoColorHex))
-                            } catch (_: Exception) {
-                                CaminoBlue
+                            val indicatorColor = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                try {
+                                    Color(android.graphics.Color.parseColor(caminoColorHex))
+                                } catch (_: Exception) {
+                                    CaminoBlue
+                                }
+                            } else {
+                                getStageComposeColor(stg.dayNumber)
+                            }
+                            val badgeText = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                "$caminoNum.${stg.dayNumber}"
+                            } else {
+                                "${stg.dayNumber}"
+                            }
+                            val itemTitle = if (mapScopeMode == MapScopeMode.TOTAL) {
+                                "${parentCamino.title}: ${stg.origin} → ${stg.destination}"
+                            } else if (isTravel) {
+                                "${tr("day", "Día")} ${stg.dayNumber}: ${stg.origin} → ${stg.destination}"
+                            } else {
+                                "${tr("stage_prefix", "Etapa")} ${stg.dayNumber}: ${stg.origin} → ${stg.destination}"
                             }
 
                             DropdownMenuItem(
@@ -1678,9 +1701,9 @@ fun InteractiveMapScreen(
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = "$caminoNum.${stg.dayNumber}",
+                                                text = badgeText,
                                                 color = Color.White,
-                                                fontSize = 9.sp,
+                                                fontSize = if (mapScopeMode == MapScopeMode.TOTAL) 9.sp else 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 maxLines = 1
                                             )
@@ -1688,7 +1711,7 @@ fun InteractiveMapScreen(
                                         Spacer(Modifier.width(8.dp))
                                         Column {
                                             Text(
-                                                text = if (isTravel) "${tr("day", "Día")} ${stg.dayNumber}: ${stg.origin} → ${stg.destination}" else "${tr("stage_tips_tag", "Etapa")} ${stg.dayNumber}: ${stg.origin} → ${stg.destination}",
+                                                text = itemTitle,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
                                                 maxLines = 1,
