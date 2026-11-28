@@ -94,7 +94,10 @@ fun CaminoListScreen(
                             !today.isBefore(startLocal) && !today.isAfter(endLocal)
                         if (isCurrentlyActive) 0 else 1
                     },
-                    { c -> parseStartDateSortable(c.startDate) },
+                    { c ->
+                        val sortVal = parseStartDateSortable(c.startDate)
+                        if (sortVal == Long.MAX_VALUE) Long.MAX_VALUE else -sortVal
+                    },
                     { c -> c.id }
                 )
             )

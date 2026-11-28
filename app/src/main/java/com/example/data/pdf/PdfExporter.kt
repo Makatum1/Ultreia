@@ -123,7 +123,7 @@ object PdfExporter {
             if (!outputDir.exists()) outputDir.mkdirs()
 
             val cleanTitle = camino.title.trim().replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ")
-            val pdfFile = File(outputDir, "Guía $cleanTitle.pdf")
+            val pdfFile = File(outputDir, "Guía - $cleanTitle.pdf")
             val fos = FileOutputStream(pdfFile)
             pdfDocument.writeTo(fos)
             fos.close()
@@ -1177,7 +1177,6 @@ object PdfExporter {
 
         // 5b. GASTADO DE LA ETAPA / DÍA (Siempre visible como Alojamientos o Vivencias)
         run {
-            val expensePdfs = parseStageExpensePdfs(stage)
             if (currentY + 55f > PAGE_HEIGHT - MARGIN - 35f) {
                 nextSubPage("Gastado")
                 currentY = 74f
@@ -1185,7 +1184,7 @@ object PdfExporter {
 
             currentY = drawSectionBanner(canvas, currentY, "GASTADO", COLOR_GOLD_DARK, "€")
 
-            if (stage.spentAmount <= 0.0 && expensePdfs.isEmpty()) {
+            if (stage.spentAmount <= 0.0) {
                 val emptyH = 34f
                 drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, emptyH, COLOR_CARD_BG, COLOR_CARD_BORDER, null, 0f, 6f)
                 paint.color = COLOR_MUTED
@@ -1202,16 +1201,7 @@ object PdfExporter {
                 paint.typeface = pdfTypeface(true)
                 val spentStr = String.format(java.util.Locale.US, "%.2f €", stage.spentAmount)
                 canvas.drawText("Total gastado: $spentStr", MARGIN + 14f, currentY + 21f, paint)
-                currentY += cardH + 8f
-
-                for (pdfDoc in expensePdfs) {
-                    if (currentY + 28f > PAGE_HEIGHT - MARGIN - 35f) {
-                        nextSubPage("Gastado")
-                        currentY = 74f
-                    }
-                    currentY = drawDocumentChip(canvas, MARGIN + 14f, currentY, PAGE_WIDTH - 2 * MARGIN - 28f, pdfDoc.name)
-                }
-                currentY += 6f
+                currentY += cardH + 10f
             }
         }
 
