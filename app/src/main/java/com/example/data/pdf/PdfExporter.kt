@@ -99,8 +99,9 @@ object PdfExporter {
             pdfDocument.finishPage(page1)
             pageNumber++
 
-            // Si el mapa general no cupo en la portada por exceso de etapas, crear página 2 dedicada al mapa satélite
-            if (!mapDrawnOnCover) {
+            // Si el mapa general no cupo en la portada por exceso de etapas (y hay algún GPX), crear página 2 dedicada al mapa
+            val hasAnyGpxStage = stages.any { it.distanceKm > 0.0 && GpxParser.deserializePoints(it.gpxTrackJson).size >= 2 }
+            if (!mapDrawnOnCover && hasAnyGpxStage) {
                 val pageInfoMap = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
                 val pageMap = pdfDocument.startPage(pageInfoMap)
                 drawFullPageMap(context, pageMap.canvas, camino, stages, pageNumber, languageMode)
@@ -629,9 +630,16 @@ object PdfExporter {
             tableY += rowH
         }
 
-        // Mapa general de la ruta (Portada del PDF) justo debajo del listado de etapas (Vista Cenital 2D)
+        // Mapa general de la ruta (Portada del PDF) solo si hay alguna etapa/día con GPX
+        val hasAnyGpxStage = stages.any { it.distanceKm > 0.0 && GpxParser.deserializePoints(it.gpxTrackJson).size >= 2 }
         val availableH = PAGE_HEIGHT - 35f - tableY
-        val mapDrawnOnCover = if (availableH >= 120f) {
+        val mapDrawnOnCover = if (!hasAnyGpxStage) {
+            drawEditorialFooter(canvas, pageNumber, isTravel, camino.title, languageMode)
+            if (isTravel && titleIcon != null) {
+                try { titleIcon.recycle() } catch (_: Exception) {}
+            }
+            true
+        } else if (availableH >= 120f) {
             val bannerY = drawSectionBanner(
                 canvas,
                 tableY + 6f,
@@ -848,53 +856,14 @@ object PdfExporter {
 
             currentY += cardH + 12f
 
-            // Tarjeta de Mapa Cartográfico Profesional (Formato Panorámico)
-            val mapBoxH = 220f
-            val chartBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + mapBoxH)
-            drawCardBox(canvas, chartBox.left, chartBox.top, chartBox.width(), chartBox.height(), COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_NAVY, 4f, 8f)
-
-            if (points.isNotEmpty()) {
+            // Tarjeta de Mapa Cartográfico Profesional: solo se muestra si esta etapa/día tiene GPX cargado
+            if (points.size >= 2) {
+                val mapBoxH = 220f
+                val chartBox = RectF(MARGIN, currentY, PAGE_WIDTH - MARGIN, currentY + mapBoxH)
+                drawCardBox(canvas, chartBox.left, chartBox.top, chartBox.width(), chartBox.height(), COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_NAVY, 4f, 8f)
                 drawMiniTrackOnCanvas(context, canvas, points, chartBox, stage)
-            } else {
-                val sCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stage.origin)
-                val eCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stage.destination)
-                if (sCoord != null && eCoord != null) {
-                    val fallbackPoints = listOf(
-                        com.example.data.model.GpxPoint(sCoord.first, sCoord.second),
-                        com.example.data.model.GpxPoint(eCoord.first, eCoord.second)
-                    )
-                    drawMiniTrackOnCanvas(context, canvas, fallbackPoints, chartBox, stage)
-                } else {
-                    paint.color = COLOR_NAVY
-                    paint.strokeWidth = 2f
-                    val path = Path()
-                    path.moveTo(chartBox.left + 35f, chartBox.bottom - 45f)
-                    path.cubicTo(
-                        chartBox.left + 150f, chartBox.top + 45f,
-                        chartBox.left + 320f, chartBox.bottom - 60f,
-                        chartBox.right - 35f, chartBox.bottom - 40f
-                    )
-                    paint.style = Paint.Style.STROKE
-                    canvas.drawPath(path, paint)
-                    paint.style = Paint.Style.FILL
-
-                    // Puntos de inicio y fin decorativos
-                    paint.color = COLOR_EMERALD
-                    canvas.drawCircle(chartBox.left + 35f, chartBox.bottom - 45f, 6f, paint)
-                    paint.color = COLOR_GOLD_DARK
-                    canvas.drawCircle(chartBox.right - 35f, chartBox.bottom - 40f, 6f, paint)
-
-                    paint.color = COLOR_SLATE
-                    paint.textSize = 9f
-                    paint.typeface = pdfTypeface(true)
-                    canvas.drawText("Origen: ${stage.origin.ifBlank { "Inicio" }}", chartBox.left + 48f, chartBox.bottom - 41f, paint)
-                    val destText = "Destino: ${stage.destination.ifBlank { "Fin" }}"
-                    val destW = paint.measureText(destText)
-                    canvas.drawText(destText, chartBox.right - 48f - destW, chartBox.bottom - 36f, paint)
-                }
+                currentY += mapBoxH + 16f
             }
-
-            currentY += mapBoxH + 16f
         }
 
         // 2. CONSEJOS DEL DÍA (Caminos) O RESUMEN EJECUTIVO (Viajes)
@@ -2652,22 +2621,10 @@ object PdfExporter {
         val drawableStages = stages.filter { it.distanceKm > 0.0 }
         if (drawableStages.isEmpty()) return
 
+        // En el PDF individual solo se dibujan etapas/días con GPX real (sin líneas rectas)
         val stageTracks = drawableStages.mapNotNull { stg ->
             val pts = GpxParser.deserializePoints(stg.gpxTrackJson)
-            if (pts.size >= 2) {
-                stg to pts
-            } else {
-                val sCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.origin, context)
-                val eCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.destination, context)
-                if (sCoord != null && eCoord != null) {
-                    stg to listOf(
-                        com.example.data.model.GpxPoint(sCoord.first, sCoord.second),
-                        com.example.data.model.GpxPoint(eCoord.first, eCoord.second)
-                    )
-                } else {
-                    null
-                }
-            }
+            if (pts.size >= 2) stg to pts else null
         }
 
         val allPoints = stageTracks.flatMap { it.second }
