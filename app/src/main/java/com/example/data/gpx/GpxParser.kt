@@ -203,9 +203,9 @@ object GpxParser {
         return result
     }
 
-    private fun simplifyTrackForMap(points: List<RawGpxPoint>, maxPoints: Int = 1800): List<GpxPoint> {
+    private fun simplifyTrackForMap(points: List<RawGpxPoint>, maxPoints: Int = 2500): List<GpxPoint> {
         if (points.size <= maxPoints) return points.map { GpxPoint(it.lat, it.lon, it.ele) }
-        val tolerances = doubleArrayOf(5.0, 8.0, 12.0, 18.0, 25.0)
+        val tolerances = doubleArrayOf(3.0, 5.0, 8.0, 12.0, 18.0)
         var best = simplifyDouglasPeucker(points, tolerances[0])
         for (tol in tolerances) {
             best = simplifyDouglasPeucker(points, tol)
@@ -479,8 +479,8 @@ object GpxParser {
         }
         safeLog("GpxParser", debugLog)
 
-        // Simplificación geométrica (Douglas-Peucker) para conservar calles, giros y puentes sin saltos rectos
-        val sampledPoints = simplifyTrackForMap(allTrackPoints, maxPoints = 1800)
+        // Simplificación geométrica (Douglas-Peucker, 3 m) para conservar calles, giros y puentes sin saltos rectos
+        val sampledPoints = simplifyTrackForMap(allTrackPoints, maxPoints = 2500)
 
         return GpxParseResult(
             points = sampledPoints,
