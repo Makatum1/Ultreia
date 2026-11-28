@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
@@ -1642,13 +1643,16 @@ fun StageExpenseSection(
             } else ""
         )
     }
+    val expensePdfs = remember(stage.expensePdfsJson, stage.expensePdfUri, stage.expensePdfName) {
+        viewModel.parseExpensePdfs(stage)
+    }
 
     val pdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                var fileName = "gasto_etapa_${stage.dayNumber}.pdf"
+                var fileName = "gasto_${stage.dayNumber}.pdf"
                 context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                     val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                     if (cursor.moveToFirst() && nameIdx >= 0) {
@@ -1657,15 +1661,14 @@ fun StageExpenseSection(
                 }
                 val dir = java.io.File(context.filesDir, "expense_pdfs")
                 if (!dir.exists()) dir.mkdirs()
-                val destFile = java.io.File(dir, "stage_${stage.id}_expense.pdf")
+                val destFile = java.io.File(dir, "stage_${stage.id}_expense_${System.currentTimeMillis()}.pdf")
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     java.io.FileOutputStream(destFile).use { output ->
                         input.copyTo(output)
                     }
                 }
-                val currentAmount = spentText.replace(",", ".").toDoubleOrNull() ?: stage.spentAmount
-                viewModel.updateStageExpense(stage.id, currentAmount, destFile.absolutePath, fileName)
-                Toast.makeText(context, "PDF de gastos adjuntado: $fileName", Toast.LENGTH_SHORT).show()
+                viewModel.addStageExpensePdf(stage.id, fileName, destFile.absolutePath)
+                Toast.makeText(context, "PDF adjuntado: $fileName", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "Error al subir PDF: ${e.message}", Toast.LENGTH_SHORT).show()
             }
@@ -1686,7 +1689,7 @@ fun StageExpenseSection(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Default.ReceiptLong,
+                    imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
                     contentDescription = null,
                     tint = CaminoBlue,
                     modifier = Modifier.size(20.dp)
@@ -1706,7 +1709,7 @@ fun StageExpenseSection(
                     val filtered = raw.filter { it.isDigit() || it == '.' || it == ',' }
                     spentText = filtered
                     val parsed = filtered.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    viewModel.updateStageExpense(stage.id, parsed, stage.expensePdfUri, stage.expensePdfName)
+                    viewModel.updateStageExpenseAmount(stage.id, parsed)
                 },
                 label = { Text("Gastado") },
                 placeholder = { Text("0.00") },
@@ -1727,46 +1730,49 @@ fun StageExpenseSection(
                 Text("Subir un archivo PDF", color = CaminoBlue, fontWeight = FontWeight.Bold)
             }
 
-            if (!stage.expensePdfUri.isNullOrBlank()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+            if (expensePdfs.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    expensePdfs.forEach { pdfDoc ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = stage.expensePdfName ?: "documento.pdf",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                val currentAmount = spentText.replace(",", ".").toDoubleOrNull() ?: stage.spentAmount
-                                viewModel.updateStageExpense(stage.id, currentAmount, null, null)
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.DeleteOutline,
-                                contentDescription = "Eliminar PDF",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = pdfDoc.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        viewModel.removeStageExpensePdf(stage.id, pdfDoc.id)
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.DeleteOutline,
+                                        contentDescription = "Eliminar PDF",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

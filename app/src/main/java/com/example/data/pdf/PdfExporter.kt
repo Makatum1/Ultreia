@@ -540,27 +540,14 @@ object PdfExporter {
             h = kpiHeight,
             label = "GASTADO",
             value = String.format(java.util.Locale.US, "%.2f €", totalSpentCover),
-            sub = "${stats.progressPercent}% completado",
+            sub = "",
             accentColor = COLOR_GOLD_DARK,
             bgColor = COLOR_WARM_BG,
             borderColor = COLOR_WARM_BORDER
         )
 
-        // Barra de progreso estilizada
-        val barY = kpiTop + kpiHeight + 12f
-        val barRect = RectF(MARGIN, barY, PAGE_WIDTH - MARGIN, barY + 7f)
-        paint.color = COLOR_CARD_BORDER
-        canvas.drawRoundRect(barRect, 4f, 4f, paint)
-
-        val fillW = (PAGE_WIDTH - (MARGIN * 2)) * (stats.progressPercent / 100f).coerceIn(0f, 1f)
-        if (fillW > 0) {
-            paint.color = COLOR_EMERALD
-            val fillRect = RectF(MARGIN, barY, MARGIN + fillW, barY + 7f)
-            canvas.drawRoundRect(fillRect, 4f, 4f, paint)
-        }
-
         // 3. TABLA EDITORIAL DE ITINERARIO Y ETAPAS
-        var tableY = barY + 22f
+        var tableY = kpiTop + kpiHeight + 18f
         val tableTitle = if (isTravel) "${tr("tab_days", languageMode).uppercase()} & ${tr("trip_tips", languageMode).uppercase()}" else "${tr("tab_stages", languageMode).uppercase()} & ${tr("main_routes", languageMode).uppercase()}"
         tableY = drawSectionBanner(canvas, tableY, tableTitle, COLOR_NAVY, if (isTravel) "🗺️" else "🧭")
 
@@ -1188,6 +1175,46 @@ object PdfExporter {
             }
         }
 
+        // 5b. GASTADO DE LA ETAPA / DÍA (Siempre visible como Alojamientos o Vivencias)
+        run {
+            val expensePdfs = parseStageExpensePdfs(stage)
+            if (currentY + 55f > PAGE_HEIGHT - MARGIN - 35f) {
+                nextSubPage("Gastado")
+                currentY = 74f
+            }
+
+            currentY = drawSectionBanner(canvas, currentY, "GASTADO", COLOR_GOLD_DARK, "€")
+
+            if (stage.spentAmount <= 0.0 && expensePdfs.isEmpty()) {
+                val emptyH = 34f
+                drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, emptyH, COLOR_CARD_BG, COLOR_CARD_BORDER, null, 0f, 6f)
+                paint.color = COLOR_MUTED
+                paint.textSize = 9.5f
+                paint.typeface = pdfTypeface(false)
+                val emptyText = if (isTravel) "Sin gastos registrados aún para este día." else "Sin gastos registrados aún para esta etapa."
+                canvas.drawText(emptyText, MARGIN + 14f, currentY + 21f, paint)
+                currentY += emptyH + 12f
+            } else {
+                val cardH = 34f
+                drawCardBox(canvas, MARGIN, currentY, PAGE_WIDTH - 2 * MARGIN, cardH, COLOR_WARM_BG, COLOR_WARM_BORDER, COLOR_GOLD_DARK, 3f, 6f)
+                paint.color = COLOR_SLATE
+                paint.textSize = 10f
+                paint.typeface = pdfTypeface(true)
+                val spentStr = String.format(java.util.Locale.US, "%.2f €", stage.spentAmount)
+                canvas.drawText("Total gastado: $spentStr", MARGIN + 14f, currentY + 21f, paint)
+                currentY += cardH + 8f
+
+                for (pdfDoc in expensePdfs) {
+                    if (currentY + 28f > PAGE_HEIGHT - MARGIN - 35f) {
+                        nextSubPage("Gastado")
+                        currentY = 74f
+                    }
+                    currentY = drawDocumentChip(canvas, MARGIN + 14f, currentY, PAGE_WIDTH - 2 * MARGIN - 28f, pdfDoc.name)
+                }
+                currentY += 6f
+            }
+        }
+
         // 6. ARCHIVOS Y DOCUMENTOS ADJUNTOS GENERALES DE LA ETAPA
         val stageAttachedFiles = parseAttachedFiles(stage.attachedFilesJson)
         if (stageAttachedFiles.isNotEmpty()) {
@@ -1365,27 +1392,14 @@ object PdfExporter {
             h = cardHeight,
             label = "GASTADO",
             value = String.format(java.util.Locale.US, "%.2f €", totalSpentStats),
-            sub = "${stats.progressPercent}% • " + if (stats.progressPercent >= 100) tr("pdf_route_completed", languageMode) else tr("pdf_itinerary_in_progress", languageMode),
+            sub = "",
             accentColor = COLOR_GOLD_DARK,
             bgColor = COLOR_WARM_BG,
             borderColor = COLOR_WARM_BORDER
         )
 
-        // Barra visual de progreso
-        startY += cardHeight + 16f
-        val barRect = RectF(MARGIN, startY, PAGE_WIDTH - MARGIN, startY + 8f)
-        paint.color = COLOR_CARD_BORDER
-        canvas.drawRoundRect(barRect, 4f, 4f, paint)
-
-        val fillW = (PAGE_WIDTH - (MARGIN * 2)) * (stats.progressPercent / 100f).coerceIn(0f, 1f)
-        if (fillW > 0) {
-            paint.color = COLOR_EMERALD
-            val fillRect = RectF(MARGIN, startY, MARGIN + fillW, startY + 8f)
-            canvas.drawRoundRect(fillRect, 4f, 4f, paint)
-        }
-
         // Sección de Desglose
-        startY += 26f
+        startY += cardHeight + 22f
         val sectionTitle = if (isTotal) tr("pdf_consolidated_metrics", languageMode) else tr("pdf_detail_stages", languageMode)
         startY = drawSectionBanner(canvas, startY, sectionTitle, COLOR_NAVY, "📈")
 
@@ -3384,8 +3398,23 @@ object PdfExporter {
         }
     }
 
+    private fun parseStageExpensePdfs(stage: StageEntity): List<AttachedFile> {
+        val list = parseAttachedFiles(stage.expensePdfsJson).toMutableList()
+        if (list.isEmpty() && !stage.expensePdfUri.isNullOrBlank()) {
+            list.add(
+                AttachedFile(
+                    id = "legacy_expense_pdf",
+                    name = stage.expensePdfName ?: "documento.pdf",
+                    uri = stage.expensePdfUri,
+                    mimeType = "application/pdf"
+                )
+            )
+        }
+        return list
+    }
+
     /**
-     * Inserta página a página el PDF adjunto en el apartado de Gastos de una etapa/día
+     * Inserta página a página todos los PDFs adjuntos en el apartado de Gastos de una etapa/día
      * inmediatamente después del contenido de esa etapa.
      */
     private fun appendStageExpensePdfPages(
@@ -3396,63 +3425,68 @@ object PdfExporter {
         stage: StageEntity,
         languageMode: LanguageMode
     ): Int {
-        val path = stage.expensePdfUri ?: return startPageNumber
-        val file = File(path)
-        if (!file.exists() || !file.isFile) return startPageNumber
+        val expensePdfs = parseStageExpensePdfs(stage)
+        if (expensePdfs.isEmpty()) return startPageNumber
 
         var pageNum = startPageNumber
         val isTravel = camino.isTravelGuide
-        try {
-            val pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
-            pfd.use { descriptor ->
-                val renderer = android.graphics.pdf.PdfRenderer(descriptor)
-                renderer.use { pdfRenderer ->
-                    for (i in 0 until pdfRenderer.pageCount) {
-                        pdfRenderer.openPage(i).use { srcPage ->
-                            val scale = 2.0f
-                            val bmpW = (srcPage.width * scale).toInt().coerceIn(400, 2400)
-                            val bmpH = (srcPage.height * scale).toInt().coerceIn(400, 3400)
-                            val bmp = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
-                            val bmpCanvas = Canvas(bmp)
-                            bmpCanvas.drawColor(Color.WHITE)
-                            srcPage.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
 
-                            val outInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNum).create()
-                            val outPage = pdfDocument.startPage(outInfo)
-                            val c = outPage.canvas
+        for (pdfDoc in expensePdfs) {
+            val file = File(pdfDoc.uri)
+            if (!file.exists() || !file.isFile) continue
 
-                            // Cabecera discreta del documento de gasto
-                            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-                            paint.color = COLOR_HEADER_BG
-                            c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 40f, paint)
-                            paint.color = COLOR_GOLD
-                            c.drawRect(0f, 38f, PAGE_WIDTH.toFloat(), 40f, paint)
+            try {
+                val pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+                pfd.use { descriptor ->
+                    val renderer = android.graphics.pdf.PdfRenderer(descriptor)
+                    renderer.use { pdfRenderer ->
+                        for (i in 0 until pdfRenderer.pageCount) {
+                            pdfRenderer.openPage(i).use { srcPage ->
+                                val scale = 2.0f
+                                val bmpW = (srcPage.width * scale).toInt().coerceIn(400, 2400)
+                                val bmpH = (srcPage.height * scale).toInt().coerceIn(400, 3400)
+                                val bmp = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
+                                val bmpCanvas = Canvas(bmp)
+                                bmpCanvas.drawColor(Color.WHITE)
+                                srcPage.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
 
-                            paint.color = Color.WHITE
-                            paint.typeface = pdfTypeface(true)
-                            paint.textSize = 9.5f
-                            val label = if (isTravel) "GASTO EN EL DÍA ${stage.dayNumber}" else "GASTO DE LA ETAPA ${stage.dayNumber}"
-                            val suffix = if (pdfRenderer.pageCount > 1) " (${i + 1}/${pdfRenderer.pageCount})" else ""
-                            c.drawText("$label • ${stage.expensePdfName ?: "PDF"}$suffix", MARGIN, 24f, paint)
+                                val outInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNum).create()
+                                val outPage = pdfDocument.startPage(outInfo)
+                                val c = outPage.canvas
 
-                            val destArea = RectF(MARGIN, 50f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 42f)
-                            val fitScale = minOf(destArea.width() / bmp.width, destArea.height() / bmp.height)
-                            val drawW = bmp.width * fitScale
-                            val drawH = bmp.height * fitScale
-                            val dx = destArea.left + (destArea.width() - drawW) / 2f
-                            val dy = destArea.top + (destArea.height() - drawH) / 2f
-                            c.drawBitmap(bmp, null, RectF(dx, dy, dx + drawW, dy + drawH), Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true })
+                                // Cabecera discreta del documento de gasto
+                                val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                                paint.color = COLOR_HEADER_BG
+                                c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 40f, paint)
+                                paint.color = COLOR_GOLD
+                                c.drawRect(0f, 38f, PAGE_WIDTH.toFloat(), 40f, paint)
 
-                            drawEditorialFooter(c, pageNum, isTravel, camino.title, languageMode)
-                            pdfDocument.finishPage(outPage)
-                            bmp.recycle()
-                            pageNum++
+                                paint.color = Color.WHITE
+                                paint.typeface = pdfTypeface(true)
+                                paint.textSize = 9.5f
+                                val label = if (isTravel) "GASTO EN EL DÍA ${stage.dayNumber}" else "GASTO DE LA ETAPA ${stage.dayNumber}"
+                                val suffix = if (pdfRenderer.pageCount > 1) " (${i + 1}/${pdfRenderer.pageCount})" else ""
+                                c.drawText("$label • ${pdfDoc.name}$suffix", MARGIN, 24f, paint)
+
+                                val destArea = RectF(MARGIN, 50f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 42f)
+                                val fitScale = minOf(destArea.width() / bmp.width, destArea.height() / bmp.height)
+                                val drawW = bmp.width * fitScale
+                                val drawH = bmp.height * fitScale
+                                val dx = destArea.left + (destArea.width() - drawW) / 2f
+                                val dy = destArea.top + (destArea.height() - drawH) / 2f
+                                c.drawBitmap(bmp, null, RectF(dx, dy, dx + drawW, dy + drawH), Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true })
+
+                                drawEditorialFooter(c, pageNum, isTravel, camino.title, languageMode)
+                                pdfDocument.finishPage(outPage)
+                                bmp.recycle()
+                                pageNum++
+                            }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
         return pageNum
     }

@@ -75,7 +75,8 @@ data class StageEntity(
     val gpxTrackJson: String? = null, // JSON array of GpxPoint
     val spentAmount: Double = 0.0,
     val expensePdfUri: String? = null,
-    val expensePdfName: String? = null
+    val expensePdfName: String? = null,
+    val expensePdfsJson: String = "[]"
 )
 
 data class AgendaItem(

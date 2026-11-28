@@ -1383,16 +1383,73 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun updateStageExpense(stageId: Long, spentAmount: Double, pdfUri: String?, pdfName: String?) {
-        viewModelScope.launch {
-            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
-            repository.updateStage(
-                stage.copy(
-                    spentAmount = spentAmount,
-                    expensePdfUri = pdfUri,
-                    expensePdfName = pdfName
+    fun parseExpensePdfs(stage: StageEntity): List<AttachedFile> {
+        val list = parseAttachedFiles(stage.expensePdfsJson).toMutableList()
+        if (list.isEmpty() && !stage.expensePdfUri.isNullOrBlank()) {
+            list.add(
+                AttachedFile(
+                    id = "legacy_expense_pdf",
+                    name = stage.expensePdfName ?: "documento.pdf",
+                    uri = stage.expensePdfUri,
+                    mimeType = "application/pdf"
                 )
             )
+        }
+        return list
+    }
+
+    fun updateStageExpenseAmount(stageId: Long, spentAmount: Double) {
+        viewModelScope.launch {
+            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
+            repository.updateStage(stage.copy(spentAmount = spentAmount))
+        }
+    }
+
+    fun addStageExpensePdf(stageId: Long, name: String, filePath: String) {
+        viewModelScope.launch {
+            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
+            val list = parseExpensePdfs(stage).toMutableList()
+            list.add(
+                AttachedFile(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = name,
+                    uri = filePath,
+                    mimeType = "application/pdf"
+                )
+            )
+            val json = serializeAttachedFiles(list)
+            repository.updateStage(
+                stage.copy(
+                    expensePdfsJson = json,
+                    expensePdfUri = null,
+                    expensePdfName = null
+                )
+            )
+        }
+    }
+
+    fun removeStageExpensePdf(stageId: Long, fileId: String) {
+        viewModelScope.launch {
+            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
+            val list = parseExpensePdfs(stage)
+            val toRemove = list.find { it.id == fileId }
+            val updatedList = list.filter { it.id != fileId }
+            val json = serializeAttachedFiles(updatedList)
+            repository.updateStage(
+                stage.copy(
+                    expensePdfsJson = json,
+                    expensePdfUri = null,
+                    expensePdfName = null
+                )
+            )
+            if (toRemove != null) {
+                try {
+                    val f = java.io.File(toRemove.uri)
+                    if (f.exists() && f.parentFile?.name == "expense_pdfs") {
+                        f.delete()
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
 
