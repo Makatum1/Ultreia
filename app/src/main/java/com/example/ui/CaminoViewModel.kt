@@ -982,7 +982,7 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
                     distanceKm = distanceKm,
                     elevationGainM = elevationGainM,
                     elevationLossM = elevationLossM,
-                    estimatedTime = estimatedTime.ifBlank { "4h 30m" },
+                    estimatedTime = estimatedTime.ifBlank { "0" },
                     difficulty = difficulty.ifBlank { "Moderado" },
                     stageNotes = stageNotes
                 )

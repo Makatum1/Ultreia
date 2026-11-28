@@ -887,7 +887,7 @@ fun InteractiveMapScreen(
             // LÓGICA: ESTE CAMINO
             // ==========================================
             for (stg in sortedStages) {
-                if (!selectedStageIds.contains(stg.id) || stg.distanceKm <= 0.0) continue
+                if (!selectedStageIds.contains(stg.id)) continue
 
                 val colorHex = getStageColor(stg.dayNumber)
                 val colorInt = try {

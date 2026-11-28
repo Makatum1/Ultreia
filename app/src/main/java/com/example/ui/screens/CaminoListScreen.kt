@@ -62,16 +62,38 @@ fun CaminoListScreen(
     }
 
     // Filter list according to the active profile (Caminos vs Viajes):
-    // "En curso" siempre primero; "Pendientes" y resto en orden cronológico
+    // Solo aparece primero si está "En curso" en la fecha actual; si no, orden cronológico
     val filteredCaminos = remember(caminos, allStages, isTravelProfile) {
         val stagesByCamino = allStages.groupBy { it.caminoId }
+        val today = java.time.LocalDate.now()
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
+        fun parseLocal(dateStr: String): java.time.LocalDate? {
+            val clean = dateStr.trim()
+            if (clean.isEmpty()) return null
+            return try {
+                java.time.LocalDate.parse(clean, fmt)
+            } catch (_: Exception) {
+                try {
+                    java.time.LocalDate.parse(clean) // yyyy-MM-dd
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+
         caminos.filter { it.isTravelGuide == isTravelProfile }
             .sortedWith(
                 compareBy<CaminoEntity>(
                     { c ->
                         val cStages = stagesByCamino[c.id] ?: emptyList()
-                        val isInProgress = cStages.any { it.isCompleted } && cStages.any { !it.isCompleted }
-                        if (isInProgress) 0 else 1
+                        val stageDates = cStages.mapNotNull { parseLocal(it.date) }
+                        val startLocal = parseLocal(c.startDate) ?: stageDates.minOrNull()
+                        val endLocal = stageDates.maxOrNull() ?: startLocal?.plusDays((cStages.size - 1).coerceAtLeast(0).toLong())
+                        val allDone = cStages.isNotEmpty() && cStages.all { it.isCompleted }
+                        val isCurrentlyActive = startLocal != null && endLocal != null &&
+                            !today.isBefore(startLocal) && !today.isAfter(endLocal) && !allDone
+                        if (isCurrentlyActive) 0 else 1
                     },
                     { c -> parseStartDateSortable(c.startDate) },
                     { c -> c.id }

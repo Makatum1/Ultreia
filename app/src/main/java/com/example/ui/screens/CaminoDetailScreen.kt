@@ -1005,6 +1005,7 @@ fun StageCardItem(
                         val hasValidTime = cleanTime.isNotEmpty() &&
                             !cleanTime.equals("n/d", ignoreCase = true) &&
                             !cleanTime.equals("null", ignoreCase = true) &&
+                            cleanTime != "0" &&
                             cleanTime != "-" &&
                             cleanTime != "--"
 
@@ -1069,10 +1070,10 @@ fun AddStageDialog(
     var origin by remember { mutableStateOf("") }
     var destination by remember { mutableStateOf("") }
     var dateStr by remember { mutableStateOf(initialDate) }
-    var distanceStr by remember { mutableStateOf("") }
-    var gainStr by remember { mutableStateOf("") }
-    var lossStr by remember { mutableStateOf("") }
-    var timeStr by remember { mutableStateOf("5h 00m") }
+    var distanceStr by remember { mutableStateOf("0") }
+    var gainStr by remember { mutableStateOf("0") }
+    var lossStr by remember { mutableStateOf("0") }
+    var timeStr by remember { mutableStateOf("0") }
     var difficulty by remember { mutableStateOf("Moderado") }
     var notes by remember { mutableStateOf("") }
 

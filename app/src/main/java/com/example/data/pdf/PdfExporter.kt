@@ -122,8 +122,8 @@ object PdfExporter {
             val outputDir = File(context.cacheDir, "shared_docs")
             if (!outputDir.exists()) outputDir.mkdirs()
 
-            val sanitizedTitle = com.example.data.backup.BackupManager.sanitizeForFileName(camino.title)
-            val pdfFile = File(outputDir, "${sanitizedTitle}.pdf")
+            val cleanTitle = camino.title.trim().replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ")
+            val pdfFile = File(outputDir, "Guía $cleanTitle.pdf")
             val fos = FileOutputStream(pdfFile)
             pdfDocument.writeTo(fos)
             fos.close()
