@@ -91,12 +91,15 @@ object BackupManager {
 
     /**
      * Genera la nomenclatura estándar para copias de seguridad:
-     * - Camino: Camino_[Nombre del Título].zip / .json
-     * - Viaje: Viaje_[Nombre del Título].zip / .json
+     * - Camino: Camino - <Nombre>.zip / .json
+     * - Viaje: Viaje - <Nombre>.zip / .json
      */
     fun getSanitizedFileName(title: String, isTravelGuide: Boolean, extension: String = "zip"): String {
-        val prefix = if (isTravelGuide) "Viaje_" else "Camino_"
-        val clean = sanitizeForFileName(title)
+        val prefix = if (isTravelGuide) "Viaje - " else "Camino - "
+        val clean = title.trim()
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .replace(Regex("\\s+"), " ")
+            .ifBlank { "Ruta" }
         return "${prefix}${clean}.${extension.removePrefix(".")}"
     }
 
