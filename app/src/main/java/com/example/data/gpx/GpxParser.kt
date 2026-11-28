@@ -134,6 +134,88 @@ object GpxParser {
     }
 
     /**
+     * Simplificación geométrica iterativa (Ramer-Douglas-Peucker) en metros.
+     * Conserva todas las curvas de calles, giros y puentes eliminando solo puntos redundantes en rectas.
+     */
+    private fun simplifyDouglasPeucker(
+        points: List<RawGpxPoint>,
+        epsilonMeters: Double
+    ): List<GpxPoint> {
+        if (points.size <= 2) return points.map { GpxPoint(it.lat, it.lon, it.ele) }
+
+        val lat0 = points[0].lat
+        val lon0 = points[0].lon
+        val cosLat = cos(Math.toRadians(lat0))
+        val mPerDegLat = 110540.0
+        val mPerDegLon = 111320.0 * cosLat
+
+        val xs = DoubleArray(points.size) { (points[it].lon - lon0) * mPerDegLon }
+        val ys = DoubleArray(points.size) { (points[it].lat - lat0) * mPerDegLat }
+
+        val keep = BooleanArray(points.size)
+        keep[0] = true
+        keep[points.lastIndex] = true
+
+        val stack = ArrayDeque<Pair<Int, Int>>()
+        stack.addLast(0 to points.lastIndex)
+
+        while (stack.isNotEmpty()) {
+            val (start, end) = stack.removeLast()
+            if (end - start <= 1) continue
+
+            val dx = xs[end] - xs[start]
+            val dy = ys[end] - ys[start]
+            val lenSq = dx * dx + dy * dy
+
+            var maxDist = -1.0
+            var maxIdx = -1
+
+            for (i in (start + 1) until end) {
+                val dist = if (lenSq < 1e-9) {
+                    hypot(xs[i] - xs[start], ys[i] - ys[start])
+                } else {
+                    val t = ((xs[i] - xs[start]) * dx + (ys[i] - ys[start]) * dy) / lenSq
+                    val clampedT = t.coerceIn(0.0, 1.0)
+                    val projX = xs[start] + clampedT * dx
+                    val projY = ys[start] + clampedT * dy
+                    hypot(xs[i] - projX, ys[i] - projY)
+                }
+                if (dist > maxDist) {
+                    maxDist = dist
+                    maxIdx = i
+                }
+            }
+
+            if (maxDist > epsilonMeters && maxIdx != -1) {
+                keep[maxIdx] = true
+                stack.addLast(start to maxIdx)
+                stack.addLast(maxIdx to end)
+            }
+        }
+
+        val result = ArrayList<GpxPoint>()
+        for (i in points.indices) {
+            if (keep[i]) {
+                val p = points[i]
+                result.add(GpxPoint(p.lat, p.lon, p.ele))
+            }
+        }
+        return result
+    }
+
+    private fun simplifyTrackForMap(points: List<RawGpxPoint>, maxPoints: Int = 1800): List<GpxPoint> {
+        if (points.size <= maxPoints) return points.map { GpxPoint(it.lat, it.lon, it.ele) }
+        val tolerances = doubleArrayOf(5.0, 8.0, 12.0, 18.0, 25.0)
+        var best = simplifyDouglasPeucker(points, tolerances[0])
+        for (tol in tolerances) {
+            best = simplifyDouglasPeucker(points, tol)
+            if (best.size <= maxPoints) return best
+        }
+        val step = best.size / maxPoints
+        return best.filterIndexed { idx, _ -> idx % step == 0 || idx == best.lastIndex }
+    }
+
+    /**
      * Procesa el archivo GPX con parser XML nativo:
      * - Lee ÚNICAMENTE <trk><trkseg><trkpt>. Ignora <wpt> y <rtept>.
      * - Si hay varios <trkseg>, los concatena sin sumar el salto inter-segmento a la distancia.
@@ -397,14 +479,8 @@ object GpxParser {
         }
         safeLog("GpxParser", debugLog)
 
-        // Puntos simplificados para mapa y perfil de elevación (máximo 300)
-        val sampledPoints = if (allTrackPoints.size > 300) {
-            val step = allTrackPoints.size / 300
-            allTrackPoints.filterIndexed { index, _ -> index % step == 0 || index == allTrackPoints.lastIndex }
-                .map { GpxPoint(it.lat, it.lon, it.ele) }
-        } else {
-            allTrackPoints.map { GpxPoint(it.lat, it.lon, it.ele) }
-        }
+        // Simplificación geométrica (Douglas-Peucker) para conservar calles, giros y puentes sin saltos rectos
+        val sampledPoints = simplifyTrackForMap(allTrackPoints, maxPoints = 1800)
 
         return GpxParseResult(
             points = sampledPoints,

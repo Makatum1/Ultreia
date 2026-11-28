@@ -1093,8 +1093,13 @@ fun InteractiveMapScreen(
                 )
                 map.post {
                     map.zoomToBoundingBox(paddedBox, true, 80)
+                    map.invalidate()
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                map.invalidate()
+            }
+        } else {
+            map.invalidate()
         }
 
         map.invalidate()
