@@ -115,6 +115,7 @@ object PdfExporter {
             for (stage in stages) {
                 val accommodations = accMap[stage.id] ?: emptyList()
                 pageNumber = drawStagePages(context, pdfDocument, pageNumber, camino, stage, accommodations, repository, languageMode)
+                pageNumber = appendStageExpensePdfPages(context, pdfDocument, pageNumber, camino, stage, languageMode)
             }
 
             // Write to file
@@ -529,16 +530,17 @@ object PdfExporter {
             borderColor = COLOR_AMBER_BORDER
         )
 
-        // Tarjeta 4: Progreso Global (Dorado)
+        // Tarjeta 4: Gastado Total (Dorado)
+        val totalSpentCover = stages.sumOf { it.spentAmount }
         drawMetricBox(
             canvas = canvas,
             x = MARGIN + (kpiWidth + kpiSpacing) * 3,
             y = kpiTop,
             w = kpiWidth,
             h = kpiHeight,
-            label = tr("progress", languageMode).uppercase(),
-            value = "${stats.progressPercent}%",
-            sub = if (stats.progressPercent >= 100) "100%" else "${stats.progressPercent}%",
+            label = "GASTADO",
+            value = String.format(java.util.Locale.US, "%.2f €", totalSpentCover),
+            sub = "${stats.progressPercent}% completado",
             accentColor = COLOR_GOLD_DARK,
             bgColor = COLOR_WARM_BG,
             borderColor = COLOR_WARM_BORDER
@@ -1353,16 +1355,17 @@ object PdfExporter {
             borderColor = COLOR_AMBER_BORDER
         )
 
-        // Card 4: Progreso Global (Dorado)
+        // Card 4: Gastado Total (Dorado)
+        val totalSpentStats = stages.sumOf { it.spentAmount }
         drawMetricBox(
             canvas = canvas,
             x = MARGIN + cardWidth + cardSpacing,
             y = startY,
             w = cardWidth,
             h = cardHeight,
-            label = tr("pdf_progress_compliance", languageMode),
-            value = "${stats.progressPercent}%",
-            sub = if (stats.progressPercent >= 100) tr("pdf_route_completed", languageMode) else tr("pdf_itinerary_in_progress", languageMode),
+            label = "GASTADO",
+            value = String.format(java.util.Locale.US, "%.2f €", totalSpentStats),
+            sub = "${stats.progressPercent}% • " + if (stats.progressPercent >= 100) tr("pdf_route_completed", languageMode) else tr("pdf_itinerary_in_progress", languageMode),
             accentColor = COLOR_GOLD_DARK,
             bgColor = COLOR_WARM_BG,
             borderColor = COLOR_WARM_BORDER
@@ -2909,7 +2912,8 @@ object PdfExporter {
         val pdfDocument = PdfDocument()
         try {
             val filteredCaminos = caminosChronological.filter { it.isTravelGuide == isTravel }
-            val stagesByCamino = stages.groupBy { it.caminoId }
+            // Regla de 0 km en PDF Total: excluir etapas/días con 0 km antes de dibujar y numerar
+            val stagesByCamino = stages.filter { it.distanceKm > 0.0 }.groupBy { it.caminoId }
 
             data class CaminoGeoData(
                 val camino: CaminoEntity,
@@ -2922,10 +2926,11 @@ object PdfExporter {
                 val centerLon: Double?
             )
 
-            val geoList = filteredCaminos.mapIndexed { index, c ->
+            val geoList = filteredCaminos.mapIndexedNotNull { index, c ->
                 val colorHex = com.example.ui.screens.getCaminoColorHex(c.id, index)
                 val colorInt = try { Color.parseColor(colorHex) } catch (_: Exception) { COLOR_BLUE }
                 val cStages = (stagesByCamino[c.id] ?: emptyList()).sortedBy { it.dayNumber }
+                if (cStages.isEmpty()) return@mapIndexedNotNull null
                 val lines = mutableListOf<List<com.example.data.model.GpxPoint>>()
                 val pts = mutableListOf<com.example.data.model.GpxPoint>()
 
@@ -3117,11 +3122,11 @@ object PdfExporter {
                                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                             }
                             linePaint.color = Color.argb(225, 255, 255, 255)
-                            linePaint.strokeWidth = 3.8f
+                            linePaint.strokeWidth = 4.6f
                             canvas.drawPath(path, linePaint)
 
                             linePaint.color = item.colorInt
-                            linePaint.strokeWidth = 2.2f
+                            linePaint.strokeWidth = 2.8f
                             canvas.drawPath(path, linePaint)
                         }
                         if (item.allPoints.isNotEmpty()) {
@@ -3377,6 +3382,79 @@ object PdfExporter {
             }
             tileMemoryCache.clear()
         }
+    }
+
+    /**
+     * Inserta página a página el PDF adjunto en el apartado de Gastos de una etapa/día
+     * inmediatamente después del contenido de esa etapa.
+     */
+    private fun appendStageExpensePdfPages(
+        context: Context,
+        pdfDocument: PdfDocument,
+        startPageNumber: Int,
+        camino: CaminoEntity,
+        stage: StageEntity,
+        languageMode: LanguageMode
+    ): Int {
+        val path = stage.expensePdfUri ?: return startPageNumber
+        val file = File(path)
+        if (!file.exists() || !file.isFile) return startPageNumber
+
+        var pageNum = startPageNumber
+        val isTravel = camino.isTravelGuide
+        try {
+            val pfd = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+            pfd.use { descriptor ->
+                val renderer = android.graphics.pdf.PdfRenderer(descriptor)
+                renderer.use { pdfRenderer ->
+                    for (i in 0 until pdfRenderer.pageCount) {
+                        pdfRenderer.openPage(i).use { srcPage ->
+                            val scale = 2.0f
+                            val bmpW = (srcPage.width * scale).toInt().coerceIn(400, 2400)
+                            val bmpH = (srcPage.height * scale).toInt().coerceIn(400, 3400)
+                            val bmp = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
+                            val bmpCanvas = Canvas(bmp)
+                            bmpCanvas.drawColor(Color.WHITE)
+                            srcPage.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+
+                            val outInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNum).create()
+                            val outPage = pdfDocument.startPage(outInfo)
+                            val c = outPage.canvas
+
+                            // Cabecera discreta del documento de gasto
+                            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                            paint.color = COLOR_HEADER_BG
+                            c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 40f, paint)
+                            paint.color = COLOR_GOLD
+                            c.drawRect(0f, 38f, PAGE_WIDTH.toFloat(), 40f, paint)
+
+                            paint.color = Color.WHITE
+                            paint.typeface = pdfTypeface(true)
+                            paint.textSize = 9.5f
+                            val label = if (isTravel) "GASTO EN EL DÍA ${stage.dayNumber}" else "GASTO DE LA ETAPA ${stage.dayNumber}"
+                            val suffix = if (pdfRenderer.pageCount > 1) " (${i + 1}/${pdfRenderer.pageCount})" else ""
+                            c.drawText("$label • ${stage.expensePdfName ?: "PDF"}$suffix", MARGIN, 24f, paint)
+
+                            val destArea = RectF(MARGIN, 50f, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 42f)
+                            val fitScale = minOf(destArea.width() / bmp.width, destArea.height() / bmp.height)
+                            val drawW = bmp.width * fitScale
+                            val drawH = bmp.height * fitScale
+                            val dx = destArea.left + (destArea.width() - drawW) / 2f
+                            val dy = destArea.top + (destArea.height() - drawH) / 2f
+                            c.drawBitmap(bmp, null, RectF(dx, dy, dx + drawW, dy + drawH), Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true })
+
+                            drawEditorialFooter(c, pageNum, isTravel, camino.title, languageMode)
+                            pdfDocument.finishPage(outPage)
+                            bmp.recycle()
+                            pageNum++
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return pageNum
     }
 
     private fun sharePdfFile(context: Context, file: File, title: String, isTravel: Boolean) {

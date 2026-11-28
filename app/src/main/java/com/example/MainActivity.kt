@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -98,11 +99,13 @@ fun UltreiaApp(viewModel: CaminoViewModel) {
 
     // Splash Screen on launch: 4 seconds duration or tap to enter
     // Displays ONLY the image (no icon on top), shifted slightly to the left
-    var showSplash by remember { mutableStateOf(true) }
+    var showSplash by rememberSaveable { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
-        delay(4000)
-        showSplash = false
+    LaunchedEffect(showSplash) {
+        if (showSplash) {
+            delay(4000)
+            showSplash = false
+        }
     }
 
     if (showSplash) {

@@ -786,6 +786,15 @@ fun StageDetailScreen(
                 }
             }
 
+            // GASTOS DE LA ETAPA / DÍA (Debajo de Vivencias)
+            item {
+                StageExpenseSection(
+                    stage = stage,
+                    isTravel = isTravel,
+                    viewModel = viewModel
+                )
+            }
+
             // ARCHIVOS Y DOCUMENTOS DE LA ETAPA (Right below vivencias)
             item {
                 StageAttachedFilesSection(
@@ -1616,6 +1625,154 @@ fun AddAccommodationDialog(
             TextButton(onClick = onDismiss) { Text(viewModel?.string("cancel") ?: "Cancelar") }
         }
     )
+}
+
+@Composable
+fun StageExpenseSection(
+    stage: StageEntity,
+    isTravel: Boolean,
+    viewModel: CaminoViewModel
+) {
+    val context = LocalContext.current
+    var spentText by remember(stage.id) {
+        mutableStateOf(
+            if (stage.spentAmount > 0.0) {
+                if (stage.spentAmount % 1.0 == 0.0) stage.spentAmount.toInt().toString()
+                else String.format(java.util.Locale.US, "%.2f", stage.spentAmount)
+            } else ""
+        )
+    }
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                var fileName = "gasto_etapa_${stage.dayNumber}.pdf"
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (cursor.moveToFirst() && nameIdx >= 0) {
+                        fileName = cursor.getString(nameIdx) ?: fileName
+                    }
+                }
+                val dir = java.io.File(context.filesDir, "expense_pdfs")
+                if (!dir.exists()) dir.mkdirs()
+                val destFile = java.io.File(dir, "stage_${stage.id}_expense.pdf")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    java.io.FileOutputStream(destFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                val currentAmount = spentText.replace(",", ".").toDoubleOrNull() ?: stage.spentAmount
+                viewModel.updateStageExpense(stage.id, currentAmount, destFile.absolutePath, fileName)
+                Toast.makeText(context, "PDF de gastos adjuntado: $fileName", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error al subir PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.ReceiptLong,
+                    contentDescription = null,
+                    tint = CaminoBlue,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (isTravel) "Gasto en el Día" else "Gasto de la Etapa",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = CaminoBlue
+                )
+            }
+
+            OutlinedTextField(
+                value = spentText,
+                onValueChange = { raw ->
+                    val filtered = raw.filter { it.isDigit() || it == '.' || it == ',' }
+                    spentText = filtered
+                    val parsed = filtered.replace(",", ".").toDoubleOrNull() ?: 0.0
+                    viewModel.updateStageExpense(stage.id, parsed, stage.expensePdfUri, stage.expensePdfName)
+                },
+                label = { Text("Gastado") },
+                placeholder = { Text("0.00") },
+                suffix = { Text("€") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedButton(
+                onClick = { pdfLauncher.launch(arrayOf("application/pdf")) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, CaminoBlue)
+            ) {
+                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = CaminoBlue, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Subir un archivo PDF", color = CaminoBlue, fontWeight = FontWeight.Bold)
+            }
+
+            if (!stage.expensePdfUri.isNullOrBlank()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stage.expensePdfName ?: "documento.pdf",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                val currentAmount = spentText.replace(",", ".").toDoubleOrNull() ?: stage.spentAmount
+                                viewModel.updateStageExpense(stage.id, currentAmount, null, null)
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "Eliminar PDF",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Dialog for GPX import options

@@ -777,6 +777,19 @@ fun InteractiveMapScreen(
         val base = if (allStages.isNotEmpty()) allStages else stages
         base.filter { filteredCaminoIds.contains(it.caminoId) }
     }
+    // Numeración consecutiva por Camino/Viaje en vista Total ignorando etapas de 0 km
+    val nonZeroStageNumberMap = remember(filteredTotalStages) {
+        val map = mutableMapOf<Long, Int>()
+        filteredTotalStages
+            .filter { it.distanceKm > 0.0 }
+            .groupBy { it.caminoId }
+            .forEach { (_, list) ->
+                list.sortedBy { it.dayNumber }.forEachIndexed { idx, stg ->
+                    map[stg.id] = idx + 1
+                }
+            }
+        map
+    }
 
     // Modo de visualización: "Este Camino" / "Este Viaje" (por defecto) vs "Total Caminos" / "Total Viajes"
     var mapScopeMode by remember { mutableStateOf(MapScopeMode.CURRENT_CAMINO) }
@@ -874,7 +887,7 @@ fun InteractiveMapScreen(
             // LÓGICA: ESTE CAMINO
             // ==========================================
             for (stg in sortedStages) {
-                if (!selectedStageIds.contains(stg.id)) continue
+                if (!selectedStageIds.contains(stg.id) || stg.distanceKm <= 0.0) continue
 
                 val colorHex = getStageColor(stg.dayNumber)
                 val colorInt = try {
@@ -914,10 +927,10 @@ fun InteractiveMapScreen(
 
                     if (hasGpx) {
                         polyline.outlinePaint.pathEffect = null
-                        polyline.outlinePaint.strokeWidth = 10f
+                        polyline.outlinePaint.strokeWidth = 13f
                     } else {
                         polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(24f, 16f), 0f)
-                        polyline.outlinePaint.strokeWidth = 6f
+                        polyline.outlinePaint.strokeWidth = 8f
                     }
 
                     polyline.setOnClickListener { _, _, _ ->
@@ -970,7 +983,7 @@ fun InteractiveMapScreen(
             if (isTotalHidden) {
                 map.invalidate()
             } else {
-                val stagesToDraw = filteredTotalStages
+                val stagesToDraw = filteredTotalStages.filter { it.distanceKm > 0.0 }
 
                 for (stg in stagesToDraw) {
                 // Color único e idéntico para todas las etapas, polilíneas y marcadores del mismo camino
@@ -1012,10 +1025,10 @@ fun InteractiveMapScreen(
 
                     if (hasGpx) {
                         polyline.outlinePaint.pathEffect = null
-                        polyline.outlinePaint.strokeWidth = 9f
+                        polyline.outlinePaint.strokeWidth = 12f
                     } else {
                         polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(24f, 16f), 0f)
-                        polyline.outlinePaint.strokeWidth = 6f
+                        polyline.outlinePaint.strokeWidth = 8f
                     }
 
                     polyline.setOnClickListener { _, _, _ ->
@@ -1327,7 +1340,7 @@ fun InteractiveMapScreen(
                         Text(
                             text = if (mapScopeMode == MapScopeMode.TOTAL) {
                                 val unitLabel = if (isTravel) "días totales" else "etapas totales"
-                                "${filteredTotalStages.size} $unitLabel"
+                                "${filteredTotalStages.count { it.distanceKm > 0.0 }} $unitLabel"
                             } else {
                                 "${progressPercent}% completado"
                             },
@@ -1484,7 +1497,7 @@ fun InteractiveMapScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = if (mapScopeMode == MapScopeMode.TOTAL) "$stageCaminoNum.${stage.dayNumber}" else "${stage.dayNumber}",
+                                        text = if (mapScopeMode == MapScopeMode.TOTAL) "$stageCaminoNum.${nonZeroStageNumberMap[stage.id] ?: stage.dayNumber}" else "${stage.dayNumber}",
                                         color = Color.White,
                                         fontSize = if (mapScopeMode == MapScopeMode.TOTAL) 9.sp else 11.sp,
                                         fontWeight = FontWeight.Bold,
@@ -1645,9 +1658,11 @@ fun InteractiveMapScreen(
 
                     val dropdownStages = remember(mapScopeMode, filteredTotalStages, sortedStages, caminoNumberMap) {
                         if (mapScopeMode == MapScopeMode.TOTAL) {
-                            filteredTotalStages.sortedWith(
-                                compareBy<StageEntity>({ caminoNumberMap[it.caminoId] ?: Int.MAX_VALUE }, { it.dayNumber })
-                            )
+                            filteredTotalStages
+                                .filter { it.distanceKm > 0.0 }
+                                .sortedWith(
+                                    compareBy<StageEntity>({ caminoNumberMap[it.caminoId] ?: Int.MAX_VALUE }, { it.dayNumber })
+                                )
                         } else {
                             sortedStages
                         }
@@ -1679,7 +1694,7 @@ fun InteractiveMapScreen(
                                 getStageComposeColor(stg.dayNumber)
                             }
                             val badgeText = if (mapScopeMode == MapScopeMode.TOTAL) {
-                                "$caminoNum.${stg.dayNumber}"
+                                "$caminoNum.${nonZeroStageNumberMap[stg.id] ?: stg.dayNumber}"
                             } else {
                                 "${stg.dayNumber}"
                             }

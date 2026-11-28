@@ -47,6 +47,7 @@ fun CaminoListScreen(
 ) {
     val isInitialLoadDone by viewModel.isInitialLoadDone.collectAsStateWithLifecycle()
     val isTravelProfile by viewModel.isTravelProfile.collectAsStateWithLifecycle()
+    val allStages by viewModel.allStages.collectAsStateWithLifecycle(emptyList())
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var showAddCaminoDialog by remember { mutableStateOf(false) }
@@ -60,9 +61,22 @@ fun CaminoListScreen(
         }
     }
 
-    // Filter list according to the active profile (Caminos vs Viajes)
-    val filteredCaminos = remember(caminos, isTravelProfile) {
+    // Filter list according to the active profile (Caminos vs Viajes):
+    // "En curso" siempre primero; "Pendientes" y resto en orden cronológico
+    val filteredCaminos = remember(caminos, allStages, isTravelProfile) {
+        val stagesByCamino = allStages.groupBy { it.caminoId }
         caminos.filter { it.isTravelGuide == isTravelProfile }
+            .sortedWith(
+                compareBy<CaminoEntity>(
+                    { c ->
+                        val cStages = stagesByCamino[c.id] ?: emptyList()
+                        val isInProgress = cStages.any { it.isCompleted } && cStages.any { !it.isCompleted }
+                        if (isInProgress) 0 else 1
+                    },
+                    { c -> parseStartDateSortable(c.startDate) },
+                    { c -> c.id }
+                )
+            )
     }
 
     var caminoToDelete by remember { mutableStateOf<CaminoEntity?>(null) }
@@ -589,7 +603,7 @@ fun CaminoItemCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "Ver Etapas",
+                        text = if (camino.isTravelGuide) "Ver Días" else "Ver Etapas",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = PilgrimYellow

@@ -925,12 +925,29 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val currentStages = repository.getStagesForCaminoOnce(caminoId).sortedBy { it.dayNumber }
             val nextDay = currentStages.size + 1
-            val finalTargetDay = (targetDay ?: nextDay).coerceIn(1, nextDay)
             val currentCamino = repository.getCaminoByIdOnce(caminoId)
+            val preTargetDay = (targetDay ?: nextDay).coerceIn(1, nextDay)
             val finalDate = if (date.isNotBlank()) date
             else if (currentCamino != null && currentCamino.startDate.isNotBlank()) {
-                AppStrings.calculateStageDate(currentCamino.startDate, finalTargetDay - 1)
+                AppStrings.calculateStageDate(currentCamino.startDate, preTargetDay - 1)
             } else ""
+
+            val parsedFinalDate = parseLocalDate(finalDate)
+            // Si la fecha introducida es anterior a etapas existentes, insertar en la posición cronológica correspondiente
+            val finalTargetDay = if (parsedFinalDate != null && (targetDay == null || targetDay == nextDay)) {
+                val earlierSlot = currentStages.firstOrNull { stg ->
+                    val resolvedStr = stg.date.ifBlank {
+                        if (currentCamino != null && currentCamino.startDate.isNotBlank()) {
+                            AppStrings.calculateStageDate(currentCamino.startDate, stg.dayNumber - 1)
+                        } else ""
+                    }
+                    val parsedExisting = parseLocalDate(resolvedStr)
+                    parsedExisting != null && parsedExisting.isAfter(parsedFinalDate)
+                }
+                earlierSlot?.dayNumber ?: preTargetDay
+            } else {
+                preTargetDay
+            }
 
             val isTravel = currentCamino?.isTravelGuide == true
             val stagePrefix = if (isTravel) AppStrings.get("day", _languageMode.value) else AppStrings.get("stage_prefix", _languageMode.value)
@@ -940,14 +957,13 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             if (finalTargetDay < nextDay) {
                 // Desplazar etapas existentes con dayNumber >= finalTargetDay en orden descendente
                 val stagesToShift = currentStages.filter { it.dayNumber >= finalTargetDay }.sortedByDescending { it.dayNumber }
-                val parsedFinalDate = parseLocalDate(finalDate)
                 for (stg in stagesToShift) {
                     val shiftedNum = stg.dayNumber + 1
                     val shiftedTitle = updateStageTitleNumber(stg.title, shiftedNum)
                     var shiftedDate = stg.date
                     if (parsedFinalDate != null && stg.date.isNotBlank()) {
                         val parsedExisting = parseLocalDate(stg.date)
-                        if (parsedExisting != null && !parsedExisting.isBefore(parsedFinalDate)) {
+                        if (parsedExisting != null && parsedExisting.isEqual(parsedFinalDate)) {
                             shiftedDate = parsedExisting.plusDays(1).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                         }
                     }
@@ -1364,6 +1380,19 @@ class CaminoViewModel(application: Application) : AndroidViewModel(application) 
             val updatedJson = serializeAttachedFiles(list)
             repository.updateStage(stage.copy(attachedFilesJson = updatedJson))
             _userMessage.value = "Archivo de etapa eliminado"
+        }
+    }
+
+    fun updateStageExpense(stageId: Long, spentAmount: Double, pdfUri: String?, pdfName: String?) {
+        viewModelScope.launch {
+            val stage = repository.getStageByIdOnce(stageId) ?: return@launch
+            repository.updateStage(
+                stage.copy(
+                    spentAmount = spentAmount,
+                    expensePdfUri = pdfUri,
+                    expensePdfName = pdfName
+                )
+            )
         }
     }
 
