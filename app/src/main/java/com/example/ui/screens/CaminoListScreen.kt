@@ -90,9 +90,8 @@ fun CaminoListScreen(
                         val stageDates = cStages.mapNotNull { parseLocal(it.date) }
                         val startLocal = parseLocal(c.startDate) ?: stageDates.minOrNull()
                         val endLocal = stageDates.maxOrNull() ?: startLocal?.plusDays((cStages.size - 1).coerceAtLeast(0).toLong())
-                        val allDone = cStages.isNotEmpty() && cStages.all { it.isCompleted }
                         val isCurrentlyActive = startLocal != null && endLocal != null &&
-                            !today.isBefore(startLocal) && !today.isAfter(endLocal) && !allDone
+                            !today.isBefore(startLocal) && !today.isAfter(endLocal)
                         if (isCurrentlyActive) 0 else 1
                     },
                     { c -> parseStartDateSortable(c.startDate) },
