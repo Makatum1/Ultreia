@@ -2649,23 +2649,24 @@ object PdfExporter {
         bounds: RectF,
         isTravel: Boolean
     ) {
-        if (stages.isEmpty()) return
+        val drawableStages = stages.filter { it.distanceKm > 0.0 }
+        if (drawableStages.isEmpty()) return
 
-        val stageTracks = stages.map { stg ->
+        val stageTracks = drawableStages.mapNotNull { stg ->
             val pts = GpxParser.deserializePoints(stg.gpxTrackJson)
             if (pts.size >= 2) {
                 stg to pts
             } else {
-                val sCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.origin)
-                val eCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.destination)
-                val sLat = sCoord?.first ?: (42.88 - (stg.dayNumber * 0.06))
-                val sLon = sCoord?.second ?: (-8.54 - (stg.dayNumber * 0.09))
-                val eLat = eCoord?.first ?: (sLat - 0.08)
-                val eLon = eCoord?.second ?: (sLon - 0.12)
-                stg to listOf(
-                    com.example.data.model.GpxPoint(sLat, sLon),
-                    com.example.data.model.GpxPoint(eLat, eLon)
-                )
+                val sCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.origin, context)
+                val eCoord = com.example.ui.screens.TownCoordinates.findCoordinates(stg.destination, context)
+                if (sCoord != null && eCoord != null) {
+                    stg to listOf(
+                        com.example.data.model.GpxPoint(sCoord.first, sCoord.second),
+                        com.example.data.model.GpxPoint(eCoord.first, eCoord.second)
+                    )
+                } else {
+                    null
+                }
             }
         }
 
